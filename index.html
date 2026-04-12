@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDC.IO — Extraction Game</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%; height: 100%; overflow: hidden;
+            background: #0a0a1a; font-family: Inter, Arial, sans-serif;
+        }
+        body.playing canvas { cursor: none; }
+        canvas { display: block; width: 100%; height: 100%; }
+        button {
+            border: 0; border-radius: 14px; padding: 14px 20px; font-weight: 700; cursor: pointer;
+            transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+        }
+        button:hover { transform: translateY(-1px); }
+        .primary-button { background: linear-gradient(135deg, #00e676, #00b86b); color: #03140d; }
+        .secondary-button { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.08); }
+        .hidden { display: none !important; }
+        #loading {
+            position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+            background: #1a1a2e; color: #00e676; font-family: monospace; font-size: 18px; z-index: 20;
+            transition: opacity 0.3s;
+        }
+        #loading.hidden { opacity: 0; pointer-events: none; }
+        #uiRoot { position: fixed; inset: 0; pointer-events: none; }
+        #topBar {
+            position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between;
+            align-items: center; padding: 20px 24px; pointer-events: auto;
+        }
+        .brand { color: #fff; letter-spacing: 0.3em; font-size: 12px; text-transform: uppercase; }
+        .screen {
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            padding: 40px; pointer-events: auto;
+        }
+        .panel {
+            width: min(1180px, 100%); border: 1px solid rgba(255,255,255,0.08); background: rgba(10,13,28,0.84);
+            box-shadow: 0 20px 80px rgba(0,0,0,0.35); backdrop-filter: blur(10px); border-radius: 20px; color: #fff;
+        }
+        .hero-panel { max-width: 940px; padding: 40px; text-align: center; }
+        .hero-panel h1 { font-size: 56px; margin-bottom: 10px; letter-spacing: 0.08em; }
+        .hero-panel p, .section-subtitle, .muted, .item-card p { color: rgba(255,255,255,0.68); line-height: 1.6; }
+        .menu-actions { display: flex; justify-content: center; gap: 16px; margin: 28px 0 32px; flex-wrap: wrap; }
+        .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; text-align: left; }
+        .summary-tile {
+            border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04);
+            border-radius: 14px; padding: 14px; min-height: 82px;
+        }
+        .summary-wide { grid-column: span 4; }
+        .summary-label {
+            display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
+            color: rgba(255,255,255,0.55); margin-bottom: 8px;
+        }
+        .inventory-layout { display: grid; grid-template-columns: 1.2fr 0.9fr; gap: 18px; padding: 24px; }
+        .inventory-section {
+            border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.035);
+            border-radius: 16px; padding: 18px;
+        }
+        .inventory-header, .item-card-header, .run-card-row {
+            display: flex; justify-content: space-between; align-items: center; gap: 12px;
+        }
+        .item-list, .run-history, #loadoutSections { display: grid; gap: 12px; }
+        #loadoutSections { max-height: 74vh; overflow: auto; padding-right: 4px; }
+        .item-card, .crate-item-card {
+            width: 100%; text-align: left; padding: 16px; background: rgba(255,255,255,0.04); color: #fff;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .market-card {
+            padding: 16px; background: rgba(255,255,255,0.04); color: #fff; border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 14px;
+        }
+        .item-card.active {
+            border-color: rgba(0,230,118,0.75); box-shadow: inset 0 0 0 1px rgba(0,230,118,0.25); background: rgba(0,230,118,0.08);
+        }
+        .item-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: rgba(255,255,255,0.72); }
+        .market-actions { display: flex; gap: 10px; margin-top: 14px; }
+        .market-actions button { flex: 1; }
+        .run-history { max-height: 430px; overflow: auto; }
+        .market-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-height: 70vh; overflow: auto; }
+        .run-card {
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px; background: rgba(255,255,255,0.04);
+        }
+        .empty-state {
+            padding: 24px; border-radius: 14px; background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.55); text-align: center;
+        }
+        .modal {
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.45); pointer-events: auto;
+        }
+        .modal-panel { width: min(420px, calc(100% - 32px)); padding: 24px; }
+        .auth-mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
+        .auth-mode-toggle button.active { background: rgba(68,138,255,0.25); color: #cfe1ff; }
+        .auth-form { display: grid; gap: 12px; margin-top: 12px; }
+        .auth-form input {
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; background: rgba(255,255,255,0.05); color: #fff;
+        }
+        .auth-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+        #cratePanel {
+            position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+            width: min(420px, calc(100% - 40px)); max-height: min(520px, calc(100% - 80px));
+            overflow: hidden; pointer-events: auto; z-index: 5;
+        }
+        .crate-panel-header { padding: 16px 16px 6px; }
+        .crate-items { display: grid; gap: 10px; padding: 0 16px 16px; max-height: 420px; overflow: auto; }
+        #crateMessage { padding: 0 16px 12px; color: #fff59d; font-size: 13px; }
+        @media (max-width: 1000px) {
+            .summary-grid, .inventory-layout, .market-grid { grid-template-columns: 1fr; }
+            .summary-wide { grid-column: span 1; }
+            #cratePanel { width: min(420px, calc(100% - 24px)); }
+        }
+        @media (max-width: 720px) {
+            .hero-panel h1 { font-size: 42px; }
+            .screen { padding: 18px; }
+            .hero-panel { padding: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Loading SDC.IO...</div>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="uiRoot">
+        <header id="topBar" class="hidden">
+            <div class="brand">Operator Control</div>
+            <button id="authButton" class="secondary-button">Login / Sign Up</button>
+        </header>
+
+        <section id="menuScreen" class="screen hidden">
+            <div class="panel hero-panel">
+                <h1>SDC.IO</h1>
+                <p>
+                    Configure a six-slot raid kit, inspect loot crates in the field with <strong>F</strong>,
+                    click items to grab them, and extract alive to bank equipment into your stash before trading it for coins in the market.
+                </p>
+                <div class="menu-actions">
+                    <button id="startButton" class="primary-button">Start Game</button>
+                    <button id="inventoryButton" class="secondary-button">Inventory</button>
+                    <button id="marketButton" class="secondary-button">Market</button>
+                </div>
+                <div id="menuSummary" class="summary-grid"></div>
+            </div>
+        </section>
+
+        <section id="inventoryScreen" class="screen hidden">
+            <div class="panel inventory-layout">
+                <div class="inventory-section">
+                    <div class="inventory-header" style="margin-bottom:16px;">
+                        <div>
+                            <h2>Loadout</h2>
+                            <div class="section-subtitle">Equip one item for each slot from your extracted stash.</div>
+                        </div>
+                        <button id="backButton" class="secondary-button">Back</button>
+                    </div>
+                    <div id="loadoutSections"></div>
+                </div>
+
+                <div class="inventory-section">
+                    <div class="inventory-header" style="margin-bottom:16px;">
+                        <div>
+                            <h2>Stash</h2>
+                            <div id="inventoryStats" class="section-subtitle"></div>
+                        </div>
+                        <div id="inventoryCoins" style="font-size: 28px; font-weight: 800; color: #00e676;"></div>
+                    </div>
+                    <div id="stashSummary" class="summary-grid" style="margin-bottom: 18px;"></div>
+                    <h3 style="margin-bottom:12px;">Extraction History</h3>
+                    <div id="runHistory" class="run-history"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="marketScreen" class="screen hidden">
+            <div class="panel inventory-layout">
+                <div class="inventory-section" style="grid-column: 1 / -1;">
+                    <div class="inventory-header" style="margin-bottom:16px;">
+                        <div>
+                            <h2>Market</h2>
+                            <div class="section-subtitle">Trade any existing item for coins. Extraction gives items only; coins come from selling.</div>
+                        </div>
+                        <div class="inventory-header">
+                            <div id="marketCoins" style="font-size: 24px; font-weight: 800; color: #00e676; margin-right: 12px;"></div>
+                            <button id="marketBackButton" class="secondary-button">Back</button>
+                        </div>
+                    </div>
+                    <div id="marketMessage" class="section-subtitle"></div>
+                    <div id="marketGrid" class="market-grid"></div>
+                </div>
+            </div>
+        </section>
+
+        <aside id="cratePanel" class="panel hidden">
+            <div class="crate-panel-header">
+                <h3>Crate Inventory</h3>
+                <div id="cratePrompt" class="section-subtitle"></div>
+            </div>
+            <div id="crateMessage"></div>
+            <div id="crateItems" class="crate-items"></div>
+        </aside>
+
+        <div id="authModal" class="modal hidden">
+            <div class="panel modal-panel">
+                <div class="inventory-header">
+                    <h2 id="authTitle">Login</h2>
+                    <button id="authClose" class="secondary-button">Close</button>
+                </div>
+                <p id="authMessage" class="section-subtitle"></p>
+                <div class="auth-mode-toggle">
+                    <button id="loginModeButton" class="secondary-button active">Login</button>
+                    <button id="signupModeButton" class="secondary-button">Sign Up</button>
+                </div>
+                <form id="authForm" class="auth-form">
+                    <input id="authUsername" type="text" placeholder="Username" autocomplete="username" required>
+                    <input id="authPassword" type="password" placeholder="Password" autocomplete="current-password" required>
+                    <button id="authSubmit" type="submit" class="primary-button">Login</button>
+                </form>
+                <div id="accountActions" class="auth-actions hidden">
+                    <button id="logoutButton" class="secondary-button">Logout</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="./js/app.js"></script>
+</body>
+</html>
