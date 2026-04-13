@@ -12,7 +12,8 @@ import {
     getRarityMeta,
     getSlotLabel,
     summarizeProfile,
-    getStashSummary
+    getStashSummary,
+    getItemImagePath
 } from './profile.js';
 
 const store = new ProfileStore();
@@ -119,15 +120,20 @@ function renderLoadoutSections(profile) {
                 const selected = selectedId === definition.id;
                 return `
                     <button class="item-card ${selected ? 'active' : ''}" data-slot="${slot}" data-item-id="${definition.id}">
-                        <div class="item-card-header">
-                            <strong>${definition.name}</strong>
-                            <span style="color:${rarity.color}">${rarity.label}</span>
-                        </div>
-                        <p>${definition.description}</p>
-                        <div class="item-stats">
-                            <span>${selected ? 'Equipped' : 'Equip'}</span>
-                            <span>Owned ${count}</span>
-                            <span>Value ${definition.sellValue}c</span>
+                        <div class="item-card-body">
+                            <img class="item-card-img" src="${getItemImagePath(definition.id)}" alt="${definition.name}" loading="lazy">
+                            <div class="item-card-info">
+                                <div class="item-card-header">
+                                    <strong>${definition.name}</strong>
+                                    <span style="color:${rarity.color}">${rarity.label}</span>
+                                </div>
+                                <p>${definition.description}</p>
+                                <div class="item-stats">
+                                    <span>${selected ? 'Equipped' : 'Equip'}</span>
+                                    <span>Owned ${count}</span>
+                                    <span>Value ${definition.sellValue}c</span>
+                                </div>
+                            </div>
                         </div>
                     </button>
                 `;
@@ -205,6 +211,7 @@ function renderMarket() {
             const owned = ownedCounts[item.id] || 0;
             return `
                 <div class="market-card" style="border-left:4px solid ${rarity.color}">
+                    <img class="item-card-img" src="${getItemImagePath(item.id)}" alt="${item.name}" loading="lazy">
                     <div class="item-card-header">
                         <strong>${item.name}</strong>
                         <span style="color:${rarity.color}">${rarity.label}</span>
@@ -280,6 +287,7 @@ function renderRuntimeUi() {
     crateItems.innerHTML = crateState.crate.items.length
         ? crateState.crate.items.map((item) => `
             <button class="crate-item-card" data-crate-item-id="${item.id}" style="border-left:4px solid ${item.rarityColor}">
+                <img class="item-card-img" src="${getItemImagePath(item.definitionId)}" alt="${item.name}" loading="lazy">
                 <div class="item-card-header">
                     <strong>${item.name}</strong>
                     <span style="color:${item.rarityColor}">${item.rarityLabel}</span>

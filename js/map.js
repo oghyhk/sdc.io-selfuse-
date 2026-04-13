@@ -8,7 +8,7 @@ import {
     HEALTHPACK_RADIUS, CRATE_WIDTH, CRATE_HEIGHT
 } from './constants.js';
 import { randInt, generateId } from './utils.js';
-import { createLootItemsForZone } from './profile.js';
+import { createLootItemsForZone, createLootItemsForCrateTier, CRATE_TIERS } from './profile.js';
 
 // Generate the map — returns { tiles[][], walls[], lootCrates[], extractionPoints[], enemySpawns[], playerSpawn }
 export function generateMap(seed) {
@@ -147,12 +147,14 @@ export function generateMap(seed) {
         return { x: MAP_WIDTH / 4, y: MAP_HEIGHT / 4 };
     }
 
-    // ---------- Loot crates ----------
+    // ---------- Loot crates with tiers ----------
     const lootCrates = [];
+    const CRATE_TIER_MAP = { [ZONE.SAFE]: 'supply', [ZONE.COMBAT]: 'tactical', [ZONE.HIGH_VALUE]: 'elite' };
     const addCrates = (count, zone) => {
+        const tierKey = CRATE_TIER_MAP[zone] || 'supply';
+        const tierMeta = CRATE_TIERS[tierKey];
         for (let i = 0; i < count; i++) {
             const pos = randomOpenPos(zone);
-            const itemCount = randInt(1, 4);
             lootCrates.push({
                 id: generateId(),
                 x: pos.x,
@@ -161,7 +163,10 @@ export function generateMap(seed) {
                 h: CRATE_HEIGHT,
                 opened: false,
                 inspected: false,
-                items: createLootItemsForZone(zone, itemCount)
+                tier: tierKey,
+                tierLabel: tierMeta.label,
+                tierColor: tierMeta.color,
+                items: createLootItemsForCrateTier(tierKey)
             });
         }
     };

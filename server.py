@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parent
 DATA_FILE = ROOT / 'data' / 'users.json'
-HOST = '127.0.0.1'
+HOST = '0.0.0.0'
 PORT = 8765
 
 

@@ -121,7 +121,9 @@ export class Renderer {
             const baseY = sy - CRATE_HEIGHT / 2;
             const baseX = sx - CRATE_WIDTH / 2;
 
-            ctx.fillStyle = crate.inspected ? COLORS.CRATE_OPENED : COLORS.CRATE;
+            // Use tier color for crate base
+            const crateColor = crate.tierColor || COLORS.CRATE;
+            ctx.fillStyle = crate.inspected ? COLORS.CRATE_OPENED : crateColor;
             ctx.fillRect(baseX, baseY, CRATE_WIDTH, CRATE_HEIGHT);
             ctx.strokeStyle = isNearby ? COLORS.CRATE_INTERACT : COLORS.CRATE_DARK;
             ctx.lineWidth = isNearby ? 2 : 1.5;
@@ -142,9 +144,13 @@ export class Renderer {
                 ctx.stroke();
             }
 
+            // Show highest rarity dot
             if (crate.items.length > 0) {
-                const topItem = crate.items[0];
-                const rarity = getRarityMeta(topItem.rarity);
+                const topRarity = crate.items.reduce((best, item) => {
+                    const order = ['white','green','blue','purple','gold','red'];
+                    return order.indexOf(item.rarity) < order.indexOf(best) ? item.rarity : best;
+                }, 'red');
+                const rarity = getRarityMeta(topRarity);
                 ctx.fillStyle = rarity.color;
                 ctx.beginPath();
                 ctx.arc(baseX + CRATE_WIDTH - 6, baseY + 6, 4, 0, Math.PI * 2);
@@ -154,7 +160,9 @@ export class Renderer {
             if (isNearby) {
                 ctx.fillStyle = COLORS.CRATE_INTERACT;
                 ctx.font = 'bold 10px monospace';
-                ctx.fillText(isOpen ? 'F CLOSE' : 'F OPEN', sx, baseY - 20);
+                // Show tier label + open/close
+                const label = crate.tierLabel ? crate.tierLabel.toUpperCase() : 'CRATE';
+                ctx.fillText(isOpen ? 'F CLOSE' : `F · ${label}`, sx, baseY - 20);
             }
         }
     }

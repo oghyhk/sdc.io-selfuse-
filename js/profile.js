@@ -19,32 +19,262 @@ export const RARITY_META = {
 export const LOADOUT_SLOTS = ['gun', 'melee', 'armor', 'helmet', 'shoes', 'backpack'];
 
 export const ITEM_DEFS = {
-    militia_carbine: { id: 'militia_carbine', category: 'gun', rarity: 'white', name: 'Militia Carbine', description: 'Starter rifle with stable handling.', sellValue: 120, stats: { damage: 16, cooldown: 0.27, bulletSpeed: 500, range: 340 } },
-    ranger_smg: { id: 'ranger_smg', category: 'gun', rarity: 'green', name: 'Ranger SMG', description: 'Fast close-range weapon for aggressive runs.', sellValue: 170, stats: { damage: 12, cooldown: 0.13, bulletSpeed: 470, range: 275 } },
-    eclipse_dmr: { id: 'eclipse_dmr', category: 'gun', rarity: 'purple', name: 'Eclipse DMR', description: 'Precision rifle for careful crate fights.', sellValue: 320, stats: { damage: 34, cooldown: 0.55, bulletSpeed: 650, range: 540 } },
-    aurora_lmg: { id: 'aurora_lmg', category: 'gun', rarity: 'gold', name: 'Aurora LMG', description: 'Heavy automatic rifle with strong sustained fire.', sellValue: 430, stats: { damage: 20, cooldown: 0.18, bulletSpeed: 540, range: 420 } },
-    inferno_rail: { id: 'inferno_rail', category: 'gun', rarity: 'red', name: 'Inferno Railgun', description: 'Prototype rifle that hits extremely hard.', sellValue: 620, stats: { damage: 52, cooldown: 0.72, bulletSpeed: 820, range: 700 } },
-    field_knife: { id: 'field_knife', category: 'melee', rarity: 'white', name: 'Field Knife', description: 'Basic close-quarters blade.', sellValue: 80, stats: { meleeDamage: 24, meleeCooldown: 0.42 } },
-    breach_hatchet: { id: 'breach_hatchet', category: 'melee', rarity: 'green', name: 'Breach Hatchet', description: 'Reliable utility hatchet.', sellValue: 110, stats: { meleeDamage: 30, meleeCooldown: 0.4 } },
-    ion_blade: { id: 'ion_blade', category: 'melee', rarity: 'blue', name: 'Ion Blade', description: 'Light blade with quick recovery.', sellValue: 180, stats: { meleeDamage: 34, meleeCooldown: 0.34 } },
-    revenant_machete: { id: 'revenant_machete', category: 'melee', rarity: 'purple', name: 'Revenant Machete', description: 'Heavy finishing blade.', sellValue: 260, stats: { meleeDamage: 42, meleeCooldown: 0.36 } },
-    cloth_vest: { id: 'cloth_vest', category: 'armor', rarity: 'white', name: 'Cloth Vest', description: 'Minimal torso protection.', sellValue: 90, modifiers: { maxHp: 10 } },
-    ranger_plate: { id: 'ranger_plate', category: 'armor', rarity: 'blue', name: 'Ranger Plate', description: 'Balanced combat vest.', sellValue: 220, modifiers: { maxHp: 28 } },
-    titan_rig: { id: 'titan_rig', category: 'armor', rarity: 'gold', name: 'Titan Rig', description: 'Heavy armor for frontline raids.', sellValue: 390, modifiers: { maxHp: 52 } },
-    scout_cap: { id: 'scout_cap', category: 'helmet', rarity: 'white', name: 'Scout Cap', description: 'Light head cover.', sellValue: 70, modifiers: { maxHp: 6 } },
-    recon_helmet: { id: 'recon_helmet', category: 'helmet', rarity: 'green', name: 'Recon Helmet', description: 'Standard issue tactical helmet.', sellValue: 140, modifiers: { maxHp: 14 } },
-    eclipse_visor: { id: 'eclipse_visor', category: 'helmet', rarity: 'purple', name: 'Eclipse Visor', description: 'Enhanced visor with reinforced shell.', sellValue: 250, modifiers: { maxHp: 24 } },
-    trail_shoes: { id: 'trail_shoes', category: 'shoes', rarity: 'white', name: 'Trail Shoes', description: 'Plain footwear for basic mobility.', sellValue: 60, modifiers: { speed: 10 } },
-    runner_boots: { id: 'runner_boots', category: 'shoes', rarity: 'green', name: 'Runner Boots', description: 'Reliable movement boost.', sellValue: 120, modifiers: { speed: 20 } },
-    phase_greaves: { id: 'phase_greaves', category: 'shoes', rarity: 'blue', name: 'Phase Greaves', description: 'Fast boots for quick disengages.', sellValue: 200, modifiers: { speed: 32 } },
-    sling_pack: { id: 'sling_pack', category: 'backpack', rarity: 'white', name: 'Sling Pack', description: 'Small pack with limited carrying space.', sellValue: 75, modifiers: { carrySlots: 3 } },
-    scout_pack: { id: 'scout_pack', category: 'backpack', rarity: 'green', name: 'Scout Pack', description: 'Compact backpack for efficient loot runs.', sellValue: 130, modifiers: { carrySlots: 5 } },
-    mule_pack: { id: 'mule_pack', category: 'backpack', rarity: 'blue', name: 'Mule Pack', description: 'Larger backpack for bigger hauls.', sellValue: 220, modifiers: { carrySlots: 8 } },
-    void_satchel: { id: 'void_satchel', category: 'backpack', rarity: 'red', name: 'Void Satchel', description: 'Prototype pack with huge haul capacity.', sellValue: 480, modifiers: { carrySlots: 12 } }
+    // ─── GUNS ───────────────────────────────────────────────
+    militia_carbine: {
+        id: 'militia_carbine', category: 'gun', rarity: 'white',
+        name: 'Militia Carbine', description: 'Starter rifle with stable handling.',
+        sellValue: 120,
+        stats: { damage: 16, cooldown: 0.27, bulletSpeed: 500, range: 340 }
+    },
+    ranger_smg: {
+        id: 'ranger_smg', category: 'gun', rarity: 'green',
+        name: 'Ranger SMG', description: 'Fast close-range weapon for aggressive runs.',
+        sellValue: 170,
+        stats: { damage: 12, cooldown: 0.13, bulletSpeed: 470, range: 275 }
+    },
+    spectre_assault: {
+        id: 'spectre_assault', category: 'gun', rarity: 'blue',
+        name: 'Spectre Assault Rifle', description: 'Reliable mid-tier rifle with balanced stats.',
+        sellValue: 240,
+        stats: { damage: 22, cooldown: 0.2, bulletSpeed: 560, range: 400 }
+    },
+    eclipse_dmr: {
+        id: 'eclipse_dmr', category: 'gun', rarity: 'purple',
+        name: 'Eclipse DMR', description: 'Precision rifle for careful crate fights.',
+        sellValue: 320,
+        stats: { damage: 34, cooldown: 0.55, bulletSpeed: 650, range: 540 }
+    },
+    aurora_lmg: {
+        id: 'aurora_lmg', category: 'gun', rarity: 'gold',
+        name: 'Aurora LMG', description: 'Heavy automatic rifle with strong sustained fire.',
+        sellValue: 430,
+        stats: { damage: 20, cooldown: 0.18, bulletSpeed: 540, range: 420 }
+    },
+    inferno_rail: {
+        id: 'inferno_rail', category: 'gun', rarity: 'red',
+        name: 'Inferno Railgun', description: 'Prototype rifle that hits extremely hard.',
+        sellValue: 620,
+        stats: { damage: 52, cooldown: 0.72, bulletSpeed: 820, range: 700 }
+    },
+
+    // ─── MELEE ──────────────────────────────────────────────
+    field_knife: {
+        id: 'field_knife', category: 'melee', rarity: 'white',
+        name: 'Field Knife', description: 'Basic close-quarters blade.',
+        sellValue: 80,
+        stats: { meleeDamage: 24, meleeCooldown: 0.42 }
+    },
+    breach_hatchet: {
+        id: 'breach_hatchet', category: 'melee', rarity: 'green',
+        name: 'Breach Hatchet', description: 'Reliable utility hatchet.',
+        sellValue: 110,
+        stats: { meleeDamage: 30, meleeCooldown: 0.4 }
+    },
+    ion_blade: {
+        id: 'ion_blade', category: 'melee', rarity: 'blue',
+        name: 'Ion Blade', description: 'Light blade with quick recovery.',
+        sellValue: 180,
+        stats: { meleeDamage: 34, meleeCooldown: 0.34 }
+    },
+    revenant_machete: {
+        id: 'revenant_machete', category: 'melee', rarity: 'purple',
+        name: 'Revenant Machete', description: 'Heavy finishing blade.',
+        sellValue: 260,
+        stats: { meleeDamage: 42, meleeCooldown: 0.36 }
+    },
+    wraith_katana: {
+        id: 'wraith_katana', category: 'melee', rarity: 'gold',
+        name: 'Wraith Katana', description: 'Elegant high-damage blade for elite operatives.',
+        sellValue: 380,
+        stats: { meleeDamage: 50, meleeCooldown: 0.3 }
+    },
+    doom_cleaver: {
+        id: 'doom_cleaver', category: 'melee', rarity: 'red',
+        name: 'Doom Cleaver', description: 'Prototype heavy weapon that obliterates anything in range.',
+        sellValue: 550,
+        stats: { meleeDamage: 68, meleeCooldown: 0.38 }
+    },
+
+    // ─── ARMOR ──────────────────────────────────────────────
+    cloth_vest: {
+        id: 'cloth_vest', category: 'armor', rarity: 'white',
+        name: 'Cloth Vest', description: 'Minimal torso protection.',
+        sellValue: 90,
+        modifiers: { maxHp: 10 }
+    },
+    kevlar_weave: {
+        id: 'kevlar_weave', category: 'armor', rarity: 'green',
+        name: 'Kevlar Weave', description: 'Standard-issue ballistic protection.',
+        sellValue: 150,
+        modifiers: { maxHp: 18 }
+    },
+    ranger_plate: {
+        id: 'ranger_plate', category: 'armor', rarity: 'blue',
+        name: 'Ranger Plate', description: 'Balanced combat vest.',
+        sellValue: 220,
+        modifiers: { maxHp: 28 }
+    },
+    warden_vest: {
+        id: 'warden_vest', category: 'armor', rarity: 'purple',
+        name: 'Warden Vest', description: 'Heavy-duty protection for high-threat zones.',
+        sellValue: 310,
+        modifiers: { maxHp: 40 }
+    },
+    titan_rig: {
+        id: 'titan_rig', category: 'armor', rarity: 'gold',
+        name: 'Titan Rig', description: 'Heavy armor for frontline raids.',
+        sellValue: 390,
+        modifiers: { maxHp: 52 }
+    },
+    bastion_plate: {
+        id: 'bastion_plate', category: 'armor', rarity: 'red',
+        name: 'Bastion Plate', description: 'Experimental exo-armor with maximum protection.',
+        sellValue: 580,
+        modifiers: { maxHp: 72 }
+    },
+
+    // ─── HELMETS ────────────────────────────────────────────
+    scout_cap: {
+        id: 'scout_cap', category: 'helmet', rarity: 'white',
+        name: 'Scout Cap', description: 'Light head cover.',
+        sellValue: 70,
+        modifiers: { maxHp: 6 }
+    },
+    recon_helmet: {
+        id: 'recon_helmet', category: 'helmet', rarity: 'green',
+        name: 'Recon Helmet', description: 'Standard issue tactical helmet.',
+        sellValue: 140,
+        modifiers: { maxHp: 14 }
+    },
+    sentinel_helm: {
+        id: 'sentinel_helm', category: 'helmet', rarity: 'blue',
+        name: 'Sentinel Helm', description: 'Reinforced helmet with side protection.',
+        sellValue: 200,
+        modifiers: { maxHp: 20 }
+    },
+    eclipse_visor: {
+        id: 'eclipse_visor', category: 'helmet', rarity: 'purple',
+        name: 'Eclipse Visor', description: 'Enhanced visor with reinforced shell.',
+        sellValue: 250,
+        modifiers: { maxHp: 24 }
+    },
+    fortress_mask: {
+        id: 'fortress_mask', category: 'helmet', rarity: 'gold',
+        name: 'Fortress Mask', description: 'Full-face tactical helmet with blast shielding.',
+        sellValue: 360,
+        modifiers: { maxHp: 36 }
+    },
+    phantom_crown: {
+        id: 'phantom_crown', category: 'helmet', rarity: 'red',
+        name: 'Phantom Crown', description: 'Prototype adaptive helmet with integrated HUD.',
+        sellValue: 520,
+        modifiers: { maxHp: 48 }
+    },
+
+    // ─── SHOES ──────────────────────────────────────────────
+    trail_shoes: {
+        id: 'trail_shoes', category: 'shoes', rarity: 'white',
+        name: 'Trail Shoes', description: 'Plain footwear for basic mobility.',
+        sellValue: 60,
+        modifiers: { speed: 10 }
+    },
+    runner_boots: {
+        id: 'runner_boots', category: 'shoes', rarity: 'green',
+        name: 'Runner Boots', description: 'Reliable movement boost.',
+        sellValue: 120,
+        modifiers: { speed: 20 }
+    },
+    phase_greaves: {
+        id: 'phase_greaves', category: 'shoes', rarity: 'blue',
+        name: 'Phase Greaves', description: 'Fast boots for quick disengages.',
+        sellValue: 200,
+        modifiers: { speed: 32 }
+    },
+    phantom_sprinters: {
+        id: 'phantom_sprinters', category: 'shoes', rarity: 'purple',
+        name: 'Phantom Sprinters', description: 'Ultra-light boots for rapid extraction.',
+        sellValue: 280,
+        modifiers: { speed: 44 }
+    },
+    blitz_treads: {
+        id: 'blitz_treads', category: 'shoes', rarity: 'gold',
+        name: 'Blitz Treads', description: 'High-performance boots with shock absorption.',
+        sellValue: 370,
+        modifiers: { speed: 56 }
+    },
+    warp_drivers: {
+        id: 'warp_drivers', category: 'shoes', rarity: 'red',
+        name: 'Warp Drivers', description: 'Experimental exo-boots that defy physics.',
+        sellValue: 520,
+        modifiers: { speed: 72 }
+    },
+
+    // ─── BACKPACKS ──────────────────────────────────────────
+    sling_pack: {
+        id: 'sling_pack', category: 'backpack', rarity: 'white',
+        name: 'Sling Pack', description: 'Small pack with limited carrying space.',
+        sellValue: 75,
+        modifiers: { carrySlots: 3 }
+    },
+    scout_pack: {
+        id: 'scout_pack', category: 'backpack', rarity: 'green',
+        name: 'Scout Pack', description: 'Compact backpack for efficient loot runs.',
+        sellValue: 130,
+        modifiers: { carrySlots: 5 }
+    },
+    mule_pack: {
+        id: 'mule_pack', category: 'backpack', rarity: 'blue',
+        name: 'Mule Pack', description: 'Larger backpack for bigger hauls.',
+        sellValue: 220,
+        modifiers: { carrySlots: 8 }
+    },
+    siege_rucksack: {
+        id: 'siege_rucksack', category: 'backpack', rarity: 'purple',
+        name: 'Siege Rucksack', description: 'Tactical rucksack built for extended operations.',
+        sellValue: 300,
+        modifiers: { carrySlots: 11 }
+    },
+    cargo_titan: {
+        id: 'cargo_titan', category: 'backpack', rarity: 'gold',
+        name: 'Cargo Titan', description: 'Heavy-duty hauler with reinforced compartments.',
+        sellValue: 400,
+        modifiers: { carrySlots: 14 }
+    },
+    void_satchel: {
+        id: 'void_satchel', category: 'backpack', rarity: 'red',
+        name: 'Void Satchel', description: 'Prototype pack with huge haul capacity.',
+        sellValue: 480,
+        modifiers: { carrySlots: 18 }
+    }
 };
 
 export const STARTER_LOADOUT = { gun: 'militia_carbine', melee: 'field_knife', armor: 'cloth_vest', helmet: 'scout_cap', shoes: 'trail_shoes', backpack: 'sling_pack' };
 export const STARTER_STASH = Object.values(STARTER_LOADOUT).map((id) => ({ definitionId: id }));
+
+// Crate tiers — each crate type draws from a weighted rarity pool
+export const CRATE_TIERS = {
+    supply: {
+        label: 'Supply Crate',
+        description: 'Common field supplies — mostly white and green gear.',
+        pool: ['white', 'white', 'white', 'green', 'green', 'blue'],
+        itemCount: { min: 2, max: 4 },
+        color: '#8d6e63'
+    },
+    tactical: {
+        label: 'Tactical Crate',
+        description: 'Military-grade equipment — blue to purple quality.',
+        pool: ['green', 'blue', 'blue', 'purple', 'purple', 'gold'],
+        itemCount: { min: 2, max: 4 },
+        color: '#5c6bc0'
+    },
+    elite: {
+        label: 'Elite Crate',
+        description: 'High-value cache — purple, gold, and rare red items.',
+        pool: ['blue', 'purple', 'gold', 'gold', 'red', 'red'],
+        itemCount: { min: 1, max: 3 },
+        color: '#c62828'
+    }
+};
 
 const LOOT_POOLS = {
     0: ['white', 'white', 'green', 'green', 'blue'],
@@ -94,6 +324,10 @@ export function getOwnedItemsByCategory(profile, category) {
         .map(([definitionId, count]) => ({ definition: ITEM_DEFS[definitionId], count }))
         .filter(({ definition }) => definition?.category === category)
         .sort((a, b) => RARITY_ORDER.indexOf(a.definition.rarity) - RARITY_ORDER.indexOf(b.definition.rarity));
+}
+
+export function getItemImagePath(definitionId) {
+    return `assets/items/${definitionId}.png`;
 }
 
 function defaultLoadout() {
@@ -187,6 +421,21 @@ export function createLootItem(definitionId) {
         stats: clone(definition.stats || {}),
         modifiers: clone(definition.modifiers || {})
     };
+}
+
+export function createLootItemsForCrateTier(tierKey) {
+    const tier = CRATE_TIERS[tierKey];
+    if (!tier) return createLootItemsForZone(0, 3);
+    const itemIds = Object.keys(ITEM_DEFS);
+    const count = tier.itemCount.min + Math.floor(Math.random() * (tier.itemCount.max - tier.itemCount.min + 1));
+    const items = [];
+    for (let i = 0; i < count; i++) {
+        const rarity = tier.pool[Math.floor(Math.random() * tier.pool.length)];
+        const candidates = itemIds.filter((id) => ITEM_DEFS[id].rarity === rarity);
+        const picked = candidates[Math.floor(Math.random() * candidates.length)] || itemIds[0];
+        items.push(createLootItem(picked));
+    }
+    return items.filter(Boolean);
 }
 
 export function createLootItemsForZone(zone, count) {
