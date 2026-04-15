@@ -4,7 +4,7 @@
 
 **Prepare Loadout → Enter Raid → Open Crates → Take Items → Fight → Extract**
 
-1. The player selects a six-slot loadout from the menu inventory.
+1. The player selects a six-slot loadout from the menu inventory: **2 gun slots** (`gunPrimary`, `gunSecondary`) plus armor, helmet, shoes, and backpack.
 2. The player deploys into a 2D top-down map with enemies, combat zones, loot-crate rooms, and extraction points.
 3. Loot is no longer loose cash on the ground. Instead, the player must move beside a crate and press `F` to open or close it.
 4. Each crate contains **1 to 4 items**. Items are shown in a centered loot panel and can be taken individually by clicking them.
@@ -12,31 +12,31 @@
 6. The player survives combat, manages carry capacity, and decides which items are worth taking.
 7. Standing inside an extraction zone for 3 seconds secures the carried items into the player stash for later trading.
 8. Death still causes full run failure.
+9. The player must equip **at least one gun** before any raid can be started.
 
 ---
 
 ## 2. Item Model
 
-### Six Equipment Classes
-The current prototype now treats all major loot as one of these six categories:
+### Live Equipment Model
+The current live build uses six equipped slots across these categories:
 
-1. **Guns**
-2. **Melee Weapons**
+1. **Primary Gun Slot**
+2. **Secondary Gun Slot**
 3. **Armors**
 4. **Helmets**
 5. **Shoes**
 6. **Backpacks**
 
-The player inventory screen supports equipping one item from each class.
+The player inventory screen supports equipping one item into each slot. Guns are still a single item category, but the player can now bring **two guns** into a raid and switch between them.
 
 ### Ammo
 Ammo is a separate loot type (not equipment) with six rarity tiers from Gray to Red. Each tier has a distinct damage multiplier and sell value. Ammo is stored in a dedicated `stashAmmo` map rather than the equipment stash. See **Section 10** for full details.
 
 ### Example Items
-The game includes 36 items across all six categories and rarity tiers:
+The current prototype currently includes these notable live items:
 
-- **Guns**: Militia Carbine (White), Ranger SMG (Green), Spectre Assault Rifle (Blue), Eclipse DMR (Purple), Aurora LMG (Gold), Inferno Railgun (Red)
-- **Melee Weapons**: Field Knife (White), Breach Hatchet (Green), Ion Blade (Blue), Revenant Machete (Purple), Wraith Katana (Gold), Doom Cleaver (Red)
+- **Guns**: G17 (White), AS VAL (Red), AWM (Red)
 - **Armors**: Cloth Vest (White), Kevlar Weave (Green), Ranger Plate (Blue), Warden Vest (Purple), Titan Rig (Gold), Bastion Plate (Red)
 - **Helmets**: Scout Cap (White), Recon Helmet (Green), Sentinel Helm (Blue), Eclipse Visor (Purple), Fortress Mask (Gold), Phantom Crown (Red)
 - **Shoes**: Trail Shoes (White), Runner Boots (Green), Phase Greaves (Blue), Phantom Sprinters (Purple), Blitz Treads (Gold), Warp Drivers (Red)
@@ -44,17 +44,25 @@ The game includes 36 items across all six categories and rarity tiers:
 - **Consumables**: Field Bandage (White), Med Kit (Green), Stim Syringe (Blue), Combat Medic Pack (Purple), Regen Injector (Gold), Nano Serum (Red)
 
 ### Consumables System
-Consumable items are picked up from loot crates during raids and stored in a separate consumable pouch (max 5). They do NOT take up backpack carry slots. Press **Q** to use a consumable. The HUD shows consumable count when any are held.
+Consumable items are picked up from loot crates and stored directly in the backpack. They stack like ammo in bundles of up to 999 per backpack slot, can be traded in the market, and cannot be placed in the safebox. Press **Q** to use a consumable. The HUD shows the total consumable count currently packed in the backpack.
 
-### Melee Weapon Rules
-Melee weapons are permanent equipment with special rules that distinguish them from all other item types:
+### Gun Rules
+Guns now use the normal rarity system and can appear in both gun slots.
 
-- **Never dropped from crates** — Melee weapons cannot appear in loot crates, zone drops, or any random loot pool.
-- **Cannot be traded** — Melee weapons cannot be bought or sold on the market.
-- **Never lost on death** — Melee weapons are kept regardless of raid outcome or difficulty mode (Easy, Advanced, Hell). The equipped melee is always preserved.
-- **Always equipped** — Every player starts with a Field Knife (White) and the loadout system ensures a melee weapon is always equipped. If missing, the starter melee is auto-restored.
+- The player may equip **up to two guns**.
+- At least **one gun must be equipped** before starting a raid.
+- The player spawns with the higher-value equipped gun active by default.
+- Press **E** during a raid to switch between the primary and secondary gun.
+- `AWM` is a high-end red gun with oversized projectile visuals (`projectileScale = 1.5`).
 
-> **Note:** The method of obtaining new/upgraded melee weapons (beyond the starter Field Knife) will be implemented later.
+### Melee System Status
+The melee system has been **removed from the live game**.
+
+- There is no melee slot in the live loadout.
+- There is no melee attack input or melee HUD in live gameplay.
+- Raids are now fully gun-based.
+
+However, melee support is intentionally **kept in the dev tooling/config workflow** so it can be restored quickly later if needed. The Dev UI / CLI still preserve melee-oriented authoring support for future recreation or experimentation.
 
 | Item | Rarity | Heal | Special |
 |------|--------|------|---------|
@@ -86,13 +94,14 @@ Size can be adjusted per-item via the Dev UI (`dev.html`) or CLI (`python dev.py
 ### Rarity Ladder
 All items, including equipment, follow this rarity order from highest to lowest:
 
-**Red > Gold > Purple > Blue > Green > White**
+**Legend > Red > Gold > Purple > Blue > Green > White > Gray**
 
 Rarity affects:
 - visual color coding
 - crate excitement/readability
 - market value
 - equipment quality and stat expectations
+- start-button and frame special effects for top-end content
 
 ---
 
@@ -104,6 +113,7 @@ Rarity affects:
 - Pressing `F` toggles the nearest crate open or closed.
 - Once opened at least once, a crate is marked as **inspected** visually.
 - Crates may become empty after all items are taken.
+- **Chaos difficulty currently has no loot crates**.
 
 ### Crate Tiers
 Crates come in three tiers that determine loot quality:
@@ -135,6 +145,11 @@ This is conceptually similar to modern extraction-mode inventory interactions wi
   - opened
   - inspected/opened-before
 - Rarity is emphasized through strong color accents in the loot panel and item markers.
+- Ground color progression now reads as:
+  - **low-value / safe**: gray
+  - **mid-value / combat**: light green
+  - **high-value**: light purple
+- `Legend` rarity uses a more animated premium presentation, and the Chaos start button borrows this visual intensity.
 
 ---
 
@@ -173,14 +188,17 @@ The front page now supports:
 The inventory page allows the player to:
 - view saved coins
 - inspect extracted loot history
-- equip one item for each of the six categories
+- equip two guns plus four armor/mobility slots
 - review stash totals by rarity
+- save loadout presets into **5 preset slots**
+- inspect the **Est. Value of Loadout** for the currently selected preset
 
 ### Market Layer
 The market page allows the player to:
 - buy any currently defined item for coins
 - sell owned items back for coins
 - compare rarity, category, and owned counts in one place
+- adjust trade amount with a quantity slider
 
 ### Persistence
 For the prototype, account and stash data are stored in a **local JSON file** served through a lightweight local API.
@@ -197,10 +215,11 @@ Saved data includes:
 
 The prototype currently uses equipment to affect the raid by modifying:
 - gun damage / fire rate / range
-- melee damage / melee cooldown
 - armor and helmet max HP
 - shoes movement speed
 - backpack carry capacity
+
+Because the player can bring two guns, loadout choice now also affects in-raid weapon swapping and risk management.
 
 ### Carry Space
 - base carry capacity is now **10** without a backpack
@@ -257,6 +276,8 @@ That makes it easier later to move raid logic to an authoritative backend while 
 - `WASD` / arrow keys: move
 - mouse: aim
 - left click: shoot
+- `E`: switch equipped gun
+- `Q`: use consumable
 - `Space`: dash
 - `R`: toggle normal / slow movement mode
 - `F`: open / close nearby crate
@@ -267,10 +288,11 @@ That makes it easier later to move raid logic to an authoritative backend while 
 ## 10. Ammo Rarity System
 
 ### Ammo Tiers
-Ammo is a distinct loot type split into six rarity tiers, each stored as a separate pack:
+Ammo is a distinct loot type split into seven rarity tiers, each stored as a separate pack:
 
 | Rarity | Definition ID | Damage Multiplier | Sell Value | Color |
 |--------|---------------|-------------------|------------|-------|
+| **Legend** | `ammo_338_ap` | Extreme / instant kill | 5,000,000 | near-black / legend UI |
 | **Gray (White)** | `ammo_white` | ×0.2 (free fallback) | 1 | `#aaa` (gray) |
 | **Green** | `ammo_green` | ×1.0 | 8 | green |
 | **Blue** | `ammo_blue` | ×1.05 | 250 | blue |
@@ -278,7 +300,7 @@ Ammo is a distinct loot type split into six rarity tiers, each stored as a separ
 | **Gold** | `ammo_gold` | ×1.4 | 25,000 | gold |
 | **Red** | `ammo_red` | Instant Kill | 1,000,000 | red |
 
-Ammo definitions live in `ITEM_DEFS` in `profile.js`. The priority ordering (highest → lowest) is maintained in `AMMO_DEFINITION_IDS`: `['ammo_red', 'ammo_gold', 'ammo_purple', 'ammo_blue', 'ammo_green', 'ammo_white']`.
+Ammo definitions live in `ITEM_DEFS` in `profile.js`. The priority ordering (highest → lowest) is maintained in `AMMO_DEFINITION_IDS`: `['ammo_338_ap', 'ammo_red', 'ammo_gold', 'ammo_purple', 'ammo_blue', 'ammo_green', 'ammo_white']`.
 
 ### Stash Ammo Storage
 Ammo is persisted separately from equipment in a `stashAmmo` map (`{ [definitionId]: count }`), not in `stashItems`. On profile load, `normalizeStashAmmo()` migrates any legacy ammo entries from the items array into this map.
@@ -292,7 +314,7 @@ Ammo is persisted separately from equipment in a `stashAmmo` map (`{ [definition
 ### Gray Ammo — Free Unlimited Fallback
 Gray ammo (`ammo_white`) is a special tier with these rules:
 - **Unlimited & free**: always available as a fallback; never runs out.
-- **Damage ×0.2**: significantly weaker than any purchased ammo.
+- **Damage ×0.8**: weaker than upgraded ammo and used as the floor-tier fallback.
 - **Cannot be persisted**: `addAmmoToProfile()` and `removeAmmoFromProfile()` silently skip it; `createPersistentEntryFromLootItem()` returns `null` for it.
 - **Cannot be extracted**: `recordExtraction()` skips gray ammo items.
 - **Cannot be stored**: `moveItemToSafebox()` and `moveItemToBackpack()` throw errors for gray ammo.
@@ -308,6 +330,7 @@ Guard functions:
 - The bullet inherits the round's `damageMultiplier`, `instantKill` flag, and rarity **color**.
 - `game.js` applies instant-kill logic: if `b.instantKill` is true, the bullet deals `e.maxHp` damage, killing any enemy in one hit.
 - Bullets are rendered on canvas in the color of their ammo rarity via `b.color` in `renderer.js`.
+- `.338 AP` additionally uses a custom premium projectile style with longer visuals and one-tile wall penetration.
 
 ### Auto-reload Triggers
 1. **Raid start** — `reloadBestAvailableAmmo(true)` is called when the player spawns.
@@ -329,17 +352,19 @@ The weapon HUD text at the bottom of the screen dynamically changes color based 
 
 On death, penalties are determined by the raid difficulty setting:
 
-| Difficulty | Backpack Lost | Gun Lost | Other Equipped Slots | Safebox |
-|------------|---------------|----------|----------------------|---------|
+| Difficulty | Backpack Lost | Equipped Guns | Other Equipped Slots | Safebox |
+|------------|---------------|---------------|----------------------|---------|
 | **Easy** | Yes (always) | No | No | Safe |
 | **Advanced** | Yes (always) | Always | 15% chance each | Safe |
 | **Hell** | Yes (always) | Always | Always | Safe |
+| **Chaos** | Yes (always) | Always | Always | 50% chance per safebox entry |
 
 Implementation: `applyDeathLosses(profile, difficulty)` in `profile.js`:
 - `easy` — returns immediately; only backpack contents are lost (handled separately by `applyRaidOutcome`).
-- `advanced` — always removes the equipped gun from stash; each other equipped slot has a 15% independent chance of removal.
+- `advanced` — always removes all equipped guns from stash; each other equipped slot has a 15% independent chance of removal.
 - `hell` — removes all equipped items from stash (every slot).
-- The **safebox** is never touched regardless of difficulty.
+- `chaos` — uses the same equipped-item loss rules as Hell and can also remove safebox entries.
+- In Chaos, each safebox entry has a **50% independent chance** to be lost on death.
 
 `ProfileStore.applyRaidOutcome()` accepts a `difficulty` parameter from `game.js` (`this.activeDifficulty`).
 
@@ -348,14 +373,17 @@ Implementation: `applyDeathLosses(profile, difficulty)` in `profile.js`:
 ## 13. Safebox
 
 - The safebox is a protected storage area (capacity: `SAFEBOX_CAPACITY`) separate from the main stash.
-- Items in the safebox are **never lost on death**, regardless of difficulty.
+- Items in the safebox are protected in all normal modes.
+- **Chaos is the only exception**: each safebox entry has a 50% independent chance to be lost on death.
 - Safebox ammo is **not auto-moved** to the backpack on raid start — the player must explicitly move items via a "Move to Backpack" action.
 - Moving ammo from safebox to backpack can trigger an auto-reload if the transferred ammo has higher priority than the currently loaded round.
 - Gray ammo cannot be placed in the safebox (it's free and unlimited).
 
+The Chaos start flow explicitly warns the player about this added safebox risk before the raid begins.
+
 ---
 
-## 14. Inventory Value Display
+## 14. Inventory Value and Run Summary Display
 
 The top-right corner of the screen shows account information including:
 - Username/login status
@@ -363,6 +391,11 @@ The top-right corner of the screen shows account information including:
 - Inv Value = total coins + the sum of `sellValue` for every item in stash, backpack, and safebox.
 - Calculated by `getProfileInventoryValue(profile)` in `profile.js`.
 - Rendered via an `.auth-status-value` span in the `.auth-status-button` container.
+
+The menu and raid-result flow also expose value summaries:
+- The selected preset panel shows **Est. Value of Loadout**.
+- The extraction success page shows **Est. Extracted Value**.
+- Extracted value counts only items gained during the raid and excludes items originally brought into the run by the player.
 
 ---
 
@@ -382,8 +415,190 @@ Implementation: `redeemButton` click handler in `app.js` calls `ProfileStore.add
 ## 16. Next Refinement Opportunities
 
 Recommended next passes:
-1. add true melee attack input and enemy stagger
-2. add item size / slot weight instead of simple carry count
-3. add stash filtering and sorting tools in inventory
-4. harden the local API auth model before any wider release
-5. add multiplayer-safe server authority for crate ownership, item pickup, and market sync
+1. expand endgame gun/ammo content and high-risk loot progression
+2. add stash filtering and sorting tools in inventory
+3. harden the local API auth model before any wider release
+4. add multiplayer-safe server authority for crate ownership, item pickup, and market sync
+5. expose more AI/debug tuning controls directly through the dev tool
+
+> Dev note: melee is no longer part of the live design, but the dev tool path still keeps melee-related authoring support so the system can be recreated quickly if desired later.
+
+---
+
+## 17. Changes Implemented Since the Last GitHub Pull
+
+This section summarizes the major live-system changes that were implemented after the last sync from GitHub.
+
+### 17.1 Dev Tool Layer Added
+
+The project now includes a dedicated content-authoring toolchain:
+
+- `dev.html` — browser-based content editor
+- `dev.py` — CLI editor / importer / exporter
+- `data/dev-config.json` — editable config source for tool-managed data
+- `server.py` endpoints for dev-config loading/saving and image generation
+
+The dev tool currently supports:
+
+- equipment authoring
+- consumable authoring
+- ammo authoring
+- enemy tuning
+- crate tier tuning
+- melee stat authoring for future restoration
+- generated art export into `assets/dev/`
+
+This separates gameplay content editing from direct hand-editing of runtime JS definitions while still preserving `js/profile.js` as the live gameplay authority.
+
+### 17.2 Expanded Live Gear / Art Pass
+
+The current repo now includes a larger live art/content set for weapons and ammo presentation, including imported weapon sprites and refreshed item art such as:
+
+- G17
+- G18
+- AKM
+- Groza
+- Vector
+- SR-25
+- M14
+- Marlin
+- M250
+- AWM
+- AP ammo art
+- Hammer art (`assets/items/Tool_Hammer.png`)
+
+This supports both the live raid/inventory UI and the new dev-tool editing flow.
+
+### 17.3 Shield System Added
+
+Purple-and-above armor and helmets now support shield layers in live gameplay.
+
+Key behavior:
+
+- shields render as a separate light-blue segment on the health bar
+- multiple shield sources can stack as layered protection
+- higher-rarity shields are consumed before lower-rarity shields
+- shield absorption depends on ammo rarity relative to shield rarity
+- shields regenerate over time using each item's `shieldRegen`
+- instant-kill rounds bypass shield protection entirely
+
+This makes equipment rarity matter more directly in combat beyond flat HP bonuses.
+
+### 17.4 Difficulty-based Map Scaling Reworked
+
+Map generation now scales by difficulty much more aggressively:
+
+| Difficulty | Map Size | Area Multiplier | Operators | Extractions |
+|---|---|---:|---:|---:|
+| Easy | 80×60 | 1× | 16–19 | 4 |
+| Advanced | 80×60 | 1× | 16–19 | 4 |
+| Hell | 160×120 | 4× | 16–19 | 2 |
+| Chaos | 320×240 | 16× | 36–39 | 1 |
+
+Additional consequences:
+
+- walls / rooms / clusters scale with map size
+- loot density and health-pack placement scale with area
+- enemy counts scale with the larger map footprint
+- Chaos now plays as a much larger operator-heavy raid instead of only a stat bump
+
+### 17.5 Chaos Extraction Gate Added
+
+Chaos difficulty now uses a locked extraction rule:
+
+- the single extraction point starts locked
+- it unlocks only after at least half of all operators are eliminated
+- the HUD and kill feed clearly communicate the lock/unlock state
+- AI operators are aware of the lock and do not pile onto extraction before it opens
+
+This turns Chaos into a delayed-endgame fight rather than an immediate sprint-to-extract mode.
+
+### 17.6 AI Navigation Upgraded to A*
+
+AI navigation is no longer limited to naive direct pursuit.
+
+The repo now includes `js/pathfinding.js`, which provides:
+
+- A* pathfinding on the tile navigation grid
+- path smoothing
+- nearest-walkable fallback resolution
+- waypoint-based movement for bot pursuit and roaming
+
+Supporting map work in `map.js` ensures walkable connectivity so operators are less likely to get trapped behind invalid room layouts.
+
+### 17.7 Persistent AI Operator Roster Expanded to 91
+
+The AI roster system has been expanded from the earlier 49/66-account versions into a 91-operator persistent roster.
+
+Current roster composition:
+
+- 17 lv1 operators
+- 19 lv2 operators
+- 30 lv3 operators
+- 25 lv4 operators
+
+Each roster entry now has:
+
+- permanent identity
+- persistent raid stats
+- persistent ELO
+- level and type specialization (`fighter`, `searcher`, `runner`)
+
+This allows AI opponents to behave more like a persistent population rather than disposable random bots.
+
+### 17.8 Lv3 / Lv4 AI Combat Behaviors Improved
+
+Higher-tier AI operators now use more advanced decision-making:
+
+- cover-seeking before healing
+- line-of-sight threat checks before consumable use
+- path-based target pursuit when direct line-of-sight is blocked
+- extraction awareness in Chaos
+- more aggressive combat logic for endgame tiers
+
+Lv4 operators specifically:
+
+- share lv3 combat intelligence
+- are restricted to gold/red loadouts
+- spawn with effectively full premium ammo / consumable reserves
+- appear rarely in Hell and much more often in Chaos
+
+### 17.9 ELO / Leaderboard System Added and Reworked
+
+The prototype now includes a live ELO progression layer for both players and persistent AI operators.
+
+Recent updates changed the ELO model so that:
+
+- killing a lower-ELO operator awards less ELO
+- killing a higher-ELO operator awards more ELO
+- each kill still grants at least `1` ELO
+- dying to a lower-ELO opponent causes more ELO loss
+- dying to a higher-ELO opponent causes less ELO loss
+- AI roster entries use the same post-raid ELO framework
+
+This replaces the older flatter kill-count-only ELO behavior with opponent-relative gain/loss.
+
+### 17.10 QoL and Combat Handling Updates
+
+Several live gameplay quality-of-life fixes were also added:
+
+- continue button support on post-raid result screens
+- abandon-item flows for inventory/loadout management
+- auto-equip handling for guns and backpack interactions
+- outrange damage attenuation support
+- gravity-boots equipment effect support
+
+Most recently, dual-gun handling was corrected so that:
+
+- picking up a gun into the second gun slot does **not** forcibly switch the currently held weapon
+- each gun preserves its own loaded clip state when switching between primary and secondary weapons
+- switching back to a previously held gun restores its prior magazine contents instead of resetting the clip
+
+### 17.11 Design Impact Summary
+
+The live game is now materially different from the earlier pulled version in four major ways:
+
+1. **Raids scale harder by difficulty** — especially Hell and Chaos.
+2. **Bots are now a persistent competitive layer** with identities, levels, ELO, and stronger navigation.
+3. **Gear depth is broader** through shields, premium AI tiers, improved ammo interactions, and richer item art/content support.
+4. **Tooling is stronger** thanks to the dev UI/CLI workflow that now supports future balancing without direct code editing for every content change.

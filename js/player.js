@@ -5,17 +5,34 @@
 import {
     PLAYER_RADIUS, PLAYER_SPEED, PLAYER_MAX_HP,
     PLAYER_SHOOT_DAMAGE, PLAYER_SHOOT_COOLDOWN, PLAYER_BULLET_SPEED, PLAYER_BULLET_RANGE,
-    PLAYER_DASH_SPEED, PLAYER_DASH_DURATION, PLAYER_DASH_COOLDOWN, PLAYER_MELEE_DAMAGE, PLAYER_MELEE_COOLDOWN,
+    PLAYER_DASH_SPEED, PLAYER_DASH_DURATION, PLAYER_DASH_COOLDOWN,
     MAP_WIDTH, MAP_HEIGHT, PLAYER_BASE_CARRY_CAPACITY, PLAYER_MAX_ENERGY,
     PLAYER_ENERGY_DRAIN_PER_SECOND, PLAYER_ENERGY_RECOVERY_PER_SECOND, PLAYER_ENERGY_IDLE_RECOVERY_PER_SECOND,
     PLAYER_SLOW_SPEED_MULTIPLIER, PLAYER_ENERGY_RETURN_THRESHOLD
 } from './constants.js';
 import { clamp, normalize, generateId, angleBetween } from './utils.js';
-import { createLootItem, getAmmoAmountForEntry, getItemDefinition, getRarityMeta, LOADOUT_SLOTS, RARITY_ORDER, STARTER_LOADOUT, isAmmoDefinition } from './profile.js';
+import { SAFEBOX_CAPACITY, createLootItem, getAmmoAmountForEntry, getItemDefinition, getRarityMeta, GUN_LOADOUT_SLOTS, LOADOUT_SLOTS, RARITY_ORDER, isAmmoDefinition, isConsumableDefinition, getStackableAmountForEntry, rarityIndex } from './profile.js';
+
+const DEFAULT_HEALING_MOVE_SPEED = 10;
+const CONSUMABLE_HEAL_RATE_BY_RARITY = {
+    gray: 1,
+    white: 1,
+    green: 1.5,
+    blue: 2,
+    purple: 3,
+    gold: 4,
+    red: 6,
+};
 
 export class Player {
     constructor(x, y, loadout = {}, backpackItems = [], safeboxItems = []) {
         this.id = generateId();
+        this.displayName = 'Operator';
+        this.isBot = false;
+        this.bulletOwnerType = 'player';
+        this.squadId = `solo-${this.id}`;
+        this.squadIndex = 0;
+        this.squadSize = 1;
         this.x = x;
         this.y = y;
         this.vx = 0;
@@ -25,17 +42,18 @@ export class Player {
         this.angle = 0; // facing direction
 
         this.loadout = {
-            gun: getItemDefinition(loadout.gun)?.category === 'gun' ? loadout.gun : 'g17',
-            melee: getItemDefinition(loadout.melee)?.category === 'melee' ? loadout.melee : 'field_knife',
-            armor: getItemDefinition(loadout.armor)?.category === 'armor' ? loadout.armor : 'cloth_vest',
-            helmet: getItemDefinition(loadout.helmet)?.category === 'helmet' ? loadout.helmet : 'scout_cap',
-            shoes: getItemDefinition(loadout.shoes)?.category === 'shoes' ? loadout.shoes : 'trail_shoes',
-            backpack: getItemDefinition(loadout.backpack)?.category === 'backpack' ? loadout.backpack : 'sling_pack'
+            gunPrimary: getItemDefinition(loadout.gunPrimary || loadout.primaryGun || loadout.gun)?.category === 'gun' ? (loadout.gunPrimary || loadout.primaryGun || loadout.gun) : null,
+            gunSecondary: getItemDefinition(loadout.gunSecondary || loadout.secondaryGun || loadout.gun2)?.category === 'gun' ? (loadout.gunSecondary || loadout.secondaryGun || loadout.gun2) : null,
+            armor: getItemDefinition(loadout.armor)?.category === 'armor' ? loadout.armor : null,
+            helmet: getItemDefinition(loadout.helmet)?.category === 'helmet' ? loadout.helmet : null,
+            shoes: getItemDefinition(loadout.shoes)?.category === 'shoes' ? loadout.shoes : null,
+            backpack: getItemDefinition(loadout.backpack)?.category === 'backpack' ? loadout.backpack : null
         };
 
-        this.weaponId = this.loadout.gun;
+        this.weaponSlot = this._getHighestValueGunSlot();
+        this.weaponId = this.weaponSlot ? this.loadout[this.weaponSlot] : null;
         this.weapon = getItemDefinition(this.weaponId);
-        this.melee = getItemDefinition(this.loadout.melee);
+        this.activeCombatSlot = this.weaponSlot || null;
         this.armor = getItemDefinition(this.loadout.armor);
         this.helmet = getItemDefinition(this.loadout.helmet);
         this.shoes = getItemDefinition(this.loadout.shoes);
@@ -59,6 +77,11 @@ export class Player {
         this.reloadTimer = 0;
         this.isReloading = false;
         this.bulletSpread = 0;
+        this.projectileScale = 1;
+        this.requireMouseReleaseForShot = false;
+        this.gunRuntimeStates = Object.fromEntries(
+            GUN_LOADOUT_SLOTS.map((slot) => [slot, this._createGunRuntimeState()])
+        );
 
         // Dash
         this.dashing = false;
@@ -76,13 +99,28 @@ export class Player {
             .map((entry) => createLootItem(entry.definitionId || entry, { quantity: entry.quantity }))
             .filter(Boolean)
             .slice(0, 4);
-
-        // Consumables inventory (picked up from loot, used with Q)
-        this.consumables = [];
+        this.broughtInCounts = this._buildBroughtInCounts(backpackItems, safeboxItems);
 
         // Active regen effect
         this.regenPerSecond = 0;
         this.regenTimer = 0;
+
+        // Active consumable healing
+        this.isHealing = false;
+        this.healingDefinitionId = null;
+        this.healingName = '';
+        this.healingRate = 0;
+        this.healingMoveSpeed = DEFAULT_HEALING_MOVE_SPEED;
+        this.healingProgress = 0;
+
+        this.runLossBreakdown = {
+            ammoUsed: 0,
+            consumablesUsed: 0,
+            abandoned: 0,
+        };
+
+        this.floatingDamageTexts = [];
+        this.onDamageTaken = null;
 
         // Extraction
         this.extracting = false;
@@ -94,9 +132,130 @@ export class Player {
         // Invincibility frames after taking damage
         this.invincible = 0;
 
+        this.shieldLayers = [];
+
         this._applyLoadoutStats(true);
         this._recalculateLootValue();
         this.reloadBestAvailableAmmo(true);
+    }
+
+    _createGunRuntimeState() {
+        return {
+            loadedAmmoQueue: [],
+            shootCooldown: 0,
+            reloadTimer: 0,
+            isReloading: false,
+        };
+    }
+
+    _ensureGunRuntimeState(slot) {
+        if (!slot || !GUN_LOADOUT_SLOTS.includes(slot)) {
+            return this._createGunRuntimeState();
+        }
+        if (!this.gunRuntimeStates[slot]) {
+            this.gunRuntimeStates[slot] = this._createGunRuntimeState();
+        }
+        return this.gunRuntimeStates[slot];
+    }
+
+    _storeActiveGunState() {
+        const slot = this.activeCombatSlot || this.weaponSlot;
+        if (!slot || !GUN_LOADOUT_SLOTS.includes(slot)) return;
+        const state = this._ensureGunRuntimeState(slot);
+        state.loadedAmmoQueue = [...this.loadedAmmoQueue];
+        state.shootCooldown = Math.max(0, Number(this.shootCooldown) || 0);
+        state.reloadTimer = Math.max(0, Number(this.reloadTimer) || 0);
+        state.isReloading = Boolean(this.isReloading);
+    }
+
+    _syncActiveGunStateFromRuntime() {
+        const slot = this.activeCombatSlot || this.weaponSlot;
+        if (!slot || !GUN_LOADOUT_SLOTS.includes(slot) || !this.weapon) {
+            this.loadedAmmoQueue = [];
+            this.currentAmmo = 0;
+            this.shootCooldown = 0;
+            this.reloadTimer = 0;
+            this.isReloading = false;
+            return;
+        }
+        const state = this._ensureGunRuntimeState(slot);
+        const cappedQueue = [...(state.loadedAmmoQueue || [])].slice(0, Math.max(0, this.ammoCapacity));
+        state.loadedAmmoQueue = cappedQueue;
+        this.loadedAmmoQueue = [...cappedQueue];
+        this.currentAmmo = this.loadedAmmoQueue.length;
+        this.shootCooldown = Math.max(0, Number(state.shootCooldown) || 0);
+        this.reloadTimer = Math.max(0, Number(state.reloadTimer) || 0);
+        this.isReloading = Boolean(state.isReloading) && this.currentAmmo < this.ammoCapacity;
+        if (!this.isReloading) {
+            this.reloadTimer = 0;
+        }
+    }
+
+    _decrementGunCooldowns(dt) {
+        for (const slot of GUN_LOADOUT_SLOTS) {
+            const state = this._ensureGunRuntimeState(slot);
+            state.shootCooldown = Math.max(0, (Number(state.shootCooldown) || 0) - dt);
+        }
+    }
+
+    _clearGunRuntimeState(slot) {
+        if (!slot || !GUN_LOADOUT_SLOTS.includes(slot)) return;
+        this.gunRuntimeStates[slot] = this._createGunRuntimeState();
+        if ((this.activeCombatSlot || this.weaponSlot) === slot) {
+            this._syncActiveGunStateFromRuntime();
+        }
+    }
+
+    _countEntryQuantity(entry) {
+        if (!entry?.definitionId) return 0;
+        if (isAmmoDefinition(entry.definitionId)) return getAmmoAmountForEntry(entry);
+        if (isConsumableDefinition(entry.definitionId)) return getStackableAmountForEntry(entry);
+        return 1;
+    }
+
+    _addCountToMap(map, definitionId, amount) {
+        if (!definitionId || amount <= 0) return;
+        map[definitionId] = (map[definitionId] || 0) + amount;
+    }
+
+    _buildBroughtInCounts(backpackItems = [], safeboxItems = []) {
+        const counts = {};
+        for (const definitionId of Object.values(this.loadout || {})) {
+            this._addCountToMap(counts, definitionId, 1);
+        }
+        for (const entry of backpackItems || []) {
+            const definitionId = entry?.definitionId || entry;
+            this._addCountToMap(counts, definitionId, this._countEntryQuantity({ definitionId, quantity: entry?.quantity }));
+        }
+        for (const entry of safeboxItems || []) {
+            const definitionId = entry?.definitionId || entry;
+            this._addCountToMap(counts, definitionId, this._countEntryQuantity({ definitionId, quantity: entry?.quantity }));
+        }
+        return counts;
+    }
+
+    _getCurrentSecuredCounts() {
+        const counts = {};
+        for (const definitionId of Object.values(this.loadout || {})) {
+            this._addCountToMap(counts, definitionId, 1);
+        }
+        for (const item of this.inventoryItems) {
+            this._addCountToMap(counts, item.definitionId, this._countEntryQuantity(item));
+        }
+        for (const item of this.safeboxItems) {
+            this._addCountToMap(counts, item.definitionId, this._countEntryQuantity(item));
+        }
+        return counts;
+    }
+
+    getExtractedRaidValue() {
+        const currentCounts = this._getCurrentSecuredCounts();
+        return Object.entries(currentCounts).reduce((sum, [definitionId, count]) => {
+            const broughtInCount = this.broughtInCounts?.[definitionId] || 0;
+            const extractedCount = Math.max(0, count - broughtInCount);
+            const definition = getItemDefinition(definitionId);
+            return sum + ((definition?.sellValue || 0) * extractedCount);
+        }, 0);
     }
 
     _calculateCarryCapacity(loadout) {
@@ -108,32 +267,74 @@ export class Player {
         return capacity;
     }
 
-    _applyLoadoutStats(resetHp = false) {
-        this.weaponId = this.loadout.gun;
+    _getItemSpace(itemOrDefinitionId) {
+        const definitionId = typeof itemOrDefinitionId === 'string' ? itemOrDefinitionId : itemOrDefinitionId?.definitionId;
+        const explicitSize = typeof itemOrDefinitionId === 'object' ? itemOrDefinitionId?.size : null;
+        return Math.max(1, Number(explicitSize ?? getItemDefinition(definitionId)?.size) || 1);
+    }
+
+    setSquad(squadId, squadIndex = 0, squadSize = 1) {
+        this.squadId = squadId || this.squadId;
+        this.squadIndex = Math.max(0, Math.floor(Number(squadIndex) || 0));
+        this.squadSize = Math.max(1, Math.floor(Number(squadSize) || 1));
+    }
+
+    isFriendlyWith(entity) {
+        return Boolean(entity) && Boolean(this.squadId) && this.squadId === entity.squadId;
+    }
+
+    getCarriedSpaceUsed() {
+        return this.inventoryItems.reduce((sum, item) => sum + this._getItemSpace(item), 0);
+    }
+
+    getRemainingCarrySpace() {
+        return Math.max(0, this.carryCapacity - this.getCarriedSpaceUsed());
+    }
+
+    getSafeboxSpaceUsed() {
+        return this.safeboxItems.reduce((sum, item) => sum + this._getItemSpace(item), 0);
+    }
+
+    _getAvailableGunSlots() {
+        return GUN_LOADOUT_SLOTS.filter((slot) => getItemDefinition(this.loadout?.[slot])?.category === 'gun');
+    }
+
+    _getHighestValueGunSlot() {
+        return this._getAvailableGunSlots().reduce((bestSlot, slot) => {
+            if (!bestSlot) return slot;
+            const bestValue = getItemDefinition(this.loadout?.[bestSlot])?.sellValue || 0;
+            const slotValue = getItemDefinition(this.loadout?.[slot])?.sellValue || 0;
+            return slotValue > bestValue ? slot : bestSlot;
+        }, null);
+    }
+
+    _applyLoadoutStats(resetHp = false, { skipStore = false } = {}) {
+        if (!skipStore) this._storeActiveGunState();
+        const availableGunSlots = this._getAvailableGunSlots();
+        if (resetHp || !availableGunSlots.includes(this.weaponSlot)) {
+            this.weaponSlot = this._getHighestValueGunSlot();
+        }
+        this.weaponId = this.weaponSlot ? this.loadout[this.weaponSlot] : null;
         this.weapon = getItemDefinition(this.weaponId);
-        this.melee = getItemDefinition(this.loadout.melee);
         this.armor = getItemDefinition(this.loadout.armor);
         this.helmet = getItemDefinition(this.loadout.helmet);
         this.shoes = getItemDefinition(this.loadout.shoes);
         this.backpack = getItemDefinition(this.loadout.backpack);
 
-        this.shootDamage = this.weapon?.stats?.damage ?? PLAYER_SHOOT_DAMAGE;
+        this.shootDamage = this.weapon?.stats?.damage ?? 0;
         this.shootCooldownDuration = this.weapon?.stats?.cooldown ?? PLAYER_SHOOT_COOLDOWN;
         this.bulletSpeed = this.weapon?.stats?.bulletSpeed ?? PLAYER_BULLET_SPEED;
         this.bulletRange = this.weapon?.stats?.range ?? PLAYER_BULLET_RANGE;
-        this.ammoCapacity = this.weapon?.stats?.clipSize ?? 1;
-        this.reloadDuration = this.weapon?.stats?.reloadTime ?? 0.8;
+        this.outrangeMulti = Math.max(0, Math.min(2, Number(this.weapon?.stats?.outrangeMulti) || 0.5));
+        this.ammoCapacity = this.weapon?.stats?.clipSize ?? 0;
+        this.reloadDuration = this.weapon?.stats?.reloadTime ?? 0;
         this.bulletSpread = this.weapon?.stats?.spread ?? 0.03;
-        this.loadedAmmoQueue = [];
-        this.currentAmmo = 0;
-        this.reloadTimer = 0;
-        this.isReloading = false;
-        this.meleeDamage = this.melee?.stats?.meleeDamage ?? PLAYER_MELEE_DAMAGE;
-        this.meleeCooldown = this.melee?.stats?.meleeCooldown ?? PLAYER_MELEE_COOLDOWN;
+        this.projectileScale = Math.max(0.5, Number(this.weapon?.projectileScale) || 1);
         this.baseMoveSpeed = PLAYER_SPEED;
         this.carryCapacity = PLAYER_BASE_CARRY_CAPACITY;
 
         let bonusHp = 0;
+        this.hasGravityBoots = false;
         for (const item of [this.armor, this.helmet, this.shoes, this.backpack]) {
             if (!item) continue;
             bonusHp += item.modifiers?.maxHp || 0;
@@ -142,15 +343,124 @@ export class Player {
             if (item.modifiers?.shootCooldownMultiplier) {
                 this.shootCooldownDuration *= item.modifiers.shootCooldownMultiplier;
             }
+            if (item.modifiers?.gravityBoots) {
+                this.hasGravityBoots = true;
+            }
         }
 
         this.maxHp = PLAYER_MAX_HP + bonusHp;
         this.hp = resetHp ? this.maxHp : Math.min(this.hp, this.maxHp);
+
+        // Build shield layers from armor and helmet (purple+ rarity)
+        const oldShields = this.shieldLayers || [];
+        this.shieldLayers = [];
+        for (const item of [this.armor, this.helmet]) {
+            if (!item) continue;
+            const shieldMax = item.modifiers?.shieldHp;
+            const shieldRegen = item.modifiers?.shieldRegen || 0;
+            if (shieldMax && shieldMax > 0) {
+                const ri = rarityIndex(item.rarity);
+                const old = oldShields.find(s => s.source === item.category);
+                this.shieldLayers.push({
+                    maxHp: shieldMax,
+                    hp: resetHp ? shieldMax : Math.min(old?.hp ?? shieldMax, shieldMax),
+                    regen: shieldRegen,
+                    rarity: item.rarity,
+                    rarityIndex: ri,
+                    source: item.category
+                });
+            }
+        }
+        this.shieldLayers.sort((a, b) => b.rarityIndex - a.rarityIndex);
+
         this.moveSpeed = this.baseMoveSpeed * (this.isSlowMode ? PLAYER_SLOW_SPEED_MULTIPLIER : 1);
+        this._syncCombatSlot();
+        this._syncActiveGunStateFromRuntime();
+    }
+
+    _syncCombatSlot() {
+        const availableGunSlots = this._getAvailableGunSlots();
+        if (!availableGunSlots.length) {
+            this.weaponSlot = null;
+            this.weaponId = null;
+            this.weapon = null;
+            this.activeCombatSlot = null;
+            return;
+        }
+        if (!availableGunSlots.includes(this.weaponSlot)) {
+            this.weaponSlot = this._getHighestValueGunSlot();
+            this.weaponId = this.weaponSlot ? this.loadout[this.weaponSlot] : null;
+            this.weapon = getItemDefinition(this.weaponId);
+        }
+        if (GUN_LOADOUT_SLOTS.includes(this.activeCombatSlot) && !availableGunSlots.includes(this.activeCombatSlot)) {
+            this.activeCombatSlot = this.weaponSlot;
+        }
+        if (!this.activeCombatSlot) {
+            this.activeCombatSlot = this.weaponSlot;
+        }
+    }
+
+    hasUsableGun() {
+        return Boolean(this.weapon && this.ammoCapacity > 0);
+    }
+
+    isGunActive() {
+        return GUN_LOADOUT_SLOTS.includes(this.activeCombatSlot) && this.hasUsableGun();
+    }
+
+    switchGun() {
+        const availableGunSlots = this._getAvailableGunSlots();
+        if (!availableGunSlots.length) {
+            this._storeActiveGunState();
+            this.activeCombatSlot = null;
+            this._syncActiveGunStateFromRuntime();
+            return this.activeCombatSlot;
+        }
+        this._storeActiveGunState();
+        if (availableGunSlots.length === 1) {
+            this.weaponSlot = availableGunSlots[0];
+        } else if (availableGunSlots.includes(this.activeCombatSlot)) {
+            const currentIndex = availableGunSlots.indexOf(this.activeCombatSlot);
+            this.weaponSlot = availableGunSlots[(currentIndex + 1) % availableGunSlots.length];
+        } else if (availableGunSlots.includes(this.weaponSlot)) {
+            const currentIndex = availableGunSlots.indexOf(this.weaponSlot);
+            this.weaponSlot = availableGunSlots[(currentIndex + 1) % availableGunSlots.length];
+        } else {
+            this.weaponSlot = this._getHighestValueGunSlot();
+        }
+
+        this.activeCombatSlot = this.weaponSlot;
+        this._applyLoadoutStats(false, { skipStore: true });
+        this.requireMouseReleaseForShot = true;
+        return this.activeCombatSlot;
     }
 
     _recalculateLootValue() {
         this.loot = this.inventoryItems.reduce((sum, item) => sum + (item.sellValue || 0), 0);
+    }
+
+    _addRunLoss(amount, key) {
+        if (!(key in this.runLossBreakdown)) return;
+        const numericAmount = Math.max(0, Number(amount) || 0);
+        this.runLossBreakdown[key] += numericAmount;
+    }
+
+    getRunLossSummary(extra = {}) {
+        const ammoUsed = this.runLossBreakdown.ammoUsed || 0;
+        const consumablesUsed = this.runLossBreakdown.consumablesUsed || 0;
+        const abandoned = this.runLossBreakdown.abandoned || 0;
+        const backpack = Math.max(0, Number(extra.backpack) || 0);
+        const deathEquipment = Math.max(0, Number(extra.deathEquipment) || 0);
+        const safebox = Math.max(0, Number(extra.safebox) || 0);
+        return {
+            ammoUsed,
+            consumablesUsed,
+            abandoned,
+            backpack,
+            deathEquipment,
+            safebox,
+            total: ammoUsed + consumablesUsed + abandoned + backpack + deathEquipment + safebox,
+        };
     }
 
     getLoadoutView() {
@@ -196,12 +506,25 @@ export class Player {
         const quantity = getAmmoAmountForEntry(item);
         item.quantity = quantity;
         item.name = `${definition?.name || 'Ammo'} x${quantity}`;
-        item.sellValue = quantity;
+        item.sellValue = (definition?.sellValue || 0) * quantity;
         item.description = `${definition?.name || 'Ammo'} pack containing ${quantity} round${quantity === 1 ? '' : 's'}.`;
     }
 
     _pushAmmoPackToBackpack(definitionId, quantity) {
         let remaining = Math.max(0, Math.floor(quantity || 0));
+
+        for (const item of this.inventoryItems) {
+            if (remaining <= 0) break;
+            if (item.definitionId !== definitionId || !isAmmoDefinition(item.definitionId)) continue;
+            const current = getAmmoAmountForEntry(item);
+            const free = Math.max(0, 999 - current);
+            if (free <= 0) continue;
+            const added = Math.min(free, remaining);
+            item.quantity = current + added;
+            this._updateAmmoPackPresentation(item);
+            remaining -= added;
+        }
+
         while (remaining > 0) {
             const packSize = Math.min(999, remaining);
             this.inventoryItems.push(createLootItem(definitionId, { quantity: packSize }));
@@ -209,17 +532,130 @@ export class Player {
         }
     }
 
-    _returnLoadedAmmoToBackpack() {
+    _pushConsumableStacksToBackpack(definitionId, quantity) {
+        let remaining = Math.max(0, Math.floor(quantity || 0));
+
+        for (const item of this.inventoryItems) {
+            if (remaining <= 0) break;
+            if (item.definitionId !== definitionId || !isConsumableDefinition(item.definitionId)) continue;
+            const current = getStackableAmountForEntry(item);
+            const free = Math.max(0, 999 - current);
+            if (free <= 0) continue;
+            const added = Math.min(free, remaining);
+            item.quantity = current + added;
+            item.name = `${getItemDefinition(definitionId)?.name || 'Consumable'} x${item.quantity}`;
+            item.sellValue = (getItemDefinition(definitionId)?.sellValue || 0) * item.quantity;
+            item.description = `${getItemDefinition(definitionId)?.name || 'Consumable'} stack containing ${item.quantity} use${item.quantity === 1 ? '' : 's'}.`;
+            remaining -= added;
+        }
+
+        while (remaining > 0) {
+            const packSize = Math.min(999, remaining);
+            this.inventoryItems.push(createLootItem(definitionId, { quantity: packSize }));
+            remaining -= packSize;
+        }
+    }
+
+    _getConsumableHealRate(definitionId) {
+        const definition = getItemDefinition(definitionId);
+        const configuredRate = Number(definition?.healRate);
+        if (Number.isFinite(configuredRate) && configuredRate > 0) {
+            return configuredRate;
+        }
+        const rarity = definition?.rarity || 'white';
+        return CONSUMABLE_HEAL_RATE_BY_RARITY[rarity] || 1;
+    }
+
+    _getConsumableMoveSpeed(definitionId) {
+        const configuredSpeed = Number(getItemDefinition(definitionId)?.healingMoveSpeed);
+        if (Number.isFinite(configuredSpeed) && configuredSpeed >= 0) {
+            return configuredSpeed;
+        }
+        return DEFAULT_HEALING_MOVE_SPEED;
+    }
+
+    _consumeConsumableUnit(definitionId) {
+        const index = this.inventoryItems.findIndex((item) => item.definitionId === definitionId && isConsumableDefinition(item.definitionId));
+        if (index === -1) return false;
+
+        const item = this.inventoryItems[index];
+        const definition = getItemDefinition(definitionId);
+        this._addRunLoss(definition?.sellValue || 0, 'consumablesUsed');
+        const remaining = getStackableAmountForEntry(item) - 1;
+        if (remaining <= 0) {
+            this.inventoryItems.splice(index, 1);
+        } else {
+            item.quantity = remaining;
+            item.name = `${definition?.name || 'Consumable'} x${remaining}`;
+            item.sellValue = (definition?.sellValue || 0) * remaining;
+            item.description = `${definition?.name || 'Consumable'} stack containing ${remaining} use${remaining === 1 ? '' : 's'}.`;
+        }
+        this._recalculateLootValue();
+        return true;
+    }
+
+    stopHealing() {
+        this.isHealing = false;
+        this.healingDefinitionId = null;
+        this.healingName = '';
+        this.healingRate = 0;
+        this.healingMoveSpeed = DEFAULT_HEALING_MOVE_SPEED;
+        this.healingProgress = 0;
+    }
+
+    _startHealing(definitionId) {
+        const definition = getItemDefinition(definitionId);
+        if (!definition || !isConsumableDefinition(definitionId)) {
+            return { ok: false, reason: 'missing', name: '' };
+        }
+        if (this.hp >= this.maxHp) {
+            return { ok: false, reason: 'full', name: definition.name };
+        }
+        this.isReloading = false;
+        this.reloadTimer = 0;
+        this.isHealing = true;
+        this.healingDefinitionId = definitionId;
+        this.healingName = definition.name;
+        this.healingRate = this._getConsumableHealRate(definitionId);
+        this.healingMoveSpeed = this._getConsumableMoveSpeed(definitionId);
+        this.healingProgress = 0;
+        return { ok: true, reason: 'started', name: definition.name };
+    }
+
+    _returnLoadedAmmoToBackpack(slot = this.activeCombatSlot || this.weaponSlot) {
+        const state = slot === (this.activeCombatSlot || this.weaponSlot)
+            ? null
+            : this._ensureGunRuntimeState(slot);
+        const queue = state ? [...(state.loadedAmmoQueue || [])] : [...this.loadedAmmoQueue];
         const ammoCounts = {};
-        for (const definitionId of this.loadedAmmoQueue) {
+        for (const definitionId of queue) {
             if (definitionId === 'ammo_white') continue;
             ammoCounts[definitionId] = (ammoCounts[definitionId] || 0) + 1;
         }
         for (const [definitionId, quantity] of Object.entries(ammoCounts)) {
             this._pushAmmoPackToBackpack(definitionId, quantity);
         }
-        this.loadedAmmoQueue = [];
-        this.currentAmmo = 0;
+        if (state) {
+            state.loadedAmmoQueue = [];
+            state.reloadTimer = 0;
+            state.isReloading = false;
+        } else {
+            this.loadedAmmoQueue = [];
+            this.currentAmmo = 0;
+            this.reloadTimer = 0;
+            this.isReloading = false;
+            this._storeActiveGunState();
+        }
+    }
+
+    returnLoadedAmmoToInventory() {
+        for (const slot of GUN_LOADOUT_SLOTS) {
+            if (getItemDefinition(this.loadout?.[slot])?.category === 'gun') {
+                this._returnLoadedAmmoToBackpack(slot);
+            }
+        }
+        this._syncActiveGunStateFromRuntime();
+        this._recalculateLootValue();
     }
 
     _getCurrentAmmoDefinitionId() {
@@ -294,22 +730,42 @@ export class Player {
         if (index === -1) return { ok: false, message: 'Item not found in backpack.' };
 
         const item = this.inventoryItems[index];
-        if (!LOADOUT_SLOTS.includes(item.category)) return { ok: false, message: 'This item cannot be equipped.' };
+        const targetSlot = item.category === 'gun'
+            ? (GUN_LOADOUT_SLOTS.find((slot) => !this.loadout[slot])
+                || GUN_LOADOUT_SLOTS.reduce((lowestValueSlot, slot) => {
+                    const currentValue = getItemDefinition(this.loadout?.[slot])?.sellValue || 0;
+                    const lowestValue = getItemDefinition(this.loadout?.[lowestValueSlot])?.sellValue || 0;
+                    return currentValue < lowestValue ? slot : lowestValueSlot;
+                }, GUN_LOADOUT_SLOTS[0]))
+            : item.category;
+        if (!LOADOUT_SLOTS.includes(targetSlot)) return { ok: false, message: 'This item cannot be equipped.' };
 
-        const currentDefinitionId = this.loadout[item.category];
-        const nextLoadout = { ...this.loadout, [item.category]: item.definitionId };
+        const currentDefinitionId = this.loadout[targetSlot];
+        const nextLoadout = { ...this.loadout, [targetSlot]: item.definitionId };
         const nextCapacity = this._calculateCarryCapacity(nextLoadout);
-        const resultingCount = this.inventoryItems.length - 1 + (currentDefinitionId ? 1 : 0);
-        if (resultingCount > nextCapacity) {
+        const resultingSpace = this.getCarriedSpaceUsed() - this._getItemSpace(item) + (currentDefinitionId ? this._getItemSpace(currentDefinitionId) : 0);
+        if (resultingSpace > nextCapacity) {
             return { ok: false, message: 'Not enough backpack space for the swap.' };
         }
 
         this.inventoryItems.splice(index, 1);
+        if (currentDefinitionId && GUN_LOADOUT_SLOTS.includes(targetSlot)) {
+            this._returnLoadedAmmoToBackpack(targetSlot);
+            this._clearGunRuntimeState(targetSlot);
+        }
+        if (item.category === 'gun') {
+            // Store current gun's state before switching away
+            this._storeActiveGunState();
+        }
         if (currentDefinitionId) {
             this.inventoryItems.push(createLootItem(currentDefinitionId));
         }
-        this.loadout[item.category] = item.definitionId;
-        this._applyLoadoutStats();
+        this.loadout[targetSlot] = item.definitionId;
+        if (item.category === 'gun') {
+            this.weaponSlot = targetSlot;
+            this.activeCombatSlot = targetSlot;
+        }
+        this._applyLoadoutStats(false, { skipStore: true });
         this._recalculateLootValue();
         return { ok: true, message: `${item.name} equipped.` };
     }
@@ -318,32 +774,39 @@ export class Player {
         const index = this.inventoryItems.findIndex((item) => item.id === itemId);
         if (index === -1) return { ok: false, message: 'Item not found in backpack.' };
         const [item] = this.inventoryItems.splice(index, 1);
+        this._addRunLoss(item.sellValue || 0, 'abandoned');
         this._recalculateLootValue();
-        return { ok: true, message: `${item.name} abandoned.` };
+        return { ok: true, message: `${item.name} abandoned.`, droppedItem: item };
     }
 
     moveBackpackItemToSafebox(itemId) {
-        if (this.safeboxItems.length >= 4) {
-            return { ok: false, message: 'Safebox is full.' };
-        }
         const index = this.inventoryItems.findIndex((item) => item.id === itemId);
         if (index === -1) return { ok: false, message: 'Item not found in backpack.' };
-        const [item] = this.inventoryItems.splice(index, 1);
-        this.safeboxItems.push(item);
+        const item = this.inventoryItems[index];
+        if (this.getSafeboxSpaceUsed() + this._getItemSpace(item) > SAFEBOX_CAPACITY) {
+            return { ok: false, message: 'Safebox is full.' };
+        }
+        const [removedItem] = this.inventoryItems.splice(index, 1);
+        if (isConsumableDefinition(item.definitionId)) {
+            this.inventoryItems.splice(index, 0, removedItem);
+            return { ok: false, message: 'Consumables cannot be moved into the safebox.' };
+        }
+        this.safeboxItems.push(removedItem);
         this._recalculateLootValue();
-        return { ok: true, message: `${item.name} moved to safebox.` };
+        return { ok: true, message: `${removedItem.name} moved to safebox.` };
     }
 
     moveSafeboxItemToBackpack(itemId) {
-        if (this.inventoryItems.length >= this.carryCapacity) {
-            return { ok: false, message: 'Backpack full.' };
-        }
         const index = this.safeboxItems.findIndex((item) => item.id === itemId);
         if (index === -1) return { ok: false, message: 'Item not found in safebox.' };
-        const [item] = this.safeboxItems.splice(index, 1);
+        const item = this.safeboxItems[index];
+        if (this.getCarriedSpaceUsed() + this._getItemSpace(item) > this.carryCapacity) {
+            return { ok: false, message: 'Backpack full.' };
+        }
+        this.safeboxItems.splice(index, 1);
         this.inventoryItems.push(item);
         if (isAmmoDefinition(item.definitionId) && (this.currentAmmo <= 0 || this._getAmmoPriority(item.definitionId) < this._getAmmoPriority(this._getCurrentAmmoDefinitionId()))) {
-            this.reloadBestAvailableAmmo(true);
+            this.reloadBestAvailableAmmo(false);
         }
         this._recalculateLootValue();
         return { ok: true, message: `${item.name} moved to backpack.` };
@@ -351,20 +814,23 @@ export class Player {
 
     unequipLoadoutItem(slot) {
         const currentDefinitionId = this.loadout[slot];
-        const fallbackId = STARTER_LOADOUT[slot];
-        if (!currentDefinitionId || currentDefinitionId === fallbackId) {
+        if (!currentDefinitionId) {
             return { ok: false, message: 'Nothing to unequip here.' };
         }
 
-        const nextLoadout = { ...this.loadout, [slot]: fallbackId };
+        const nextLoadout = { ...this.loadout, [slot]: null };
         const nextCapacity = this._calculateCarryCapacity(nextLoadout);
-        if (this.inventoryItems.length + 1 > nextCapacity) {
+        if (this.getCarriedSpaceUsed() + this._getItemSpace(currentDefinitionId) > nextCapacity) {
             return { ok: false, message: 'Backpack is too full to unequip this item.' };
         }
 
         const currentDefinition = getItemDefinition(currentDefinitionId);
+        if (GUN_LOADOUT_SLOTS.includes(slot)) {
+            this._returnLoadedAmmoToBackpack(slot);
+        }
         this.inventoryItems.push(createLootItem(currentDefinitionId));
-        this.loadout[slot] = fallbackId;
+        this.loadout[slot] = null;
+        this._clearGunRuntimeState(slot);
         this._applyLoadoutStats();
         this._recalculateLootValue();
         return { ok: true, message: `${currentDefinition?.name || 'Item'} moved to backpack.` };
@@ -372,22 +838,65 @@ export class Player {
 
     abandonLoadoutItem(slot) {
         const currentDefinitionId = this.loadout[slot];
-        const fallbackId = STARTER_LOADOUT[slot];
-        if (!currentDefinitionId || currentDefinitionId === fallbackId) {
+        if (!currentDefinitionId) {
             return { ok: false, message: 'Nothing to abandon here.' };
         }
         const currentDefinition = getItemDefinition(currentDefinitionId);
-        this.loadout[slot] = fallbackId;
+        if (GUN_LOADOUT_SLOTS.includes(slot)) {
+            this._returnLoadedAmmoToBackpack(slot);
+        }
+        this.loadout[slot] = null;
+        this._clearGunRuntimeState(slot);
+        this._addRunLoss(currentDefinition?.sellValue || 0, 'abandoned');
         this._applyLoadoutStats();
-        return { ok: true, message: `${currentDefinition?.name || 'Item'} abandoned.` };
+        const droppedItem = createLootItem(currentDefinitionId);
+        return { ok: true, message: `${currentDefinition?.name || 'Item'} abandoned.`, droppedItem };
+    }
+
+    _updateFloatingDamageTexts(dt) {
+        for (let i = this.floatingDamageTexts.length - 1; i >= 0; i -= 1) {
+            const entry = this.floatingDamageTexts[i];
+            entry.life -= dt;
+            entry.yOffset -= entry.riseSpeed * dt;
+            entry.xOffset += entry.driftX * dt;
+            if (entry.life <= 0) {
+                this.floatingDamageTexts.splice(i, 1);
+            }
+        }
+    }
+
+    _spawnFloatingDamageText(amount) {
+        const value = Math.max(0, Math.round(Number(amount) || 0));
+        if (value <= 0) return;
+        this.floatingDamageTexts.push({
+            value,
+            life: 0.55,
+            maxLife: 0.55,
+            xOffset: (Math.random() * 10) - 5,
+            yOffset: -this.radius * 0.2,
+            driftX: (Math.random() * 20) - 10,
+            riseSpeed: 28 + Math.random() * 16,
+        });
     }
 
     update(dt, input, wallGrid, bullets) {
+        this._updateFloatingDamageTexts(dt);
         if (!this.alive) return;
 
+        if (input.shooting && this.isHealing) {
+            this.stopHealing();
+        }
+
+        if (!input.shooting) {
+            this.requireMouseReleaseForShot = false;
+        }
+
+        this._storeActiveGunState();
+        this._decrementGunCooldowns(dt);
+        this._syncActiveGunStateFromRuntime();
+
         // Timers
-        this.shootCooldown = Math.max(0, this.shootCooldown - dt);
-        if (this.isReloading) {
+        if (this.isReloading && !this.isHealing) {
             this.reloadTimer = Math.max(0, this.reloadTimer - dt);
             if (this.reloadTimer <= 0) {
                 this.isReloading = false;
@@ -407,6 +916,34 @@ export class Player {
             }
         }
 
+        // Shield regen
+        if (this.shieldLayers) {
+            for (const shield of this.shieldLayers) {
+                if (shield.hp < shield.maxHp) {
+                    shield.hp = Math.min(shield.maxHp, shield.hp + shield.regen * dt);
+                }
+            }
+        }
+
+        if (this.isHealing) {
+            if (!this.healingDefinitionId || this.hp >= this.maxHp) {
+                this.stopHealing();
+            } else {
+                this.healingProgress += this.healingRate * dt;
+                while (this.healingProgress >= 1 && this.hp < this.maxHp) {
+                    if (!this._consumeConsumableUnit(this.healingDefinitionId)) {
+                        this.stopHealing();
+                        break;
+                    }
+                    this.heal(1);
+                    this.healingProgress -= 1;
+                }
+                if (this.hp >= this.maxHp) {
+                    this.stopHealing();
+                }
+            }
+        }
+
         // Aim angle
         this.angle = angleBetween(this.x, this.y, input.aimWorld.x, input.aimWorld.y);
 
@@ -414,36 +951,44 @@ export class Player {
         const energyRatio = this.energy / this.energyMax;
 
         if (input.modeToggleRequested) {
-            if (energyRatio > PLAYER_ENERGY_RETURN_THRESHOLD && !this.forcedSlowMode) {
+            if (!this.hasGravityBoots && energyRatio > PLAYER_ENERGY_RETURN_THRESHOLD && !this.forcedSlowMode) {
                 this.manualSlowMode = !this.manualSlowMode;
             }
         }
 
-        if (!this.dashing) {
-            if (!this.manualSlowMode && !this.forcedSlowMode && isMoving) {
-                this.energy = Math.max(0, this.energy - PLAYER_ENERGY_DRAIN_PER_SECOND * dt);
-            } else {
-                const recoveryRate = isMoving ? PLAYER_ENERGY_RECOVERY_PER_SECOND : PLAYER_ENERGY_IDLE_RECOVERY_PER_SECOND;
-                this.energy = Math.min(this.energyMax, this.energy + recoveryRate * dt);
-            }
-        }
-
-        if (this.energy <= 0) {
-            this.energy = 0;
-            this.forcedSlowMode = true;
-        }
-
-        const nextEnergyRatio = this.energy / this.energyMax;
-        if (this.forcedSlowMode && nextEnergyRatio >= PLAYER_ENERGY_RETURN_THRESHOLD) {
+        if (this.hasGravityBoots) {
+            // Gravity boots: no energy drain, always normal speed (except healing)
+            this.energy = this.energyMax;
             this.forcedSlowMode = false;
+            this.manualSlowMode = false;
+            this.isSlowMode = false;
+        } else {
+            if (!this.dashing) {
+                if (!this.manualSlowMode && !this.forcedSlowMode && isMoving) {
+                    this.energy = Math.max(0, this.energy - PLAYER_ENERGY_DRAIN_PER_SECOND * dt);
+                } else {
+                    const recoveryRate = isMoving ? PLAYER_ENERGY_RECOVERY_PER_SECOND : PLAYER_ENERGY_IDLE_RECOVERY_PER_SECOND;
+                    this.energy = Math.min(this.energyMax, this.energy + recoveryRate * dt);
+                }
+            }
+
+            if (this.energy <= 0) {
+                this.energy = 0;
+                this.forcedSlowMode = true;
+            }
+
+            const nextEnergyRatio = this.energy / this.energyMax;
+            if (this.forcedSlowMode && nextEnergyRatio >= PLAYER_ENERGY_RETURN_THRESHOLD) {
+                this.forcedSlowMode = false;
+            }
+
+            this.isSlowMode = this.forcedSlowMode || this.manualSlowMode;
         }
 
-        this.isSlowMode = this.forcedSlowMode || this.manualSlowMode;
-
-        this.moveSpeed = this.baseMoveSpeed * (this.isSlowMode ? PLAYER_SLOW_SPEED_MULTIPLIER : 1);
+        this.moveSpeed = this.isHealing ? this.healingMoveSpeed : this.baseMoveSpeed * (this.isSlowMode ? PLAYER_SLOW_SPEED_MULTIPLIER : 1);
 
         // Dash initiation
-        if (input.dashRequested && !this.dashing && this.dashCooldown <= 0) {
+        if (input.dashRequested && !this.isHealing && !this.dashing && this.dashCooldown <= 0) {
             const dir = input.moveDir;
             if (dir.x !== 0 || dir.y !== 0) {
                 this.dashing = true;
@@ -482,32 +1027,40 @@ export class Player {
         this.x = clamp(this.x, this.radius, MAP_WIDTH - this.radius);
         this.y = clamp(this.y, this.radius, MAP_HEIGHT - this.radius);
 
-        if (!input.shooting && !this.isReloading && this.currentAmmo < this.ammoCapacity && (this.getBackpackAmmoCount() > 0 || this._hasFallbackAmmo())) {
+        if (input.weaponSwitchRequested) {
+            this.switchGun();
+        }
+
+        if (!this.isHealing && this.isGunActive() && !input.shooting && !this.isReloading && this.currentAmmo < this.ammoCapacity && (this.getBackpackAmmoCount() > 0 || this._hasFallbackAmmo())) {
             this.startReload();
         }
 
-        if (input.shooting && this.isReloading && this.currentAmmo > 0) {
+        if (!this.isHealing && this.isGunActive() && input.shooting && this.isReloading && this.currentAmmo > 0) {
             this.isReloading = false;
             this.reloadTimer = 0;
         }
 
         // Shooting
-        if (input.shooting && this.shootCooldown <= 0 && !this.dashing) {
+        if (this.isGunActive() && input.shooting && !this.requireMouseReleaseForShot && this.shootCooldown <= 0 && !this.dashing) {
             if (this.isReloading) {
+                this._storeActiveGunState();
                 return;
             }
             if (this.currentAmmo <= 0) {
                 this.startReload();
+                this._storeActiveGunState();
                 return;
             }
             this._shoot(input.aimWorld, bullets);
             this.currentAmmo = this.loadedAmmoQueue.length;
             this.shootCooldown = this.shootCooldownDuration;
         }
+
+        this._storeActiveGunState();
     }
 
     startReload() {
-        if (this.isReloading || this.currentAmmo >= this.ammoCapacity) return false;
+        if (this.isHealing || !this.isGunActive() || this.isReloading || this.currentAmmo >= this.ammoCapacity || this.ammoCapacity <= 0) return false;
         this.isReloading = true;
         this.reloadTimer = this.reloadDuration;
         return true;
@@ -518,6 +1071,12 @@ export class Player {
         const ammoDefinition = getItemDefinition(ammoDefinitionId);
         const ammoColor = getRarityMeta(ammoDefinition?.rarity || 'white').color;
         const damageMultiplier = ammoDefinition?.damageMultiplier ?? 1;
+        const projectileStyle = ammoDefinition?.projectileStyle || 'orb';
+        const projectileScale = Math.max(0.5, Number(this.projectileScale) || 1);
+        const projectileWidth = Math.max(2, (Number(ammoDefinition?.projectileWidth) || 4) * projectileScale);
+        if (ammoDefinitionId !== 'ammo_white') {
+            this._addRunLoss(ammoDefinition?.sellValue || 0, 'ammoUsed');
+        }
         const angle = angleBetween(this.x, this.y, aimWorld.x, aimWorld.y) + ((Math.random() * 2) - 1) * this.bulletSpread;
         const cos = Math.cos(angle);
         const sin = Math.sin(angle);
@@ -528,13 +1087,23 @@ export class Player {
             vx: cos * this.bulletSpeed,
             vy: sin * this.bulletSpeed,
             damage: this.shootDamage * damageMultiplier,
-            owner: 'player',
+            owner: this.bulletOwnerType || 'player',
+            ownerId: this.id,
+            ownerSquadId: this.squadId,
             ammoDefinitionId,
             color: ammoColor,
             instantKill: Boolean(ammoDefinition?.instantKill),
-            radius: 4,
-            life: this.bulletRange / this.bulletSpeed,
-            maxLife: this.bulletRange / this.bulletSpeed
+            radius: projectileStyle === 'ap' ? projectileWidth * 0.5 : 4 * projectileScale,
+            wallPenetration: Math.max(0, Math.floor(Number(ammoDefinition?.wallPenetration) || 0)),
+            projectileStyle,
+            projectileColor: ammoDefinition?.projectileColor || ammoColor,
+            projectileWidth,
+            projectileLength: Math.max(projectileWidth * 3, Number(ammoDefinition?.projectileLength) || 18),
+            trailLength: Math.max(projectileWidth * 8, Number(ammoDefinition?.trailLength) || 32),
+            life: (this.bulletRange * 2) / this.bulletSpeed,
+            maxLife: (this.bulletRange * 2) / this.bulletSpeed,
+            baseRange: this.bulletRange,
+            outrangeMulti: this.outrangeMulti
         });
     }
 
@@ -559,59 +1128,121 @@ export class Player {
         }
     }
 
-    takeDamage(amount) {
+    takeDamage(amount, bullet = null) {
         if (this.invincible > 0) return;
-        this.hp -= amount;
-        this.damageFlash = 0.15;
+        const rawDamage = Math.max(0, Number(amount) || 0);
+        let hpDamage = rawDamage;
+        if (rawDamage > 0 && this.shieldLayers && this.shieldLayers.length > 0 && bullet && !bullet.instantKill) {
+            hpDamage = this._applyShieldDamage(rawDamage, bullet);
+        }
+        this.hp -= hpDamage;
+        this.damageFlash = 0.28;
         this.invincible = 0.2;
+        this._spawnFloatingDamageText(rawDamage);
+        if (this.onDamageTaken) {
+            this.onDamageTaken(this, hpDamage);
+        }
         if (this.hp <= 0) {
             this.hp = 0;
             this.alive = false;
         }
     }
 
+    /**
+     * Distribute damage across shield layers and return the HP damage that
+     * passes through to the operator.
+     *   ammo < shield rarity  → shield absorbs all (overflow to operator)
+     *   ammo = shield rarity  → shield absorbs 30 %
+     *   ammo > shield rarity  → both shield and operator take full damage
+     * Higher-rarity shields are consumed first.
+     */
+    _applyShieldDamage(damage, bullet) {
+        const ammoDef = getItemDefinition(bullet.ammoDefinitionId);
+        const ammoRi = ammoDef ? rarityIndex(ammoDef.rarity) : 0;
+        let remaining = damage;
+        for (const shield of this.shieldLayers) {
+            if (shield.hp <= 0 || remaining <= 0) continue;
+            if (ammoRi < shield.rarityIndex) {
+                const absorbed = Math.min(shield.hp, remaining);
+                shield.hp -= absorbed;
+                remaining -= absorbed;
+            } else if (ammoRi === shield.rarityIndex) {
+                const shieldPortion = remaining * 0.3;
+                const absorbed = Math.min(shield.hp, shieldPortion);
+                shield.hp -= absorbed;
+                remaining -= absorbed;
+            } else {
+                shield.hp = Math.max(0, shield.hp - remaining);
+            }
+        }
+        return remaining;
+    }
+
     heal(amount) {
         this.hp = Math.min(this.maxHp, this.hp + amount);
     }
 
-    addConsumable(definitionId) {
-        const def = getItemDefinition(definitionId);
-        if (!def || def.category !== 'consumable') return false;
-        this.consumables.push(definitionId);
-        return true;
-    }
-
     getConsumableCount() {
-        return this.consumables.length;
+        return this.inventoryItems.reduce((sum, item) => {
+            if (!isConsumableDefinition(item.definitionId)) return sum;
+            return sum + getStackableAmountForEntry(item);
+        }, 0);
     }
 
     useConsumable() {
-        if (this.consumables.length === 0) return false;
-        const definitionId = this.consumables.shift();
-        const def = getItemDefinition(definitionId);
-        if (!def) return false;
-
-        if (def.healAmount === -1) {
-            // Full heal
-            this.hp = this.maxHp;
-        } else if (def.healAmount > 0) {
-            this.heal(def.healAmount);
+        if (this.isHealing) {
+            const name = this.healingName;
+            this.stopHealing();
+            return { action: 'cancelled', name };
         }
 
-        if (def.restoreEnergy) {
-            this.energy = this.energyMax;
-        }
+        const index = this.inventoryItems.findIndex((item) => isConsumableDefinition(item.definitionId));
+        if (index === -1) return false;
 
-        if (def.regenPerSecond && def.regenDuration) {
-            this.regenPerSecond = def.regenPerSecond;
-            this.regenTimer = def.regenDuration;
+        const definitionId = this.inventoryItems[index].definitionId;
+        const result = this._startHealing(definitionId);
+        if (!result.ok) {
+            return result.reason === 'full'
+                ? { action: 'full', name: result.name }
+                : false;
         }
-
-        return { definitionId, name: def.name };
+        return { action: 'started', definitionId, name: result.name };
     }
 
     addItem(item) {
-        if (this.inventoryItems.length >= this.carryCapacity) {
+        if (isConsumableDefinition(item.definitionId)) {
+            const quantity = getStackableAmountForEntry(item) || 1;
+            const existingFreeSlots = this.inventoryItems
+                .filter((entry) => entry.definitionId === item.definitionId && isConsumableDefinition(entry.definitionId))
+                .reduce((sum, entry) => sum + Math.max(0, 999 - getStackableAmountForEntry(entry)), 0);
+            const extraSlotsNeeded = Math.ceil(Math.max(0, quantity - existingFreeSlots) / 999);
+            const extraSpaceNeeded = extraSlotsNeeded * this._getItemSpace(item);
+            if (this.getCarriedSpaceUsed() + extraSpaceNeeded > this.carryCapacity) {
+                return false;
+            }
+            this._pushConsumableStacksToBackpack(item.definitionId, quantity);
+            this._recalculateLootValue();
+            return true;
+        }
+
+        // Auto-equip gun to free hand slot if available
+        if (getItemDefinition(item.definitionId)?.category === 'gun') {
+            const freeSlot = GUN_LOADOUT_SLOTS.find((slot) => !this.loadout[slot]);
+            if (freeSlot) {
+                const hadGun = this.weapon != null;
+                this._storeActiveGunState();
+                this.loadout[freeSlot] = item.definitionId;
+                if (!hadGun) {
+                    // First gun — switch to it
+                    this.weaponSlot = freeSlot;
+                    this.activeCombatSlot = freeSlot;
+                }
+                this._applyLoadoutStats(false, { skipStore: true });
+                return true;
+            }
+        }
+
+        if (this.getCarriedSpaceUsed() + this._getItemSpace(item) > this.carryCapacity) {
             return false;
         }
         this.inventoryItems.push(item);
@@ -620,7 +1251,7 @@ export class Player {
     }
 
     getCarriedItemCount() {
-        return this.inventoryItems.length;
+        return this.getCarriedSpaceUsed();
     }
 
     canReturnToNormalMode() {
@@ -628,20 +1259,39 @@ export class Player {
     }
 
     getWeaponHudInfo() {
+        if (!this.hasUsableGun()) {
+            return {
+                text: 'NO GUN EQUIPPED',
+                color: '#9e9e9e',
+                ammoDefinitionId: null,
+                active: false,
+            };
+        }
         const reserveAmmo = this.getBackpackAmmoCount();
         const ammoDefinitionId = this._getCurrentAmmoDefinitionId();
         const ammoMeta = getRarityMeta(getItemDefinition(ammoDefinitionId)?.rarity || 'white');
         if (this.isReloading) {
             return {
-                text: `${this.weapon?.name || 'Gun'} · RELOADING ${this.reloadTimer.toFixed(1)}s · RESERVE ${reserveAmmo > 0 ? reserveAmmo : '∞'}`,
+                text: `${this.isGunActive() ? '▶ ' : ''}${this.weapon?.name || 'Gun'} · RELOADING ${this.reloadTimer.toFixed(1)}s · RESERVE ${reserveAmmo > 0 ? reserveAmmo : '∞'} · E SWITCH`,
                 color: ammoMeta.color,
                 ammoDefinitionId,
+                active: this.isGunActive(),
             };
         }
         return {
-            text: `${this.weapon?.name || 'Gun'} · AMMO ${this.currentAmmo}/${this.ammoCapacity} · RESERVE ${reserveAmmo > 0 ? reserveAmmo : '∞'}`,
+            text: `${this.isGunActive() ? '▶ ' : ''}${this.weapon?.name || 'Gun'} · AMMO ${this.currentAmmo}/${this.ammoCapacity} · RESERVE ${reserveAmmo > 0 ? reserveAmmo : '∞'} · E SWITCH`,
             color: ammoMeta.color,
             ammoDefinitionId,
+            active: this.isGunActive(),
+        };
+    }
+
+    getHealingHudInfo() {
+        if (!this.isHealing) return null;
+        const rarityMeta = getRarityMeta(getItemDefinition(this.healingDefinitionId)?.rarity || 'white');
+        return {
+            text: `HEALING ${this.healingName || 'Consumable'} · ${this.healingRate.toFixed(1)} HP/S · MOVE 10 · Q CANCEL`,
+            color: rarityMeta.color,
         };
     }
 }

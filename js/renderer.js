@@ -7,18 +7,48 @@ import {
     TILE, ZONE, COLORS, EXTRACTION_RADIUS, EXTRACTION_TIME,
     PLAYER_DASH_COOLDOWN, CRATE_WIDTH, CRATE_HEIGHT
 } from './constants.js';
-import { getRarityMeta } from './profile.js';
+import { formatCompactValue, getRarityMeta } from './profile.js';
 
 export class Renderer {
     constructor(ctx, camera) {
         this.ctx = ctx;
         this.cam = camera;
+        this.coinImage = new Image();
+        this.coinImage.src = '/assets/items/coin.png';
     }
 
     clear() {
         const { ctx, cam } = this;
         ctx.fillStyle = COLORS.BG;
         ctx.fillRect(0, 0, cam.width, cam.height);
+    }
+
+    drawCoinValueText(label, value, x, y, options = {}) {
+        const { ctx } = this;
+        const text = `${label}${formatCompactValue(value)}`;
+        const gap = options.gap ?? 6;
+        const iconSize = options.iconSize ?? 14;
+        const align = options.align || ctx.textAlign || 'left';
+        const iconOffsetY = options.iconOffsetY ?? (ctx.textBaseline === 'middle' ? -iconSize / 2 : -iconSize + 3);
+        const textWidth = ctx.measureText(text).width;
+        const totalWidth = textWidth + gap + iconSize;
+
+        let startX = x;
+        if (align === 'center') {
+            startX = x - totalWidth / 2;
+        } else if (align === 'right' || align === 'end') {
+            startX = x - totalWidth;
+        }
+
+        ctx.save();
+        ctx.textAlign = 'left';
+        ctx.fillText(text, startX, y);
+        if (this.coinImage.complete && this.coinImage.naturalWidth > 0) {
+            ctx.drawImage(this.coinImage, startX + textWidth + gap, y + iconOffsetY, iconSize, iconSize);
+        } else {
+            ctx.fillText(' c', startX + textWidth, y);
+        }
+        ctx.restore();
     }
 
     // ---------- Map ----------
@@ -45,7 +75,7 @@ export class Renderer {
                     // Floor — zone-based coloring
                     const zone = zones[r][c];
                     if (zone === ZONE.HIGH_VALUE) {
-                        ctx.fillStyle = '#1a0f0f';
+                        ctx.fillStyle = COLORS.FLOOR_HIGH_VALUE;
                     } else if (zone === ZONE.COMBAT) {
                         ctx.fillStyle = COLORS.FLOOR_DARK;
                     } else {
@@ -63,11 +93,29 @@ export class Renderer {
     }
 
     // ---------- Extraction zones ----------
-    drawExtractionZones(zones, playerExtracting, extractTimer) {
+    drawExtractionZones(zones, playerExtracting, extractTimer, gateOpen = true) {
         const { ctx, cam } = this;
         for (const ez of zones) {
             const sx = ez.x - cam.x;
             const sy = ez.y - cam.y;
+
+            if (!gateOpen) {
+                // Locked — dim red pulsing circle
+                const pulse = 0.4 + 0.15 * Math.sin(Date.now() / 500);
+                ctx.globalAlpha = pulse;
+                ctx.strokeStyle = '#ff5252';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(sx, sy, ez.radius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = '#ff5252';
+                ctx.font = 'bold 11px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('LOCKED', sx, sy - ez.radius - 8);
+                ctx.fillText('🔒', sx, sy);
+                ctx.globalAlpha = 1;
+                continue;
+            }
 
             // Glow
             const gradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, ez.radius * 1.5);
@@ -195,6 +243,10 @@ export class Renderer {
         const sx = player.x - cam.x;
         const sy = player.y - cam.y;
 
+        if (player.isHealing) {
+            this.drawHealingEffect(sx, sy, player.radius);
+        }
+
         // Dash trail
         if (player.dashing) {
             ctx.globalAlpha = 0.3;
@@ -205,6 +257,8 @@ export class Renderer {
             ctx.globalAlpha = 1;
         }
 
+        this._drawOperatorBackpack(player, sx, sy);
+
         // Body
         ctx.fillStyle = player.damageFlash > 0 ? '#ff6666' : COLORS.PLAYER;
         ctx.strokeStyle = COLORS.PLAYER_STROKE;
@@ -214,18 +268,11 @@ export class Renderer {
         ctx.fill();
         ctx.stroke();
 
+        this._drawOperatorArmorRing(player, sx, sy);
+        this._drawOperatorHelmet(player, sx, sy);
+
         // Direction indicator (gun barrel)
-        const barrelLen = player.radius + 8;
-        const bx = sx + Math.cos(player.angle) * barrelLen;
-        const by = sy + Math.sin(player.angle) * barrelLen;
-        ctx.strokeStyle = COLORS.PLAYER_STROKE;
-        ctx.lineWidth = 4;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(sx + Math.cos(player.angle) * player.radius * 0.5, sy + Math.sin(player.angle) * player.radius * 0.5);
-        ctx.lineTo(bx, by);
-        ctx.stroke();
-        ctx.lineCap = 'butt';
+        this._drawOperatorGun(player, sx, sy, COLORS.PLAYER_STROKE);
 
         // Eye / face direction
         const eyeX = sx + Math.cos(player.angle) * player.radius * 0.4;
@@ -234,6 +281,245 @@ export class Renderer {
         ctx.beginPath();
         ctx.arc(eyeX, eyeY, 3, 0, Math.PI * 2);
         ctx.fill();
+
+        const shieldHpP = (player.shieldLayers || []).reduce((s, l) => s + l.hp, 0);
+        const shieldMaxP = (player.shieldLayers || []).reduce((s, l) => s + l.maxHp, 0);
+        const totalCapP = Math.max(1, player.maxHp + shieldMaxP);
+        const miniBarW = player.radius * 2.2;
+        const miniBarH = 4;
+        const miniBarX = sx - miniBarW / 2;
+        const miniBarY = sy + player.radius + 2;
+        ctx.fillStyle = COLORS.HP_BAR_BG;
+        ctx.fillRect(miniBarX, miniBarY, miniBarW, miniBarH);
+        const hpRatioP = player.hp / Math.max(1, player.maxHp);
+        const hpFracP = Math.max(0, Math.min(1, player.hp / totalCapP));
+        ctx.fillStyle = hpRatioP > 0.3 ? COLORS.HP_BAR : COLORS.HP_BAR_LOW;
+        ctx.fillRect(miniBarX, miniBarY, miniBarW * hpFracP, miniBarH);
+        if (shieldHpP > 0) {
+            ctx.fillStyle = COLORS.SHIELD_BAR;
+            ctx.fillRect(miniBarX + miniBarW * hpFracP, miniBarY, miniBarW * Math.max(0, Math.min(1, shieldHpP / totalCapP)), miniBarH);
+        }
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(miniBarX, miniBarY, miniBarW, miniBarH);
+
+        this._drawOperatorName(player, sx, sy, COLORS.OPERATOR_NAME_SELF);
+    }
+
+    _getRarityColor(itemDefinition, fallback = COLORS.PLAYER_STROKE) {
+        return itemDefinition ? getRarityMeta(itemDefinition.rarity).color : fallback;
+    }
+
+    _drawOperatorArmorRing(operator, sx, sy) {
+        const { ctx } = this;
+        if (!operator?.armor) return;
+
+        ctx.save();
+        ctx.strokeStyle = this._getRarityColor(operator.armor, COLORS.PLAYER_STROKE);
+        ctx.lineWidth = 3;
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(sx, sy, operator.radius + 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    _drawOperatorHelmet(operator, sx, sy) {
+        const { ctx } = this;
+        if (!operator?.helmet) return;
+
+        const helmetRadius = operator.radius * 0.46;
+        const helmetX = sx + Math.cos(operator.angle) * operator.radius * 0.12;
+        const helmetY = sy - operator.radius * 0.28;
+
+        ctx.save();
+        ctx.fillStyle = this._getRarityColor(operator.helmet, COLORS.PLAYER_STROKE);
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.arc(helmetX, helmetY, helmetRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    _drawOperatorBackpack(operator, sx, sy) {
+        const { ctx } = this;
+        if (!operator?.backpack) return;
+
+        const backpackRadius = operator.radius * 0.62;
+        const backpackX = sx - Math.cos(operator.angle) * operator.radius * 0.58;
+        const backpackY = sy - Math.sin(operator.angle) * operator.radius * 0.58;
+
+        ctx.save();
+        ctx.fillStyle = this._getRarityColor(operator.backpack, COLORS.PLAYER_STROKE);
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.arc(backpackX, backpackY, backpackRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    _drawOperatorGun(operator, sx, sy, fallbackStroke) {
+        const { ctx } = this;
+        const barrelLen = operator.radius + 8;
+        const startX = sx + Math.cos(operator.angle) * operator.radius * 0.5;
+        const startY = sy + Math.sin(operator.angle) * operator.radius * 0.5;
+        const endX = sx + Math.cos(operator.angle) * barrelLen;
+        const endY = sy + Math.sin(operator.angle) * barrelLen;
+        const gunColor = this._getRarityColor(operator?.weapon, fallbackStroke);
+
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+
+        ctx.strokeStyle = gunColor;
+        ctx.lineWidth = 4;
+        ctx.shadowColor = gunColor;
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    _drawOperatorName(operator, sx, sy, color) {
+        const { ctx } = this;
+        if (!operator?.displayName) return;
+        ctx.save();
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = color;
+        ctx.shadowColor = 'rgba(0,0,0,0.65)';
+        ctx.shadowBlur = 6;
+        ctx.fillText(operator.displayName, sx, sy + operator.radius + 8);
+        ctx.restore();
+    }
+
+    _drawFloatingDamageTexts(operator, sx, sy) {
+        const { ctx } = this;
+        if (!operator?.floatingDamageTexts?.length) return;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        for (const entry of operator.floatingDamageTexts) {
+            const alpha = Math.max(0, entry.life / entry.maxLife);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#ff5a5a';
+            ctx.shadowColor = 'rgba(0,0,0,0.7)';
+            ctx.shadowBlur = 8;
+            ctx.font = 'bold 13px monospace';
+            ctx.fillText(`-${entry.value}`, sx + entry.xOffset, sy + entry.yOffset);
+        }
+
+        ctx.restore();
+        ctx.globalAlpha = 1;
+    }
+
+    drawAiPlayers(players = [], localPlayer = null) {
+        const { ctx, cam } = this;
+        for (const bot of players) {
+            if (!bot) continue;
+            if (bot.aiExtracted) continue;
+            if (!bot.alive && bot.deathTimer > 0.65) continue;
+
+            const sx = bot.x - cam.x;
+            const sy = bot.y - cam.y;
+            if (sx < -60 || sx > cam.width + 60 || sy < -60 || sy > cam.height + 60) continue;
+
+            if (!bot.alive) {
+                ctx.globalAlpha = Math.max(0, 1 - bot.deathTimer * 1.6);
+            }
+
+            this._drawOperatorBackpack(bot, sx, sy);
+
+            ctx.fillStyle = bot.damageFlash > 0 ? '#bbdefb' : COLORS.AI_PLAYER;
+            ctx.strokeStyle = COLORS.AI_PLAYER_STROKE;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(sx, sy, bot.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            this._drawOperatorArmorRing(bot, sx, sy);
+            this._drawOperatorHelmet(bot, sx, sy);
+
+            this._drawOperatorGun(bot, sx, sy, COLORS.AI_PLAYER_STROKE);
+
+            const eyeX = sx + Math.cos(bot.angle) * bot.radius * 0.4;
+            const eyeY = sy + Math.sin(bot.angle) * bot.radius * 0.4;
+            ctx.fillStyle = '#f5fbff';
+            ctx.beginPath();
+            ctx.arc(eyeX, eyeY, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            const shieldHpB = (bot.shieldLayers || []).reduce((s, l) => s + l.hp, 0);
+            const shieldMaxB = (bot.shieldLayers || []).reduce((s, l) => s + l.maxHp, 0);
+            const totalCapB = Math.max(1, bot.maxHp + shieldMaxB);
+            const miniBarW = bot.radius * 2.2;
+            const miniBarH = 4;
+            const miniBarX = sx - miniBarW / 2;
+            const miniBarY = sy + bot.radius + 2;
+            ctx.fillStyle = COLORS.HP_BAR_BG;
+            ctx.fillRect(miniBarX, miniBarY, miniBarW, miniBarH);
+            const hpRatioB = bot.hp / Math.max(1, bot.maxHp);
+            const hpFracB = Math.max(0, Math.min(1, bot.hp / totalCapB));
+            ctx.fillStyle = hpRatioB > 0.3 ? COLORS.HP_BAR : COLORS.HP_BAR_LOW;
+            ctx.fillRect(miniBarX, miniBarY, miniBarW * hpFracB, miniBarH);
+            if (shieldHpB > 0) {
+                ctx.fillStyle = COLORS.SHIELD_BAR;
+                ctx.fillRect(miniBarX + miniBarW * hpFracB, miniBarY, miniBarW * Math.max(0, Math.min(1, shieldHpB / totalCapB)), miniBarH);
+            }
+            ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(miniBarX, miniBarY, miniBarW, miniBarH);
+
+            const nameColor = localPlayer && localPlayer.isFriendlyWith?.(bot)
+                ? COLORS.OPERATOR_NAME_TEAM
+                : COLORS.OPERATOR_NAME_ENEMY;
+            this._drawOperatorName(bot, sx, sy, nameColor);
+
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    drawHealingEffect(sx, sy, radius) {
+        const { ctx } = this;
+        const time = Date.now() * 0.0024;
+        const plusCount = 6;
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        for (let i = 0; i < plusCount; i++) {
+            const phase = (i / plusCount) + time;
+            const orbitAngle = phase * Math.PI * 2;
+            const orbitRadius = radius + 6 + ((i % 2) * 5);
+            const rise = (phase % 1) * 24;
+            const px = sx + Math.cos(orbitAngle) * orbitRadius;
+            const py = sy - rise + Math.sin(orbitAngle * 0.7) * 6;
+            const alpha = 0.2 + (1 - (phase % 1)) * 0.6;
+            const size = 12 + ((i + Math.floor(time * 3)) % 3);
+
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#8dff98';
+            ctx.shadowColor = '#4caf50';
+            ctx.shadowBlur = 10;
+            ctx.font = `bold ${size}px monospace`;
+            ctx.fillText('+', px, py);
+        }
+
+        ctx.restore();
     }
 
     // ---------- Enemies ----------
@@ -327,9 +613,32 @@ export class Renderer {
             const sy = b.y - cam.y;
             if (sx < -10 || sx > cam.width + 10 || sy < -10 || sy > cam.height + 10) continue;
 
-            const color = b.owner === 'player'
-                ? (b.color || COLORS.BULLET_PLAYER)
-                : COLORS.BULLET_ENEMY;
+            if (b.projectileStyle === 'ap') {
+                const projectileWidth = Math.max(2, Number(b.projectileWidth) || 4);
+                const projectileLength = Math.max(projectileWidth * 3, Number(b.projectileLength) || 24);
+                const tailLength = Math.max(projectileLength * 2, Number(b.trailLength) || 52);
+                const angle = Math.atan2(b.vy, b.vx);
+
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.rotate(angle);
+
+                const tailGradient = ctx.createLinearGradient(0, 0, -tailLength, 0);
+                tailGradient.addColorStop(0, 'rgba(0, 0, 0, 0.65)');
+                tailGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = tailGradient;
+                ctx.fillRect(-tailLength, -projectileWidth * 0.45, tailLength, projectileWidth * 0.9);
+
+                ctx.fillStyle = b.projectileColor || '#050505';
+                ctx.fillRect(-projectileLength * 0.2, -projectileWidth * 0.5, projectileLength, projectileWidth);
+
+                ctx.restore();
+                continue;
+            }
+
+            const color = b.owner === 'enemy'
+                ? COLORS.BULLET_ENEMY
+                : (b.color || COLORS.BULLET_PLAYER);
             ctx.fillStyle = color;
             ctx.shadowColor = color;
             ctx.shadowBlur = 6;
@@ -377,16 +686,11 @@ export class Renderer {
 
     // ---------- Damage flash overlay ----------
     drawDamageFlash(player) {
-        if (!player.alive || player.damageFlash <= 0) return;
-        const { ctx, cam } = this;
-        ctx.fillStyle = COLORS.DAMAGE_FLASH;
-        ctx.globalAlpha = player.damageFlash / 0.15;
-        ctx.fillRect(0, 0, cam.width, cam.height);
-        ctx.globalAlpha = 1;
+        return;
     }
 
     // ---------- HUD ----------
-    drawHUD(player, gameTime, extracting, extractTimer, interactionText = '', crateMessage = '') {
+    drawHUD(player, gameTime, extracting, extractTimer, interactionText = '', crateMessage = '', killFeed = [], killBanner = null) {
         const { ctx, cam } = this;
 
         const barGroupW = 260;
@@ -399,21 +703,32 @@ export class Renderer {
         const energyX = cam.width / 2 - energyBarW / 2;
         const energyY = hpY - 12;
 
-        // Energy bar
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.fillRect(energyX, energyY, energyBarW, energyBarH);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(energyX, energyY, energyBarW * (player.energy / player.energyMax), energyBarH);
-        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(energyX, energyY, energyBarW, energyBarH);
+        // Energy bar (hidden with gravity boots)
+        if (!player.hasGravityBoots) {
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            ctx.fillRect(energyX, energyY, energyBarW, energyBarH);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(energyX, energyY, energyBarW * (player.energy / player.energyMax), energyBarH);
+            ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(energyX, energyY, energyBarW, energyBarH);
+        }
 
-        // Health bar
+        // Health bar (with shield)
+        const hudShieldHp = (player.shieldLayers || []).reduce((s, l) => s + l.hp, 0);
+        const hudShieldMax = (player.shieldLayers || []).reduce((s, l) => s + l.maxHp, 0);
+        const hudTotalCap = Math.max(1, player.maxHp + hudShieldMax);
         ctx.fillStyle = COLORS.HP_BAR_BG;
         ctx.fillRect(hpX, hpY, hpBarW, hpBarH);
-        const hpRatio = player.hp / player.maxHp;
+        const hpRatio = player.hp / Math.max(1, player.maxHp);
+        const hudHpFrac = Math.max(0, Math.min(1, player.hp / hudTotalCap));
         ctx.fillStyle = hpRatio > 0.3 ? COLORS.HP_BAR : COLORS.HP_BAR_LOW;
-        ctx.fillRect(hpX, hpY, hpBarW * hpRatio, hpBarH);
+        ctx.fillRect(hpX, hpY, hpBarW * hudHpFrac, hpBarH);
+        if (hudShieldHp > 0) {
+            ctx.fillStyle = COLORS.SHIELD_BAR;
+            const shieldFrac = Math.max(0, Math.min(1, hudShieldHp / hudTotalCap));
+            ctx.fillRect(hpX + hpBarW * hudHpFrac, hpY, hpBarW * shieldFrac, hpBarH);
+        }
         ctx.strokeStyle = '#555';
         ctx.lineWidth = 1;
         ctx.strokeRect(hpX, hpY, hpBarW, hpBarH);
@@ -422,13 +737,20 @@ export class Renderer {
         ctx.fillStyle = COLORS.HUD_TEXT;
         ctx.font = 'bold 11px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`HP ${player.hp}/${player.maxHp}`, cam.width / 2, hpY + 12);
+        const hpText = hudShieldMax > 0
+            ? `HP ${Math.round(player.hp)}/${Math.round(player.maxHp)} | SH ${Math.round(hudShieldHp)}/${Math.round(hudShieldMax)}`
+            : `HP ${Math.round(player.hp)}/${Math.round(player.maxHp)}`;
+        ctx.fillText(hpText, cam.width / 2, hpY + 12);
 
         // Carry summary
         ctx.fillStyle = COLORS.LOOT_COMMON;
         ctx.font = 'bold 12px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`CARRY ${player.getCarriedItemCount()}/${player.carryCapacity} · EST. VALUE ${player.loot}c`, cam.width / 2, hpY - 20);
+        this.drawCoinValueText(`SPACE ${player.getCarriedSpaceUsed()}/${player.carryCapacity} · EST. VALUE `, player.loot, cam.width / 2, hpY - 20, {
+            align: 'center',
+            iconSize: 12,
+            iconOffsetY: -9,
+        });
         const weaponHud = player.getWeaponHudInfo();
         ctx.fillStyle = weaponHud.color || '#d0d7de';
         ctx.font = 'bold 16px monospace';
@@ -438,17 +760,28 @@ export class Renderer {
         ctx.shadowBlur = 0;
 
         const dashReady = player.dashCooldown <= 0;
-        const modeText = player.isSlowMode ? 'SLOW' : 'NORMAL';
+        const modeText = player.hasGravityBoots ? 'GRAVITY BOOTS' : (player.isSlowMode ? 'SLOW' : 'NORMAL');
         ctx.fillStyle = '#ffffff';
         ctx.font = '10px monospace';
-        ctx.fillText(`ENERGY ${Math.round(player.energy)}/${player.energyMax} · MODE ${modeText} · R TO TOGGLE · DASH ${dashReady ? 'READY' : `${player.dashCooldown.toFixed(1)}s`}`, cam.width / 2, hpY + 32);
+        if (player.hasGravityBoots) {
+            ctx.fillText(`MODE ${modeText} · DASH ${dashReady ? 'READY' : `${player.dashCooldown.toFixed(1)}s`}`, cam.width / 2, hpY + 32);
+        } else {
+            ctx.fillText(`ENERGY ${Math.round(player.energy)}/${player.energyMax} · MODE ${modeText} · R TO TOGGLE · DASH ${dashReady ? 'READY' : `${player.dashCooldown.toFixed(1)}s`}`, cam.width / 2, hpY + 32);
+        }
+
+        const healingHud = player.getHealingHudInfo?.();
+        if (healingHud) {
+            ctx.fillStyle = healingHud.color || '#4caf50';
+            ctx.font = 'bold 11px monospace';
+            ctx.fillText(healingHud.text, cam.width / 2, hpY + 46);
+        }
 
         // Consumables
         const consumableCount = player.getConsumableCount();
         if (consumableCount > 0) {
             ctx.fillStyle = '#4caf50';
             ctx.font = 'bold 11px monospace';
-            ctx.fillText(`💊 CONSUMABLES x${consumableCount} · Q TO USE`, cam.width / 2, hpY + 46);
+            ctx.fillText(`💊 CONSUMABLES x${consumableCount} · Q TO ${player.isHealing ? 'CANCEL' : 'HEAL'}`, cam.width / 2, hpY + (healingHud ? 60 : 46));
         }
 
         // Timer
@@ -474,6 +807,9 @@ export class Renderer {
             ctx.font = 'bold 12px monospace';
             ctx.fillText(crateMessage, cam.width / 2, 61);
         }
+
+        this._drawKillFeed(killFeed, cam.width);
+        this._drawKillBanner(killBanner, cam.width);
 
         // Extraction progress
         if (extracting) {
@@ -503,8 +839,103 @@ export class Renderer {
         }
     }
 
+    _drawKillFeed(killFeed = [], width = 0) {
+        const { ctx } = this;
+        if (!killFeed.length) return;
+
+        ctx.save();
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+
+        killFeed.forEach((entry, index) => {
+            const alpha = Math.max(0, entry.life / entry.maxLife);
+            const boxX = width - 284;
+            const y = 104 + index * 42;
+            const boxWidth = 262;
+
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = 'rgba(6,12,18,0.72)';
+            ctx.fillRect(boxX, y - 15, boxWidth, 32);
+            ctx.strokeStyle = entry.color || '#ffcc80';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(boxX, y - 15, boxWidth, 32);
+
+            ctx.fillStyle = entry.color || '#ffcc80';
+            ctx.fillRect(boxX, y - 15, 5, 32);
+
+            ctx.fillStyle = '#8fb3c7';
+            ctx.font = 'bold 10px monospace';
+            ctx.fillText(entry.detail || 'ELIMINATION', boxX + 14, y - 7);
+
+            ctx.fillStyle = '#f2f7fb';
+            ctx.shadowColor = 'rgba(0,0,0,0.4)';
+            ctx.shadowBlur = 4;
+            ctx.font = 'bold 13px monospace';
+            ctx.fillText(entry.text || 'TARGET', boxX + 14, y + 7);
+
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(143,227,255,0.55)';
+            ctx.beginPath();
+            ctx.moveTo(boxX + boxWidth - 20, y - 9);
+            ctx.lineTo(boxX + boxWidth - 8, y - 9);
+            ctx.moveTo(boxX + boxWidth - 20, y + 9);
+            ctx.lineTo(boxX + boxWidth - 8, y + 9);
+            ctx.stroke();
+        });
+
+        ctx.restore();
+        ctx.globalAlpha = 1;
+    }
+
+    _drawKillBanner(killBanner, width = 0) {
+        const { ctx } = this;
+        if (!killBanner) return;
+
+        const alpha = Math.max(0, killBanner.life / killBanner.maxLife);
+        const scale = 1 + (1 - alpha) * 0.08;
+        const panelWidth = 332;
+        const panelX = width / 2 - panelWidth / 2;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'rgba(6,12,18,0.78)';
+        ctx.fillRect(panelX, 82, panelWidth, 70);
+
+        ctx.strokeStyle = 'rgba(143,227,255,0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(panelX, 82, panelWidth, 70);
+
+        ctx.fillStyle = killBanner.color || '#8fe3ff';
+        ctx.fillRect(panelX, 82, 6, 70);
+        ctx.fillRect(panelX + panelWidth - 6, 82, 6, 70);
+
+        ctx.fillStyle = 'rgba(143,227,255,0.72)';
+        ctx.font = 'bold 10px monospace';
+        ctx.fillText(killBanner.tag || 'OPERATOR ELIMINATION', width / 2, 95);
+
+        ctx.fillStyle = killBanner.color || '#ffb74d';
+        ctx.shadowColor = killBanner.color || '#ffb74d';
+        ctx.shadowBlur = 12;
+        ctx.font = `bold ${Math.round(24 * scale)}px monospace`;
+        ctx.fillText(killBanner.title || 'TARGET DOWN', width / 2, 116);
+
+        ctx.fillStyle = '#dce8ef';
+        ctx.shadowBlur = 4;
+        ctx.font = 'bold 12px monospace';
+        ctx.fillText(killBanner.subtitle || '', width / 2, 136);
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(143,227,255,0.58)';
+        ctx.font = 'bold 10px monospace';
+        ctx.fillText(`CHAIN ${killBanner.chain || 1} · STREAK ${killBanner.streak || 1}`, width / 2, 149);
+        ctx.restore();
+        ctx.globalAlpha = 1;
+    }
+
     // ---------- Minimap ----------
-    drawMinimap(tiles, player, enemies, crates, extractionPoints) {
+    drawMinimap(tiles, player, enemies, aiPlayers, crates, extractionPoints) {
         const { ctx, cam } = this;
         const mmW = 160;
         const mmH = 120;
@@ -556,6 +987,12 @@ export class Renderer {
         for (const e of enemies) {
             if (!e.alive) continue;
             ctx.fillRect(mmX + e.x * scaleX - 1, mmY + e.y * scaleY - 1, 2, 2);
+        }
+
+        ctx.fillStyle = COLORS.MINIMAP_AI_PLAYER;
+        for (const bot of aiPlayers || []) {
+            if (!bot.alive || bot.aiExtracted) continue;
+            ctx.fillRect(mmX + bot.x * scaleX - 1, mmY + bot.y * scaleY - 1, 3, 3);
         }
 
         // Player

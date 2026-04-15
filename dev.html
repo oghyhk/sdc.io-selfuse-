@@ -10,7 +10,7 @@
   --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;
   --text:#e6edf3;--text2:#8b949e;--accent:#58a6ff;--accent2:#1f6feb;
   --green:#3fb950;--red:#f85149;--orange:#d29922;--purple:#bc8cff;
-  --gold:#ffca28;--blue:#64b5f6;
+  --gold:#ffca28;--blue:#64b5f6;--legend:#ff9f1a;
 }
 body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 /* Header */
@@ -52,6 +52,18 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 .card .thumb{width:100%;height:120px;background:var(--surface2);border-radius:6px;margin-bottom:10px;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .card .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .card .thumb .placeholder{color:var(--text2);font-size:32px}
+@keyframes ap-frame-pulse {
+  0%{box-shadow:0 0 0 1px rgba(255,77,77,.72),0 0 10px rgba(255,77,77,.5),0 0 24px rgba(255,202,40,.14);filter:drop-shadow(0 0 6px rgba(255,77,77,.4))}
+  50%{box-shadow:0 0 0 1px rgba(255,202,40,.95),0 0 16px rgba(255,77,77,.82),0 0 30px rgba(255,202,40,.32);filter:drop-shadow(0 0 12px rgba(255,202,40,.58))}
+  100%{box-shadow:0 0 0 1px rgba(255,77,77,.72),0 0 10px rgba(255,77,77,.5),0 0 24px rgba(255,202,40,.14);filter:drop-shadow(0 0 6px rgba(255,77,77,.4))}
+}
+@keyframes legend-text-shimmer {
+  0%{text-shadow:0 0 8px rgba(255,120,60,.18),0 0 14px rgba(255,202,40,.08);filter:saturate(1)}
+  50%{text-shadow:0 0 12px rgba(255,120,60,.46),0 0 22px rgba(255,202,40,.36);filter:saturate(1.18)}
+  100%{text-shadow:0 0 8px rgba(255,120,60,.18),0 0 14px rgba(255,202,40,.08);filter:saturate(1)}
+}
+.legend-frame{border:1px solid rgba(255,102,102,.9)!important;background:linear-gradient(135deg,rgba(255,90,90,.18),rgba(255,202,40,.12)),rgba(13,17,23,.92)!important;animation:ap-frame-pulse 1.8s ease-in-out infinite}
+.legend-text{animation:legend-text-shimmer 1.9s ease-in-out infinite;font-weight:700;letter-spacing:.02em}
 /* Detail panel */
 .detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;justify-content:center;align-items:flex-start;padding:40px 20px;overflow-y:auto}
 .detail-overlay.open{display:flex}
@@ -79,6 +91,7 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 .toast.show{opacity:1;transform:translateY(0)}
 .toast.error{background:var(--red)}
 /* Rarity colors */
+.rarity-legend{background:#ff9f1a}
 .rarity-white{background:#eceff1}
 .rarity-gray{background:#9e9e9e}
 .rarity-green{background:#81c784}
@@ -98,6 +111,13 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 /* Crate pool pills */
 .pool-pills{display:flex;flex-wrap:wrap;gap:4px}
 .pool-pill{padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.reward-level-badge{display:inline-flex;align-items:center;justify-content:center;padding:4px 10px;border-radius:999px;background:rgba(88,166,255,.16);color:#9fd0ff;font-size:12px;font-weight:700;margin-bottom:8px}
+.reward-value{font-size:18px;font-weight:700;color:var(--gold)}
+.reward-status{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.reward-status.enabled{background:rgba(63,185,80,.14);color:#7ce38e}
+.reward-status.disabled{background:rgba(248,81,73,.14);color:#ff8b84}
+.reward-item-hint{font-size:12px;color:var(--text2);margin-top:6px;line-height:1.5}
+.sim-select{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px}
 </style>
 </head>
 <body>
@@ -105,32 +125,35 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 <div class="header">
   <h1>⚡ SDC.IO Developer Tool</h1>
   <span class="status" id="statusText">Loading...</span>
-  <button class="save-btn" id="saveBtn" onclick="saveConfig()">💾 Save Config</button>
 </div>
 
 <div class="tabs">
-  <div class="tab active" data-tab="items" onclick="switchTab('items')">🔫 Items</div>
+  <div class="tab active" data-tab="equipments" onclick="switchTab('equipments')">🦺 Equipments</div>
+  <div class="tab" data-tab="goods" onclick="switchTab('goods')">💰 Goods</div>
+  <div class="tab" data-tab="consumables" onclick="switchTab('consumables')">💊 Consumables</div>
   <div class="tab" data-tab="enemies" onclick="switchTab('enemies')">👾 Enemies</div>
   <div class="tab" data-tab="crates" onclick="switchTab('crates')">📦 Crates</div>
   <div class="tab" data-tab="ammo" onclick="switchTab('ammo')">💥 Ammo</div>
+  <div class="tab" data-tab="level-rewards" onclick="switchTab('level-rewards')">🎁 Level Rewards</div>
+  <div class="tab" data-tab="sim" onclick="switchTab('sim')">⚔️ Combat Sim</div>
 </div>
 
-<!-- ============= ITEMS PANEL ============= -->
+<!-- ============= EQUIPMENTS PANEL ============= -->
 <div class="container">
-<div class="panel active" id="panel-items">
+<div class="panel active" id="panel-equipments">
   <div class="toolbar">
-    <input type="text" id="itemSearch" placeholder="Search items..." oninput="renderItems()">
-    <select id="itemCatFilter" onchange="renderItems()">
+    <input type="text" id="equipmentSearch" placeholder="Search equipments..." oninput="renderEquipments()">
+    <select id="equipmentCatFilter" onchange="renderEquipments()">
       <option value="">All Categories</option>
       <option value="gun">Gun</option>
-      <option value="melee">Melee</option>
       <option value="armor">Armor</option>
       <option value="helmet">Helmet</option>
       <option value="shoes">Shoes</option>
       <option value="backpack">Backpack</option>
     </select>
-    <select id="itemRarityFilter" onchange="renderItems()">
+    <select id="equipmentRarityFilter" onchange="renderEquipments()">
       <option value="">All Rarities</option>
+      <option value="legend">Legend</option>
       <option value="white">White</option>
       <option value="gray">Gray</option>
       <option value="green">Green</option>
@@ -139,9 +162,71 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
       <option value="gold">Gold</option>
       <option value="red">Red</option>
     </select>
-    <button class="btn btn-primary" onclick="openItemEditor()">+ New Item</button>
+    <select id="equipmentSort" onchange="renderEquipments()">
+      <option value="category-name">Sort: Category</option>
+      <option value="rarity-desc">Sort: Rarity ↓</option>
+      <option value="rarity-asc">Sort: Rarity ↑</option>
+      <option value="name">Sort: Name</option>
+      <option value="value-desc">Sort: Value ↓</option>
+      <option value="value-asc">Sort: Value ↑</option>
+    </select>
+    <button class="btn btn-primary" onclick="openItemEditor(null, 'gun')">+ New Equipment</button>
   </div>
-  <div class="grid" id="itemGrid"></div>
+  <div class="grid" id="equipmentGrid"></div>
+</div>
+
+<!-- ============= GOODS PANEL ============= -->
+<div class="panel" id="panel-goods">
+  <div class="toolbar">
+    <input type="text" id="goodsSearch" placeholder="Search goods..." oninput="renderGoods()">
+    <select id="goodsRarityFilter" onchange="renderGoods()">
+      <option value="">All Rarities</option>
+      <option value="legend">Legend</option>
+      <option value="white">White</option>
+      <option value="gray">Gray</option>
+      <option value="green">Green</option>
+      <option value="blue">Blue</option>
+      <option value="purple">Purple</option>
+      <option value="gold">Gold</option>
+      <option value="red">Red</option>
+    </select>
+    <select id="goodsSort" onchange="renderGoods()">
+      <option value="rarity-desc">Sort: Rarity ↓</option>
+      <option value="rarity-asc">Sort: Rarity ↑</option>
+      <option value="name">Sort: Name</option>
+      <option value="value-desc">Sort: Value ↓</option>
+      <option value="value-asc">Sort: Value ↑</option>
+    </select>
+    <button class="btn btn-primary" onclick="openItemEditor(null, 'loot')">+ New Goods Item</button>
+  </div>
+  <div class="grid" id="goodsGrid"></div>
+</div>
+
+<!-- ============= CONSUMABLES PANEL ============= -->
+<div class="panel" id="panel-consumables">
+  <div class="toolbar">
+    <input type="text" id="consumableSearch" placeholder="Search consumables..." oninput="renderConsumables()">
+    <select id="consumableRarityFilter" onchange="renderConsumables()">
+      <option value="">All Rarities</option>
+      <option value="legend">Legend</option>
+      <option value="white">White</option>
+      <option value="gray">Gray</option>
+      <option value="green">Green</option>
+      <option value="blue">Blue</option>
+      <option value="purple">Purple</option>
+      <option value="gold">Gold</option>
+      <option value="red">Red</option>
+    </select>
+    <select id="consumableSort" onchange="renderConsumables()">
+      <option value="rarity-desc">Sort: Rarity ↓</option>
+      <option value="rarity-asc">Sort: Rarity ↑</option>
+      <option value="name">Sort: Name</option>
+      <option value="value-desc">Sort: Value ↓</option>
+      <option value="value-asc">Sort: Value ↑</option>
+    </select>
+    <button class="btn btn-primary" onclick="openItemEditor(null, 'consumable')">+ New Consumable</button>
+  </div>
+  <div class="grid" id="consumableGrid"></div>
 </div>
 
 <!-- ============= ENEMIES PANEL ============= -->
@@ -162,10 +247,83 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 <div class="panel" id="panel-ammo">
   <table class="data-table" id="ammoTable">
     <thead>
-      <tr><th>Rarity</th><th>Name</th><th>Damage Multi</th><th>Sell Value</th><th>Color</th><th>Instant Kill</th><th></th></tr>
+      <tr><th>Rarity</th><th>Name</th><th>Damage Multi</th><th>Value</th><th>Buy Tax %</th><th>Sell Tax %</th><th></th>Color</th><th>Instant Kill</th><th></th></tr>
     </thead>
     <tbody id="ammoBody"></tbody>
   </table>
+</div>
+
+<!-- ============= LEVEL REWARDS PANEL ============= -->
+<div class="panel" id="panel-level-rewards">
+  <div class="toolbar">
+    <input type="text" id="levelRewardSearch" placeholder="Search rewards by level or label..." oninput="renderLevelRewards()">
+    <select id="levelRewardEnabledFilter" onchange="renderLevelRewards()">
+      <option value="">All Status</option>
+      <option value="enabled">Enabled</option>
+      <option value="disabled">Disabled</option>
+    </select>
+    <select id="levelRewardSort" onchange="renderLevelRewards()">
+      <option value="level-asc">Sort: Level ↑</option>
+      <option value="level-desc">Sort: Level ↓</option>
+      <option value="coins-desc">Sort: Coins ↓</option>
+      <option value="coins-asc">Sort: Coins ↑</option>
+    </select>
+    <button class="btn btn-primary" onclick="openLevelRewardEditor()">+ New Level Reward</button>
+  </div>
+  <div class="grid" id="levelRewardGrid"></div>
+</div>
+
+<!-- ============= COMBAT SIMULATOR PANEL ============= -->
+<div class="panel" id="panel-sim">
+  <div style="display:flex;gap:24px;flex-wrap:wrap">
+    <!-- Squad A -->
+    <div style="flex:1;min-width:320px">
+      <h3 style="color:var(--accent);margin-bottom:12px">🔵 Squad A (Blue)</h3>
+      <div class="form-row"><div class="form-group"><label>Primary Gun</label><select id="sim_a_gun1" class="sim-select"></select></div><div class="form-group"><label>Secondary Gun</label><select id="sim_a_gun2" class="sim-select"></select></div></div>
+      <div class="form-row"><div class="form-group"><label>Armor</label><select id="sim_a_armor" class="sim-select"></select></div><div class="form-group"><label>Helmet</label><select id="sim_a_helmet" class="sim-select"></select></div></div>
+      <div class="form-row"><div class="form-group"><label>Shoes</label><select id="sim_a_shoes" class="sim-select"></select></div><div class="form-group"><label>Ammo Type</label><select id="sim_a_ammo" class="sim-select"></select></div></div>
+      <div class="form-row"><div class="form-group"><label>Consumable</label><select id="sim_a_consumable" class="sim-select"></select></div><div class="form-group"><label>Consumable Uses</label><input id="sim_a_consumable_count" type="number" min="0" max="999" value="20" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:80px"></div></div>
+      <div style="margin-top:8px;padding:10px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text2)" id="sim_a_preview"></div>
+    </div>
+    <!-- Squad B -->
+    <div style="flex:1;min-width:320px">
+      <h3 style="color:var(--red);margin-bottom:12px">🔴 Squad B (Red)</h3>
+      <div class="form-row"><div class="form-group"><label>Primary Gun</label><select id="sim_b_gun1" class="sim-select"></select></div><div class="form-group"><label>Secondary Gun</label><select id="sim_b_gun2" class="sim-select"></select></div></div>
+      <div class="form-row"><div class="form-group"><label>Armor</label><select id="sim_b_armor" class="sim-select"></select></div><div class="form-group"><label>Helmet</label><select id="sim_b_helmet" class="sim-select"></select></div></div>
+      <div class="form-row"><div class="form-group"><label>Shoes</label><select id="sim_b_shoes" class="sim-select"></select></div><div class="form-group"><label>Ammo Type</label><select id="sim_b_ammo" class="sim-select"></select></div></div>
+      <div class="form-row"><div class="form-group"><label>Consumable</label><select id="sim_b_consumable" class="sim-select"></select></div><div class="form-group"><label>Consumable Uses</label><input id="sim_b_consumable_count" type="number" min="0" max="999" value="20" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:80px"></div></div>
+      <div style="margin-top:8px;padding:10px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text2)" id="sim_b_preview"></div>
+    </div>
+  </div>
+  <!-- Controls -->
+  <div style="margin-top:20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <div class="form-group" style="min-width:120px;flex:0">
+      <label>Squad Size</label>
+      <select id="sim_squad_size" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px">
+        <option value="1">1v1</option>
+        <option value="2">2v2</option>
+        <option value="3" selected>3v3</option>
+        <option value="4">4v4</option>
+        <option value="5">5v5</option>
+      </select>
+    </div>
+    <div class="form-group" style="min-width:120px;flex:0">
+      <label>Matches</label>
+      <input id="sim_matches" type="number" min="1" max="100000" value="1000" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100px">
+    </div>
+    <div class="form-group" style="min-width:120px;flex:0">
+      <label>Engagement Range</label>
+      <select id="sim_range" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px">
+        <option value="150">Close (150px)</option>
+        <option value="250" selected>Medium (250px)</option>
+        <option value="400">Long (400px)</option>
+        <option value="600">Sniper (600px)</option>
+      </select>
+    </div>
+    <div style="margin-top:16px"><button class="btn btn-primary" onclick="runCombatSim()" id="sim_run_btn" style="padding:10px 28px;font-size:14px">⚔️ Run Simulation</button></div>
+  </div>
+  <!-- Results -->
+  <div id="sim_results" style="margin-top:24px"></div>
 </div>
 </div>
 
@@ -179,17 +337,90 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 
 <script>
 // ─── State ────────────────────────────────
-let config = { version:1, items:{}, enemies:{}, crate_tiers:{}, ammo:{} };
-const RARITY_COLORS = { white:'#eceff1', gray:'#9e9e9e', green:'#81c784', blue:'#64b5f6', purple:'#b388ff', gold:'#ffca28', red:'#ff4d4d' };
-const API = '/api';
+let config = { version:1, items:{}, enemies:{}, crate_tiers:{}, ammo:{}, player_level_rewards:{} };
+const RARITY_COLORS = { legend:'#ff9f1a', white:'#eceff1', gray:'#9e9e9e', green:'#81c784', blue:'#64b5f6', purple:'#b388ff', gold:'#ffca28', red:'#ff4d4d' };
+const RARITY_SORT_ORDER = ['gray', 'white', 'green', 'blue', 'purple', 'gold', 'red', 'legend'];
+const CONSUMABLE_HEAL_RATE_BY_RARITY = { gray:1, white:1, green:1.5, blue:2, purple:3, gold:4, red:6, legend:8 };
+const MAX_PLAYER_LEVEL = 9999;
+const DEFAULT_LEVEL_REWARD_INTERVAL = 10;
+const API_PATH = '/api';
+let resolvedApiBase = null;
+
+function updateStatusText() {
+  const consumableCount = Object.values(config.items || {}).filter(item => item.category === 'consumable').length;
+  const goodsCount = Object.values(config.items || {}).filter(item => item.lootType === 'goods').length;
+  const itemCount = Object.values(config.items || {}).filter(Boolean).length;
+  const rewardCount = Object.keys(config.player_level_rewards || {}).length;
+  document.getElementById('statusText').textContent = `${itemCount} items, ${goodsCount} goods, ${consumableCount} consumables, ${Object.keys(config.enemies || {}).length} enemies, ${Object.keys(config.ammo || {}).length} ammo types, ${rewardCount} level rewards${resolvedApiBase ? ` · API ${resolvedApiBase}` : ''}`;
+}
+
+function getRaritySortIndex(rarity) {
+  const index = RARITY_SORT_ORDER.indexOf(rarity);
+  return index === -1 ? RARITY_SORT_ORDER.length : index;
+}
+
+function getApiCandidates() {
+  const queryApi = new URLSearchParams(window.location.search).get('api');
+  const candidates = [];
+  const push = (value) => {
+    if (!value || candidates.includes(value)) return;
+    candidates.push(value.replace(/\/$/, ''));
+  };
+
+  if (resolvedApiBase) push(resolvedApiBase);
+
+  if (queryApi) push(queryApi);
+
+  if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+    push(window.location.origin + API_PATH);
+    if (window.location.port !== '8765') {
+      push(`${window.location.protocol}//${window.location.hostname}:8765${API_PATH}`);
+    }
+  }
+
+  push(`http://127.0.0.1:8765${API_PATH}`);
+  push(`http://localhost:8765${API_PATH}`);
+  return candidates;
+}
+
+async function fetchApiJson(path, options = {}) {
+  let lastError = null;
+  const isGet = !options.method || options.method === 'GET';
+  const cacheBust = isGet ? (path.includes('?') ? '&' : '?') + '_t=' + Date.now() : '';
+  for (const base of getApiCandidates()) {
+    try {
+      const url = base + path + cacheBust;
+      const response = await fetch(url, { cache: 'no-store', ...options });
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`Unexpected non-JSON response from ${url}`);
+      }
+      if (!response.ok || data?.ok === false) {
+        throw new Error(data?.message || `Request failed with status ${response.status}`);
+      }
+      resolvedApiBase = base;
+      return data;
+    } catch (error) {
+      console.warn(`[DevTool] ${options.method || 'GET'} ${base}${path} failed:`, error.message);
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('Unable to reach the dev API.');
+}
 
 // ─── Init ─────────────────────────────────
 async function init() {
   try {
-    const r = await fetch(API + '/dev-config');
-    const d = await r.json();
-    if (d.ok && d.config) {
+    const d = await fetchApiJson('/dev-config');
+    if (d.config) {
       config = d.config;
+      if (!config.player_level_rewards) config.player_level_rewards = {};
+      config.items = Object.fromEntries(
+        Object.entries(config.items || {}).filter(([, item]) => item?.category !== 'melee')
+      );
       // Separate ammo from items for display
       if (!config.ammo) config.ammo = {};
       for (const [id, item] of Object.entries(config.items)) {
@@ -197,15 +428,19 @@ async function init() {
           config.ammo[id] = { ...item };
         }
       }
-      document.getElementById('statusText').textContent = `${Object.keys(config.items).length} items, ${Object.keys(config.enemies).length} enemies, ${Object.keys(config.ammo).length} ammo types`;
+      updateStatusText();
     }
   } catch(e) {
     document.getElementById('statusText').textContent = 'Error loading config: ' + e.message;
   }
-  renderItems();
+  renderEquipments();
+  renderGoods();
+  renderConsumables();
   renderEnemies();
   renderCrates();
   renderAmmo();
+  renderLevelRewards();
+  buildSimDropdowns();
 }
 
 // ─── Tab Switching ────────────────────────
@@ -222,59 +457,147 @@ function toast(msg, isError) {
   setTimeout(() => t.className = 'toast', 2500);
 }
 
-// ─── Save ─────────────────────────────────
-async function saveConfig() {
-  const btn = document.getElementById('saveBtn');
-  btn.textContent = '⏳ Saving...';
-  try {
-    // Merge ammo back into items for saving
-    const saveData = JSON.parse(JSON.stringify(config));
-    for (const [id, ammo] of Object.entries(config.ammo || {})) {
-      saveData.items[id] = ammo;
+async function persistConfig() {
+  // Sync: ensure config.ammo reflects any config.items edits for ammo items
+  for (const [id, item] of Object.entries(config.items || {})) {
+    if (item.lootType === 'ammo' && config.ammo?.[id]) {
+      config.ammo[id] = { ...item };
     }
-    const r = await fetch(API + '/dev-config', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(saveData)
-    });
-    const d = await r.json();
-    if (d.ok) {
-      btn.textContent = '✅ Saved!'; btn.classList.add('saved');
-      toast('Config saved successfully');
-    } else { throw new Error(d.message); }
-  } catch(e) {
-    btn.textContent = '❌ Error'; toast(e.message, true);
   }
-  setTimeout(() => { btn.textContent = '💾 Save Config'; btn.classList.remove('saved'); }, 2000);
+  const saveData = JSON.parse(JSON.stringify(config));
+  delete saveData.ammo;
+  for (const [id, ammo] of Object.entries(config.ammo || {})) {
+    saveData.items[id] = ammo;
+  }
+  const body = JSON.stringify(saveData);
+  console.log('[DevTool] Saving config:', body.length, 'bytes,', Object.keys(saveData.items || {}).length, 'items');
+  const d = await fetchApiJson('/dev-config', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: body
+  });
+  if (!d.ok) {
+    throw new Error(d.message || 'Failed to save config.');
+  }
+  console.log('[DevTool] Config saved successfully');
+  return d;
 }
 
-// ─── Items ────────────────────────────────
-function getItemImagePath(id) {
-  return `assets/dev/${id.replace(/[^a-zA-Z0-9_]/g,'_')}.jpg`;
+function sortItems(items, mode = 'name') {
+  const list = [...items];
+  list.sort((a, b) => {
+    if (mode === 'rarity-desc') {
+      return getRaritySortIndex(b.rarity) - getRaritySortIndex(a.rarity)
+        || (a.name || '').localeCompare(b.name || '');
+    }
+    if (mode === 'rarity-asc') {
+      return getRaritySortIndex(a.rarity) - getRaritySortIndex(b.rarity)
+        || (a.name || '').localeCompare(b.name || '');
+    }
+    if (mode === 'value-desc') {
+      return (Number(b.sellValue) || 0) - (Number(a.sellValue) || 0)
+        || (a.name || '').localeCompare(b.name || '');
+    }
+    if (mode === 'value-asc') {
+      return (Number(a.sellValue) || 0) - (Number(b.sellValue) || 0)
+        || (a.name || '').localeCompare(b.name || '');
+    }
+    if (mode === 'category-name') {
+      return (a.category || '').localeCompare(b.category || '')
+        || (a.name || '').localeCompare(b.name || '');
+    }
+    return (a.name || '').localeCompare(b.name || '');
+  });
+  return list;
 }
 
-function renderItems() {
-  const search = (document.getElementById('itemSearch').value || '').toLowerCase();
-  const cat = document.getElementById('itemCatFilter').value;
-  const rar = document.getElementById('itemRarityFilter').value;
-  const grid = document.getElementById('itemGrid');
-  const items = Object.values(config.items)
-    .filter(i => i.lootType !== 'ammo')
-    .filter(i => !search || i.name.toLowerCase().includes(search) || i.id.toLowerCase().includes(search))
-    .filter(i => !cat || i.category === cat)
-    .filter(i => !rar || i.rarity === rar)
-    .sort((a,b) => (a.category||'').localeCompare(b.category||'') || (a.name||'').localeCompare(b.name||''));
-  
-  grid.innerHTML = items.map(item => {
-    const rc = RARITY_COLORS[item.rarity] || '#999';
-    const imgPath = getItemImagePath(item.id);
+function getCategoryLabel(item) {
+  if (!item) return 'unknown';
+  if (item.lootType === 'ammo') return 'ammo';
+  if (item.lootType === 'goods') return 'goods';
+  return item.category || 'unknown';
+}
+
+function getItemImagePath(item) {
+  if (!item) return '';
+  if (typeof item.image === 'string' && item.image.trim()) {
+    return item.image;
+  }
+  return `/assets/items/${item.id}.png`;
+}
+
+function sanitizePercentValue(value, minimum, maximum, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(maximum, Math.max(minimum, numeric));
+}
+
+function renderItemGrid(gridId, items, emptyMessage) {
+  const grid = document.getElementById(gridId);
+  const safeItems = (items || []).filter(item => item && item.id);
+  if (!safeItems.length) {
+    grid.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
+    return;
+  }
+
+  grid.innerHTML = safeItems.map(item => {
+    const imgPath = getItemImagePath(item);
+    const fallbackImgPath = `/assets/dev/${item.id}.jpg`;
     const statsHtml = formatStats(item);
+    const icon = item.category === 'consumable'
+      ? '💊'
+      : item.lootType === 'goods'
+        ? '💰'
+        : item.lootType === 'ammo'
+          ? '💥'
+          : '🔫';
+    const legendFrameClass = item.rarity === 'legend' ? ' legend-frame' : '';
+    const legendTextClass = item.rarity === 'legend' ? ' legend-text' : '';
     return `<div class="card" onclick="openItemEditor('${item.id}')">
-      <div class="thumb"><img src="${imgPath}" onerror="this.parentElement.innerHTML='<div class=placeholder>🔫</div>'" alt="${item.name}"></div>
-      <h3><span class="rarity-dot rarity-${item.rarity}"></span>${item.name}</h3>
-      <div class="meta">${item.category} · ${item.rarity} · $${item.sellValue} · size:${item.size||1}</div>
+      <div class="thumb${legendFrameClass}"><img src="${imgPath}" data-fallback-src="${fallbackImgPath}" onerror="if(this.dataset.fallbackSrc && this.src.indexOf(this.dataset.fallbackSrc) === -1){this.src=this.dataset.fallbackSrc;return;} this.parentElement.innerHTML='<div class=placeholder>${icon}</div>'" alt="${item.name}"></div>
+      <h3 class="${item.rarity === 'legend' ? 'legend-text' : ''}"><span class="rarity-dot rarity-${item.rarity}"></span>${item.name}</h3>
+      <div class="meta${legendTextClass}">${getCategoryLabel(item)} · ${item.rarity} · $${item.sellValue} · size:${item.size||1}</div>
       <div class="stats">${statsHtml}</div>
     </div>`;
   }).join('');
+}
+
+function renderEquipments() {
+  const search = String(document.getElementById('equipmentSearch').value || '').toLowerCase();
+  const cat = document.getElementById('equipmentCatFilter').value;
+  const rar = document.getElementById('equipmentRarityFilter').value;
+  const sortMode = document.getElementById('equipmentSort').value;
+  const equipmentCategories = ['gun', 'armor', 'helmet', 'shoes', 'backpack'];
+  const items = Object.values(config.items || {})
+    .filter(Boolean)
+    .filter(i => equipmentCategories.includes(i.category))
+    .filter(i => !search || String(i.name || '').toLowerCase().includes(search) || String(i.id || '').toLowerCase().includes(search))
+    .filter(i => !cat || i.category === cat)
+    .filter(i => !rar || i.rarity === rar);
+  renderItemGrid('equipmentGrid', sortItems(items, sortMode), 'No equipments found.');
+}
+
+function renderGoods() {
+  const search = String(document.getElementById('goodsSearch').value || '').toLowerCase();
+  const rar = document.getElementById('goodsRarityFilter').value;
+  const sortMode = document.getElementById('goodsSort').value;
+  const items = Object.values(config.items || {})
+    .filter(Boolean)
+    .filter(i => i.lootType === 'goods')
+    .filter(i => !search || String(i.name || '').toLowerCase().includes(search) || String(i.id || '').toLowerCase().includes(search))
+    .filter(i => !rar || i.rarity === rar);
+  renderItemGrid('goodsGrid', sortItems(items, sortMode), 'No goods found.');
+}
+
+function renderConsumables() {
+  const search = String(document.getElementById('consumableSearch').value || '').toLowerCase();
+  const rar = document.getElementById('consumableRarityFilter').value;
+  const sortMode = document.getElementById('consumableSort').value;
+  const items = Object.values(config.items || {})
+    .filter(Boolean)
+    .filter(i => i.category === 'consumable')
+    .filter(i => !search || String(i.name || '').toLowerCase().includes(search) || String(i.id || '').toLowerCase().includes(search))
+    .filter(i => !rar || i.rarity === rar);
+  renderItemGrid('consumableGrid', sortItems(items, sortMode), 'No consumables found.');
 }
 
 function formatStats(item) {
@@ -286,33 +609,52 @@ function formatStats(item) {
   }
   if (item.modifiers) {
     for (const [k,v] of Object.entries(item.modifiers)) {
-      parts.push(`${k}: <span>+${v}</span>`);
+      parts.push(`${k}: <span>${v >= 0 ? '+' : ''}${v}</span>`);
     }
   }
   return parts.join(' · ');
 }
 
-function openItemEditor(id) {
+function openItemEditor(id, forcedCategory = null) {
   const isNew = !id;
-  const item = isNew ? { id:'', name:'', category:'gun', rarity:'white', description:'', sellValue:100, stats:{}, modifiers:{} } : { ...config.items[id] };
+  const sourceItem = !isNew ? config.items?.[id] : null;
+  if (!isNew && !sourceItem) {
+    toast(`Item not found: ${id}`, true);
+    return;
+  }
+  const item = isNew ? { id:'', name:'', category:forcedCategory || 'gun', rarity:'white', description:'', sellValue:100, stats:{}, modifiers:{} } : { ...sourceItem };
   
   const detail = document.getElementById('detailContent');
-  const cat = item.category || 'gun';
+  const supportedCategories = ['gun', 'loot', 'armor', 'helmet', 'shoes', 'backpack', 'consumable'];
+  const requestedCategory = forcedCategory || item.category || 'gun';
+  const cat = supportedCategories.includes(requestedCategory) ? requestedCategory : 'gun';
   const isGun = cat === 'gun';
-  const isMelee = cat === 'melee';
+  const isConsumable = cat === 'consumable';
+  const isGoods = cat === 'loot';
   const isEquip = ['armor','helmet','shoes','backpack'].includes(cat);
+  const imagePath = typeof item.image === 'string' ? item.image : '';
+  const buyMarketTax = sanitizePercentValue(item.buyMarketTaxPercent, 1, 1000, 10);
+  const sellMarketTax = sanitizePercentValue(item.sellMarketTaxPercent, 1, 99, 10);
   
   detail.innerHTML = `
     <button class="close-btn" onclick="closeDetail()">✕</button>
-    <h2>${isNew ? 'Create New Item' : 'Edit: ' + item.name}</h2>
+    <h2>${isNew ? `Create New ${isConsumable ? 'Consumable' : isGoods ? 'Goods Item' : 'Equipment'}` : 'Edit: ' + item.name}</h2>
     <div class="form-row">
       <div class="form-group"><label>ID</label><input id="ed_id" value="${item.id}" ${isNew?'':'readonly'}></div>
       <div class="form-group"><label>Name</label><input id="ed_name" value="${item.name}"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>Category</label>
-        <select id="ed_cat" onchange="openItemEditor(${isNew?"":("'"+id+"'")})">
-          ${['gun','melee','armor','helmet','shoes','backpack'].map(c=>`<option value="${c}" ${c===cat?'selected':''}>${c}</option>`).join('')}
+        <select id="ed_cat" onchange="openItemEditor(${isNew?"null":("'"+id+"'")}, this.value)">
+          ${[
+            ['gun','gun'],
+            ['loot','goods'],
+            ['armor','armor'],
+            ['helmet','helmet'],
+            ['shoes','shoes'],
+            ['backpack','backpack'],
+            ['consumable','consumable']
+          ].map(([value,label])=>`<option value="${value}" ${value===cat?'selected':''}>${label}</option>`).join('')}
         </select>
       </div>
       <div class="form-group"><label>Rarity</label>
@@ -320,16 +662,23 @@ function openItemEditor(id) {
           ${Object.keys(RARITY_COLORS).map(r=>`<option value="${r}" ${r===item.rarity?'selected':''}>${r}</option>`).join('')}
         </select>
       </div>
-      <div class="form-group"><label>Sell Value</label><input id="ed_sell" type="number" value="${item.sellValue||0}"></div>
+      <div class="form-group"><label>Value</label><input id="ed_sell" type="number" value="${item.sellValue||0}"></div>
       <div class="form-group"><label>Size (carry slots)</label><input id="ed_size" type="number" min="1" value="${item.size||1}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1 1 100%"><label>Image</label><input id="ed_image" value="${imagePath}" placeholder="/assets/items/example.png"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Buying Market Tax (%)</label><input id="ed_buy_tax" type="number" min="1" max="1000" step="1" value="${buyMarketTax}"></div>
+      <div class="form-group"><label>Selling Market Tax (%)</label><input id="ed_sell_tax" type="number" min="1" max="99" step="1" value="${sellMarketTax}"></div>
     </div>
     <div class="form-group"><label>Description</label><textarea id="ed_desc">${item.description||''}</textarea></div>
     ${isGun ? renderGunStats(item.stats||{}) : ''}
-    ${isMelee ? renderMeleeStats(item.stats||{}) : ''}
+    ${isConsumable ? renderConsumableStats(item) : ''}
     ${isEquip ? renderEquipStats(item.modifiers||{}, cat) : ''}
     <div class="form-actions">
       <button class="btn btn-save" onclick="saveItem('${id||''}',${isNew})">💾 Save</button>
-      <button class="btn btn-gen" id="genImgBtn" onclick="generateImage('${id||''}',${isNew})">🎨 Generate Image</button>
+      <button class="btn btn-gen" onclick="editItemImage()">🖼 Edit Image</button>
       ${isNew ? '' : `<button class="btn btn-delete" onclick="deleteItem('${id}')">🗑 Delete</button>`}
       <button class="btn btn-cancel" onclick="closeDetail()">Cancel</button>
     </div>
@@ -340,94 +689,171 @@ function openItemEditor(id) {
 function renderGunStats(s) {
   return `<h3 style="margin:16px 0 8px;font-size:13px;color:var(--text2)">Gun Stats</h3>
   <div class="form-row">
-    ${['damage','cooldown','bulletSpeed','range','clipSize','reloadTime','spread'].map(f =>
+    ${['damage','cooldown','bulletSpeed','range','clipSize','reloadTime','spread','outrangeMulti'].map(f =>
       `<div class="form-group"><label>${f}</label><input id="ed_stat_${f}" type="number" step="any" value="${s[f]||0}"></div>`
     ).join('')}
   </div>`;
 }
 
-function renderMeleeStats(s) {
-  return `<h3 style="margin:16px 0 8px;font-size:13px;color:var(--text2)">Melee Stats</h3>
-  <div class="form-row">
-    <div class="form-group"><label>meleeDamage</label><input id="ed_stat_meleeDamage" type="number" value="${s.meleeDamage||0}"></div>
-    <div class="form-group"><label>meleeCooldown</label><input id="ed_stat_meleeCooldown" type="number" step="any" value="${s.meleeCooldown||0}"></div>
-  </div>`;
-}
-
 function renderEquipStats(m, cat) {
-  const fields = { armor:'maxHp', helmet:'maxHp', shoes:'speed', backpack:'carrySlots' };
-  const f = fields[cat] || 'maxHp';
+  if (cat === 'backpack') {
+    return `<h3 style="margin:16px 0 8px;font-size:13px;color:var(--text2)">Modifiers</h3>
+    <div class="form-row">
+      <div class="form-group"><label>carrySlots</label><input id="ed_mod_carrySlots" type="number" value="${m.carrySlots||0}"></div>
+    </div>`;
+  }
+  // armor, helmet, shoes all get both maxHp and speed
+  const showGravityBoots = cat === 'shoes';
+  const showShield = cat === 'armor' || cat === 'helmet';
   return `<h3 style="margin:16px 0 8px;font-size:13px;color:var(--text2)">Modifiers</h3>
   <div class="form-row">
-    <div class="form-group"><label>${f}</label><input id="ed_mod_${f}" type="number" value="${m[f]||0}"></div>
+    <div class="form-group"><label>maxHp</label><input id="ed_mod_maxHp" type="number" value="${m.maxHp||0}"></div>
+    <div class="form-group"><label>speed</label><input id="ed_mod_speed" type="number" value="${m.speed||0}"></div>
+    ${showShield ? `
+    <div class="form-group"><label>shieldHp</label><input id="ed_mod_shieldHp" type="number" value="${m.shieldHp||0}"></div>
+    <div class="form-group"><label>shieldRegen</label><input id="ed_mod_shieldRegen" type="number" step="any" value="${m.shieldRegen||0}"></div>
+    ` : ''}
+    ${showGravityBoots ? `<div class="form-group" style="display:flex;align-items:center;gap:6px"><label>gravityBoots</label><input id="ed_mod_gravityBoots" type="checkbox" ${m.gravityBoots ? 'checked' : ''}></div>` : ''}
   </div>`;
 }
 
-function saveItem(oldId, isNew) {
+function renderConsumableStats(item) {
+  const rarity = item.rarity || document.getElementById('ed_rarity')?.value || 'white';
+  const defaultHealRate = CONSUMABLE_HEAL_RATE_BY_RARITY[rarity] || 1;
+  const healRate = item.healRate ?? '';
+  const healingMoveSpeed = item.healingMoveSpeed ?? '';
+  return `<h3 style="margin:16px 0 8px;font-size:13px;color:var(--text2)">Consumable Rules</h3>
+  <div class="form-row">
+    <div class="form-group"><label>Heal Per Unit</label><input value="1 HP" readonly></div>
+    <div class="form-group"><label>Heal Speed Override</label><input id="ed_consumable_healRate" type="number" min="0" step="any" value="${healRate}" placeholder="${defaultHealRate} HP/sec default"></div>
+    <div class="form-group"><label>Move Speed While Healing</label><input id="ed_consumable_moveSpeed" type="number" min="0" step="any" value="${healingMoveSpeed}" placeholder="10 default"></div>
+  </div>
+  <div style="font-size:12px;color:var(--text2);margin-top:4px;line-height:1.6">
+    In raid, consumables heal continuously by consuming <strong>1 unit per 1 HP</strong>. Leave either field empty to use the default values (${defaultHealRate} HP/sec and 10 move speed). Reloading is disabled while healing. Press <strong>Q</strong> again to cancel healing, and left click automatically cancels healing before shooting.
+  </div>`;
+}
+
+async function saveItem(oldId, isNew) {
   const id = document.getElementById('ed_id').value.trim();
   if (!id) return toast('ID is required', true);
   if (isNew && config.items[id]) return toast('ID already exists', true);
+
+  const buyMarketTaxPercent = parseInt(document.getElementById('ed_buy_tax')?.value, 10);
+  const sellMarketTaxPercent = parseInt(document.getElementById('ed_sell_tax')?.value, 10);
+  if (!Number.isFinite(buyMarketTaxPercent) || buyMarketTaxPercent < 1 || buyMarketTaxPercent > 1000) {
+    return toast('Buying market tax must be between 1 and 1000%.', true);
+  }
+  if (!Number.isFinite(sellMarketTaxPercent) || sellMarketTaxPercent < 1 || sellMarketTaxPercent > 99) {
+    return toast('Selling market tax must be between 1 and 99%.', true);
+  }
   
   const cat = document.getElementById('ed_cat').value;
+  const existingItem = (!isNew && oldId && config.items[oldId]) ? config.items[oldId] : config.items[id];
   const item = {
-    id, category: cat, rarity: document.getElementById('ed_rarity').value,
+    ...(existingItem || {}),
+    id,
+    category: cat,
+    rarity: document.getElementById('ed_rarity').value,
     name: document.getElementById('ed_name').value,
     description: document.getElementById('ed_desc').value,
     sellValue: parseInt(document.getElementById('ed_sell').value) || 0,
-    size: parseInt(document.getElementById('ed_size').value) || 1
+    size: parseInt(document.getElementById('ed_size').value) || 1,
+    buyMarketTaxPercent,
+    sellMarketTaxPercent
   };
+  const imageValue = document.getElementById('ed_image')?.value?.trim() || '';
+  if (imageValue) item.image = imageValue;
+  else delete item.image;
+  delete item.stats;
+  delete item.modifiers;
   
   if (cat === 'gun') {
+    delete item.lootType;
     item.stats = {};
-    ['damage','cooldown','bulletSpeed','range','clipSize','reloadTime','spread'].forEach(f => {
+    ['damage','cooldown','bulletSpeed','range','clipSize','reloadTime','spread','outrangeMulti'].forEach(f => {
       const v = parseFloat(document.getElementById('ed_stat_'+f)?.value);
       if (v) item.stats[f] = v;
     });
-  } else if (cat === 'melee') {
-    item.stats = {
-      meleeDamage: parseInt(document.getElementById('ed_stat_meleeDamage')?.value) || 0,
-      meleeCooldown: parseFloat(document.getElementById('ed_stat_meleeCooldown')?.value) || 0
-    };
-  } else {
-    const modFields = { armor:'maxHp', helmet:'maxHp', shoes:'speed', backpack:'carrySlots' };
-    const f = modFields[cat];
-    const v = parseInt(document.getElementById('ed_mod_'+f)?.value) || 0;
-    if (v) item.modifiers = { [f]: v };
+  } else if (cat === 'consumable') {
+    delete item.lootType;
+    item.healAmount = Number.isFinite(Number(existingItem?.healAmount)) ? Number(existingItem.healAmount) : 20;
+    if (existingItem?.restoreEnergy) item.restoreEnergy = true;
+    if (Number.isFinite(Number(existingItem?.regenPerSecond))) item.regenPerSecond = Number(existingItem.regenPerSecond);
+    if (Number.isFinite(Number(existingItem?.regenDuration))) item.regenDuration = Number(existingItem.regenDuration);
+
+    const healRateValue = document.getElementById('ed_consumable_healRate')?.value?.trim();
+    const moveSpeedValue = document.getElementById('ed_consumable_moveSpeed')?.value?.trim();
+    if (healRateValue !== '') item.healRate = parseFloat(healRateValue) || 0;
+    if (moveSpeedValue !== '') item.healingMoveSpeed = parseFloat(moveSpeedValue) || 0;
+  } else if (cat === 'loot') {
+    item.lootType = existingItem?.lootType === 'ammo' ? 'goods' : (existingItem?.lootType || 'goods');
+  } else if (cat !== 'consumable') {
+    delete item.lootType;
+    if (cat === 'backpack') {
+      const v = parseInt(document.getElementById('ed_mod_carrySlots')?.value) || 0;
+      if (v) item.modifiers = { carrySlots: v };
+    } else {
+      // armor, helmet, shoes: both maxHp and speed
+      const hp = parseInt(document.getElementById('ed_mod_maxHp')?.value) || 0;
+      const spd = parseInt(document.getElementById('ed_mod_speed')?.value) || 0;
+      const shieldHp = parseInt(document.getElementById('ed_mod_shieldHp')?.value) || 0;
+      const shieldRegen = parseFloat(document.getElementById('ed_mod_shieldRegen')?.value) || 0;
+      const gravBoots = cat === 'shoes' && document.getElementById('ed_mod_gravityBoots')?.checked;
+      item.modifiers = {};
+      if (hp) item.modifiers.maxHp = hp;
+      if (spd) item.modifiers.speed = spd;
+      if (shieldHp) item.modifiers.shieldHp = shieldHp;
+      if (shieldRegen) item.modifiers.shieldRegen = shieldRegen;
+      if (gravBoots) item.modifiers.gravityBoots = true;
+      if (!Object.keys(item.modifiers).length) delete item.modifiers;
+    }
   }
   
   if (!isNew && oldId && oldId !== id) delete config.items[oldId];
   config.items[id] = item;
-  closeDetail(); renderItems(); toast('Item saved');
+  // Keep config.ammo in sync if this item is also tracked there
+  if (config.ammo && config.ammo[id]) {
+    config.ammo[id] = { ...item };
+  }
+  try {
+    await persistConfig();
+    updateStatusText();
+    closeDetail();
+    renderEquipments();
+    renderGoods();
+    renderConsumables();
+    toast(cat === 'consumable' ? 'Consumable saved' : cat === 'loot' ? 'Goods item saved' : 'Equipment saved');
+  } catch (e) {
+    toast(e.message, true);
+  }
 }
 
-function deleteItem(id) {
+async function deleteItem(id) {
   if (!confirm('Delete ' + id + '?')) return;
   delete config.items[id];
-  closeDetail(); renderItems(); toast('Item deleted');
+  try {
+    await persistConfig();
+    updateStatusText();
+    closeDetail();
+    renderEquipments();
+    renderGoods();
+    renderConsumables();
+    toast('Entry deleted');
+  } catch (e) {
+    toast(e.message, true);
+  }
 }
 
-async function generateImage(id, isNew) {
-  const btn = document.getElementById('genImgBtn');
-  const name = document.getElementById('ed_name').value;
-  const cat = document.getElementById('ed_cat').value;
-  const rar = document.getElementById('ed_rarity').value;
-  if (!name) return toast('Set name first', true);
-  
-  btn.disabled = true; btn.textContent = '⏳ Generating...';
-  const prompt = `Game item icon, ${cat} weapon equipment, ${name}, ${rar} rarity quality, dark background, tactical military style, detailed 3D render, top-down game asset`;
-  
-  try {
-    const itemId = document.getElementById('ed_id').value.trim() || id || 'unknown';
-    const r = await fetch(API + '/generate-image', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ prompt, itemId, width:512, height:512 })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      toast('Image generated: ' + d.path);
-    } else { throw new Error(d.message); }
-  } catch(e) { toast(e.message, true); }
-  btn.disabled = false; btn.textContent = '🎨 Generate Image';
+function editItemImage() {
+  const input = document.getElementById('ed_image');
+  if (!input) {
+    toast('Image field is unavailable.', true);
+    return;
+  }
+  const current = input.value || '';
+  const next = prompt('Enter the image path for this item. Leave empty to clear it.', current);
+  if (next === null) return;
+  input.value = next.trim();
 }
 
 // ─── Enemies ──────────────────────────────
@@ -491,7 +917,7 @@ function openEnemyEditor(id) {
   document.getElementById('detailOverlay').classList.add('open');
 }
 
-function saveEnemy(oldId, isNew) {
+async function saveEnemy(oldId, isNew) {
   const id = document.getElementById('ee_id').value.trim();
   if (!id) return toast('ID required', true);
   const enemy = {
@@ -513,13 +939,27 @@ function saveEnemy(oldId, isNew) {
   };
   if (!isNew && oldId && oldId !== id) delete config.enemies[oldId];
   config.enemies[id] = enemy;
-  closeDetail(); renderEnemies(); toast('Enemy saved');
+  try {
+    await persistConfig();
+    closeDetail();
+    renderEnemies();
+    toast('Enemy saved');
+  } catch (e) {
+    toast(e.message, true);
+  }
 }
 
-function deleteEnemy(id) {
+async function deleteEnemy(id) {
   if (!confirm('Delete ' + id + '?')) return;
   delete config.enemies[id];
-  closeDetail(); renderEnemies(); toast('Enemy deleted');
+  try {
+    await persistConfig();
+    closeDetail();
+    renderEnemies();
+    toast('Enemy deleted');
+  } catch (e) {
+    toast(e.message, true);
+  }
 }
 
 // ─── Crates ───────────────────────────────
@@ -538,7 +978,7 @@ function renderCrates() {
 
 function openCrateEditor(key) {
   const crate = config.crate_tiers[key];
-  const allRarities = ['white','green','blue','purple','gold','red'];
+  const allRarities = ['white','green','blue','purple','gold','red','legend'];
   document.getElementById('detailContent').innerHTML = `
     <button class="close-btn" onclick="closeDetail()">✕</button>
     <h2>Edit: ${crate.label || key}</h2>
@@ -561,7 +1001,7 @@ function openCrateEditor(key) {
   document.getElementById('detailOverlay').classList.add('open');
 }
 
-function saveCrate(key) {
+async function saveCrate(key) {
   config.crate_tiers[key] = {
     label: document.getElementById('ce_label').value,
     description: document.getElementById('ce_desc').value,
@@ -572,23 +1012,32 @@ function saveCrate(key) {
     },
     pool: document.getElementById('ce_pool').value.split(',').map(s => s.trim()).filter(Boolean)
   };
-  closeDetail(); renderCrates(); toast('Crate saved');
+  try {
+    await persistConfig();
+    closeDetail();
+    renderCrates();
+    toast('Crate saved');
+  } catch (e) {
+    toast(e.message, true);
+  }
 }
 
 // ─── Ammo ─────────────────────────────────
 function renderAmmo() {
   const body = document.getElementById('ammoBody');
   const ammoList = Object.entries(config.ammo || {}).sort((a,b) => {
-    const order = ['gray','green','blue','purple','gold','red'];
+    const order = ['gray','white','green','blue','purple','gold','red','legend'];
     return order.indexOf(a[1].rarity) - order.indexOf(b[1].rarity);
   });
   
   body.innerHTML = ammoList.map(([id, a]) => `
     <tr>
-      <td><span class="rarity-dot rarity-${a.rarity}"></span>${a.rarity}</td>
-      <td>${a.name}</td>
+      <td><span class="rarity-dot rarity-${a.rarity}"></span><span class="${a.rarity === 'legend' ? 'legend-text' : ''}">${a.rarity}</span></td>
+      <td class="${a.rarity === 'legend' ? 'legend-text' : ''}">${a.name}</td>
       <td class="edit-cell" onclick="editAmmoField('${id}','damageMultiplier')">${a.damageMultiplier}×</td>
       <td class="edit-cell" onclick="editAmmoField('${id}','sellValue')">${a.sellValue?.toLocaleString()}</td>
+      <td class="edit-cell" onclick="editAmmoField('${id}','buyMarketTaxPercent')">${sanitizePercentValue(a.buyMarketTaxPercent, 1, 1000, 10)}%</td>
+      <td class="edit-cell" onclick="editAmmoField('${id}','sellMarketTaxPercent')">${sanitizePercentValue(a.sellMarketTaxPercent, 1, 99, 10)}%</td>
       <td><span style="color:${RARITY_COLORS[a.rarity]}">●</span> ${RARITY_COLORS[a.rarity]}</td>
       <td>${a.instantKill ? '⚡ Yes' : 'No'}</td>
       <td><button class="btn" onclick="openAmmoEditor('${id}')">Edit</button></td>
@@ -609,13 +1058,17 @@ function openAmmoEditor(id) {
     </div>
     <div class="form-row">
       <div class="form-group"><label>Damage Multiplier</label><input id="ae_dm" type="number" step="any" value="${a.damageMultiplier}"></div>
-      <div class="form-group"><label>Sell Value</label><input id="ae_sell" type="number" value="${a.sellValue}"></div>
+      <div class="form-group"><label>Value</label><input id="ae_sell" type="number" value="${a.sellValue}"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>Instant Kill</label><select id="ae_ik">
         <option value="false" ${!a.instantKill?'selected':''}>No</option>
         <option value="true" ${a.instantKill?'selected':''}>Yes</option>
       </select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Buy Market Tax %</label><input id="ae_buyTax" type="number" min="1" max="1000" step="1" value="${sanitizePercentValue(a.buyMarketTaxPercent, 1, 1000, 10)}"></div>
+      <div class="form-group"><label>Sell Market Tax %</label><input id="ae_sellTax" type="number" min="1" max="99" step="1" value="${sanitizePercentValue(a.sellMarketTaxPercent, 1, 99, 10)}"></div>
     </div>
     <div class="form-group"><label>Description</label><textarea id="ae_desc">${a.description||''}</textarea></div>
     <div class="form-actions">
@@ -626,27 +1079,770 @@ function openAmmoEditor(id) {
   document.getElementById('detailOverlay').classList.add('open');
 }
 
-function saveAmmo(id) {
+async function saveAmmo(id) {
   config.ammo[id] = {
-    ...config.ammmo?.[id],
+    ...config.ammo?.[id],
     id, category:'loot', lootType:'ammo',
     name: document.getElementById('ae_name').value,
     rarity: document.getElementById('ae_rarity').value,
     damageMultiplier: parseFloat(document.getElementById('ae_dm').value),
     sellValue: parseInt(document.getElementById('ae_sell').value),
     instantKill: document.getElementById('ae_ik').value === 'true',
+    buyMarketTaxPercent: sanitizePercentValue(document.getElementById('ae_buyTax').value, 1, 1000, 10),
+    sellMarketTaxPercent: sanitizePercentValue(document.getElementById('ae_sellTax').value, 1, 99, 10),
     description: document.getElementById('ae_desc').value,
     ammoAmount: 1
   };
-  closeDetail(); renderAmmo(); toast('Ammo saved');
+  // Keep config.items in sync so persistConfig merges correctly
+  if (config.items) config.items[id] = { ...config.ammo[id] };
+  try {
+    await persistConfig();
+    closeDetail();
+    renderAmmo();
+    toast('Ammo saved');
+  } catch (e) {
+    toast(e.message, true);
+  }
 }
 
-function editAmmoField(id, field) {
+// ─── Level Rewards ───────────────────────
+function getLevelRewardEntries() {
+  const entries = new Map();
+
+  for (let level = DEFAULT_LEVEL_REWARD_INTERVAL; level <= MAX_PLAYER_LEVEL; level += DEFAULT_LEVEL_REWARD_INTERVAL) {
+    const coins = Math.max(1000, level * 250);
+    entries.set(level, {
+      level,
+      type: 'coins',
+      coins,
+      itemId: '',
+      quantity: 0,
+      label: `Lv. ${level} reward`,
+      description: `Receive ${coins.toLocaleString()} coins for reaching Lv. ${level}.`,
+      enabled: true,
+      source: 'default'
+    });
+  }
+
+  Object.entries(config.player_level_rewards || {}).forEach(([levelKey, reward]) => {
+    const safeReward = reward && typeof reward === 'object' ? reward : {};
+    const level = parseInt(levelKey, 10) || parseInt(safeReward.level, 10) || 0;
+    if (!Number.isFinite(level) || level <= 0 || level > MAX_PLAYER_LEVEL) return;
+    const base = entries.get(level) || {
+      level,
+      type: 'coins',
+      coins: 0,
+      itemId: '',
+      quantity: 0,
+      label: `Lv. ${level} reward`,
+      description: '',
+      enabled: true,
+      source: 'custom'
+    };
+    entries.set(level, {
+      ...base,
+      level,
+      type: safeReward.type === 'item' ? 'item' : 'coins',
+      coins: Math.max(0, parseInt(safeReward.coins, 10) || 0),
+      itemId: String(safeReward.itemId || ''),
+      quantity: Math.max(1, parseInt(safeReward.quantity, 10) || 1),
+      label: String(safeReward.label || base.label),
+      description: String(safeReward.description || base.description),
+      enabled: safeReward.enabled !== false,
+      source: 'override'
+    });
+  });
+
+  return Array.from(entries.values());
+}
+
+function getRewardSourceItems() {
+  return Object.values(config.items || {})
+    .filter(item => item && item.id)
+    .sort((a, b) => getCategoryLabel(a).localeCompare(getCategoryLabel(b)) || String(a.name || '').localeCompare(String(b.name || '')));
+}
+
+function buildLevelRewardItemOptions(selectedId = '') {
+  return getRewardSourceItems().map(item => {
+    const selected = item.id === selectedId ? 'selected' : '';
+    return `<option value="${item.id}" ${selected}>${item.name} (${getCategoryLabel(item)} · ${item.rarity})</option>`;
+  }).join('');
+}
+
+function getLevelRewardValueLabel(entry) {
+  if (entry.type === 'item' && entry.itemId) {
+    const item = (config.items || {})[entry.itemId] || (config.ammo || {})[entry.itemId];
+    const name = item?.name || entry.itemId;
+    return `${name} ×${Math.max(1, parseInt(entry.quantity, 10) || 1)}`;
+  }
+  return `${Math.max(0, parseInt(entry.coins, 10) || 0).toLocaleString()} coins`;
+}
+
+function syncLevelRewardEditorFields() {
+  const rewardType = document.getElementById('lr_type')?.value || 'coins';
+  const coinsGroup = document.getElementById('lr_coins_group');
+  const itemGroup = document.getElementById('lr_item_group');
+  const quantityGroup = document.getElementById('lr_quantity_group');
+  if (coinsGroup) coinsGroup.style.display = rewardType === 'coins' ? '' : 'none';
+  if (itemGroup) itemGroup.style.display = rewardType === 'item' ? '' : 'none';
+  if (quantityGroup) quantityGroup.style.display = rewardType === 'item' ? '' : 'none';
+
+  const itemSelect = document.getElementById('lr_itemId');
+  const hint = document.getElementById('lr_item_hint');
+  if (itemSelect && hint) {
+    const item = (config.items || {})[itemSelect.value] || (config.ammo || {})[itemSelect.value];
+    hint.textContent = item
+      ? `${item.name} · ${getCategoryLabel(item)} · ${item.rarity}`
+      : 'Choose any existing game item as the reward.';
+  }
+}
+
+function renderLevelRewards() {
+  const grid = document.getElementById('levelRewardGrid');
+  const search = String(document.getElementById('levelRewardSearch').value || '').toLowerCase();
+  const enabledFilter = document.getElementById('levelRewardEnabledFilter').value;
+  const sortMode = document.getElementById('levelRewardSort').value;
+
+  const rewards = getLevelRewardEntries()
+    .filter(entry => !search || String(entry.level).includes(search) || entry.label.toLowerCase().includes(search) || entry.description.toLowerCase().includes(search) || getLevelRewardValueLabel(entry).toLowerCase().includes(search) || String(entry.itemId || '').toLowerCase().includes(search))
+    .filter(entry => !enabledFilter || (enabledFilter === 'enabled' ? entry.enabled : !entry.enabled));
+
+  rewards.sort((a, b) => {
+    if (sortMode === 'level-desc') return b.level - a.level;
+    if (sortMode === 'coins-desc') return b.coins - a.coins || a.level - b.level;
+    if (sortMode === 'coins-asc') return a.coins - b.coins || a.level - b.level;
+    return a.level - b.level;
+  });
+
+  if (!rewards.length) {
+    grid.innerHTML = '<div class="empty-state">No level rewards found.</div>';
+    return;
+  }
+
+  grid.innerHTML = rewards.map(entry => `
+    <div class="card" onclick="openLevelRewardEditor(${entry.level})">
+      <div class="reward-level-badge">Lv. ${entry.level}</div>
+      <h3>${entry.label}</h3>
+      <div class="meta"><span class="reward-status ${entry.enabled ? 'enabled' : 'disabled'}">${entry.enabled ? 'enabled' : 'disabled'}</span> · ${entry.source}</div>
+      <div class="reward-value">${getLevelRewardValueLabel(entry)}</div>
+      <div class="stats">${entry.description || 'No description set.'}</div>
+    </div>
+  `).join('');
+}
+
+function openLevelRewardEditor(level = null) {
+  const isNew = level == null;
+  const existingReward = !isNew ? config.player_level_rewards?.[String(level)] : null;
+  const normalizedLevel = parseInt(level, 10) || 10;
+  const defaultCoins = Math.max(1000, normalizedLevel * 250);
+  const reward = existingReward && typeof existingReward === 'object'
+    ? { ...existingReward, level: normalizedLevel }
+    : { level: normalizedLevel, type: 'coins', coins: isNew ? 2500 : defaultCoins, itemId: '', quantity: 1, label: '', description: '', enabled: true };
+  const hasOverride = Boolean(existingReward && typeof existingReward === 'object');
+
+  document.getElementById('detailContent').innerHTML = `
+    <button class="close-btn" onclick="closeDetail()">✕</button>
+    <h2>${isNew ? 'Create Level Reward' : `Edit Level Reward: Lv. ${reward.level}`}</h2>
+    <div class="form-row">
+      <div class="form-group"><label>Level</label><input id="lr_level" type="number" min="1" max="9999" value="${reward.level}" ${isNew ? '' : 'readonly'}></div>
+      <div class="form-group"><label>Reward Type</label>
+        <select id="lr_type" onchange="syncLevelRewardEditorFields()">
+          <option value="coins" ${reward.type !== 'item' ? 'selected' : ''}>Coins</option>
+          <option value="item" ${reward.type === 'item' ? 'selected' : ''}>Item</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" id="lr_coins_group"><label>Coins</label><input id="lr_coins" type="number" min="0" value="${reward.coins || 0}"></div>
+      <div class="form-group" id="lr_item_group"><label>Reward Item</label>
+        <input id="lr_itemSearch" list="lr_item_options" value="${reward.itemId || ''}" placeholder="Type to search item by id or name" oninput="document.getElementById('lr_itemId').value=this.value;syncLevelRewardEditorFields()">
+        <datalist id="lr_item_options">${buildLevelRewardItemOptions(reward.itemId || '')}</datalist>
+        <input id="lr_itemId" type="hidden" value="${reward.itemId || ''}">
+        <div id="lr_item_hint" class="reward-item-hint"></div>
+      </div>
+      <div class="form-group" id="lr_quantity_group"><label>Quantity</label><input id="lr_quantity" type="number" min="1" value="${Math.max(1, parseInt(reward.quantity, 10) || 1)}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Label</label><input id="lr_label" value="${String(reward.label || '').replace(/"/g, '&quot;')}" placeholder="Lv. ${reward.level} reward"></div>
+      <div class="form-group"><label>Status</label>
+        <select id="lr_enabled">
+          <option value="true" ${reward.enabled !== false ? 'selected' : ''}>Enabled</option>
+          <option value="false" ${reward.enabled === false ? 'selected' : ''}>Disabled</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>Description</label><textarea id="lr_desc">${reward.description || ''}</textarea></div>
+    <div class="form-actions">
+      <button class="btn btn-save" onclick="saveLevelReward(${isNew ? 'null' : level})">💾 Save</button>
+      ${hasOverride ? `<button class="btn btn-delete" onclick="deleteLevelReward(${level})">↺ Revert Override</button>` : ''}
+      <button class="btn btn-cancel" onclick="closeDetail()">Cancel</button>
+    </div>
+  `;
+  document.getElementById('detailOverlay').classList.add('open');
+  syncLevelRewardEditorFields();
+}
+
+async function saveLevelReward(oldLevel) {
+  const level = parseInt(document.getElementById('lr_level').value, 10);
+  if (!Number.isFinite(level) || level <= 0) return toast('Level must be a positive whole number.', true);
+  if (oldLevel == null && config.player_level_rewards?.[String(level)]) return toast('A reward for that level already exists.', true);
+
+  const rewardType = document.getElementById('lr_type').value;
+  const itemId = (document.getElementById('lr_itemSearch')?.value || '').trim();
+  const rewardItem = (config.items || {})[itemId] || (config.ammo || {})[itemId];
+  if (rewardType === 'item' && !rewardItem) return toast('Choose a valid reward item from the game.', true);
+
+  config.player_level_rewards ||= {};
+  config.player_level_rewards[String(level)] = {
+    level,
+    type: rewardType,
+    coins: rewardType === 'coins' ? Math.max(0, parseInt(document.getElementById('lr_coins').value, 10) || 0) : 0,
+    itemId: rewardType === 'item' ? rewardItem.id : '',
+    quantity: rewardType === 'item' ? Math.max(1, parseInt(document.getElementById('lr_quantity').value, 10) || 1) : 0,
+    label: document.getElementById('lr_label').value.trim() || `Lv. ${level} reward`,
+    description: document.getElementById('lr_desc').value.trim(),
+    enabled: document.getElementById('lr_enabled').value === 'true'
+  };
+
+  try {
+    await persistConfig();
+    updateStatusText();
+    closeDetail();
+    renderLevelRewards();
+    toast('Level reward saved');
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+async function deleteLevelReward(level) {
+  if (!confirm(`Delete level reward for Lv. ${level}?`)) return;
+  delete config.player_level_rewards[String(level)];
+  try {
+    await persistConfig();
+    updateStatusText();
+    closeDetail();
+    renderLevelRewards();
+    toast('Level reward deleted');
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+async function editAmmoField(id, field) {
   const current = config.ammo[id]?.[field];
   const val = prompt(`Edit ${field} for ${id}:`, current);
   if (val === null) return;
   config.ammo[id][field] = field === 'sellValue' ? parseInt(val) : parseFloat(val);
-  renderAmmo();
+  try {
+    await persistConfig();
+    renderAmmo();
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+// ─── Overlay ──────────────────────────────
+function closeDetail() {
+  document.getElementById('detailOverlay').classList.remove('open');
+}
+document.getElementById('detailOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('detailOverlay')) closeDetail();
+});
+
+// ─── Combat Simulator ─────────────────────
+const SIM_CONSTANTS = {
+  PLAYER_MAX_HP: 100,
+  PLAYER_SPEED: 180,
+  PLAYER_RADIUS: 14,
+  TICK_RATE: 1 / 60,
+  MAX_TICKS: 60 * 120, // 2 min max per match
+  AI_AIM_JITTER: 0.06,
+  AI_STRAFE_CHANGE_INTERVAL: 0.8,
+  AI_SHOOT_PROBABILITY: 0.92,
+  BULLET_RADIUS: 4,
+  ARENA_SIZE: 3000,
+  HEAL_HP_THRESHOLD: 0.5, // start healing below 50% HP
+  DEFAULT_HEALING_MOVE_SPEED: 10,
+};
+
+function buildSimDropdowns() {
+  const items = Object.values(config.items || {});
+  const ammoItems = Object.values(config.ammo || {});
+  const guns = items.filter(i => i?.category === 'gun').sort((a,b) => getRaritySortIndex(b.rarity) - getRaritySortIndex(a.rarity) || (a.name||'').localeCompare(b.name||''));
+  const armors = items.filter(i => i?.category === 'armor').sort((a,b) => getRaritySortIndex(b.rarity) - getRaritySortIndex(a.rarity) || (a.name||'').localeCompare(b.name||''));
+  const helmets = items.filter(i => i?.category === 'helmet').sort((a,b) => getRaritySortIndex(b.rarity) - getRaritySortIndex(a.rarity) || (a.name||'').localeCompare(b.name||''));
+  const shoes = items.filter(i => i?.category === 'shoes').sort((a,b) => getRaritySortIndex(b.rarity) - getRaritySortIndex(a.rarity) || (a.name||'').localeCompare(b.name||''));
+  const ammo = ammoItems.sort((a,b) => getRaritySortIndex(b.rarity) - getRaritySortIndex(a.rarity) || (a.name||'').localeCompare(b.name||''));
+  const consumables = items.filter(i => i?.category === 'consumable').sort((a,b) => getRaritySortIndex(b.rarity) - getRaritySortIndex(a.rarity) || (a.name||'').localeCompare(b.name||''));
+
+  function optionHtml(list, emptyLabel) {
+    return `<option value="">${emptyLabel}</option>` + list.map(i => {
+      const dot = RARITY_COLORS[i.rarity] || '#fff';
+      return `<option value="${i.id}">${i.name} (${i.rarity})</option>`;
+    }).join('');
+  }
+
+  for (const side of ['a','b']) {
+    document.getElementById(`sim_${side}_gun1`).innerHTML = optionHtml(guns, '— No Gun —');
+    document.getElementById(`sim_${side}_gun2`).innerHTML = optionHtml(guns, '— No Gun —');
+    document.getElementById(`sim_${side}_armor`).innerHTML = optionHtml(armors, '— No Armor —');
+    document.getElementById(`sim_${side}_helmet`).innerHTML = optionHtml(helmets, '— No Helmet —');
+    document.getElementById(`sim_${side}_shoes`).innerHTML = optionHtml(shoes, '— No Shoes —');
+    document.getElementById(`sim_${side}_ammo`).innerHTML = optionHtml(ammo, 'Gray Ammo (default)');
+    document.getElementById(`sim_${side}_consumable`).innerHTML = optionHtml(consumables, '— No Consumable —');
+  }
+
+  // set reasonable defaults if available
+  const defaultGun = guns[Math.floor(guns.length/2)]?.id || guns[0]?.id || '';
+  for (const side of ['a','b']) {
+    const g1 = document.getElementById(`sim_${side}_gun1`);
+    if (g1.querySelector(`option[value="${defaultGun}"]`)) g1.value = defaultGun;
+  }
+
+  // attach change listeners for preview
+  for (const side of ['a','b']) {
+    for (const slot of ['gun1','gun2','armor','helmet','shoes','ammo','consumable']) {
+      document.getElementById(`sim_${side}_${slot}`).addEventListener('change', () => updateSimPreview(side));
+    }
+    document.getElementById(`sim_${side}_consumable_count`).addEventListener('change', () => updateSimPreview(side));
+  }
+  updateSimPreview('a');
+  updateSimPreview('b');
+}
+
+function getSimLoadout(side) {
+  return {
+    gun1: document.getElementById(`sim_${side}_gun1`).value || null,
+    gun2: document.getElementById(`sim_${side}_gun2`).value || null,
+    armor: document.getElementById(`sim_${side}_armor`).value || null,
+    helmet: document.getElementById(`sim_${side}_helmet`).value || null,
+    shoes: document.getElementById(`sim_${side}_shoes`).value || null,
+    ammo: document.getElementById(`sim_${side}_ammo`).value || null,
+    consumable: document.getElementById(`sim_${side}_consumable`).value || null,
+    consumableCount: parseInt(document.getElementById(`sim_${side}_consumable_count`).value) || 0,
+  };
+}
+
+function getSimItemDef(id) {
+  if (!id) return null;
+  return config.items?.[id] || config.ammo?.[id] || null;
+}
+
+function computeSimStats(loadout) {
+  const gun = getSimItemDef(loadout.gun1);
+  const gun2 = getSimItemDef(loadout.gun2);
+  const armor = getSimItemDef(loadout.armor);
+  const helmet = getSimItemDef(loadout.helmet);
+  const shoes = getSimItemDef(loadout.shoes);
+  const ammo = getSimItemDef(loadout.ammo);
+
+  let maxHp = SIM_CONSTANTS.PLAYER_MAX_HP;
+  let speed = SIM_CONSTANTS.PLAYER_SPEED;
+  for (const item of [armor, helmet, shoes]) {
+    if (!item) continue;
+    maxHp += item.modifiers?.maxHp || 0;
+    speed += item.modifiers?.speed || 0;
+  }
+
+  const damage = gun?.stats?.damage ?? 0;
+  const cooldown = gun?.stats?.cooldown ?? 0.25;
+  const bulletSpeed = gun?.stats?.bulletSpeed ?? 500;
+  const range = gun?.stats?.range ?? 350;
+  const clipSize = gun?.stats?.clipSize ?? 0;
+  const reloadTime = gun?.stats?.reloadTime ?? 1;
+  const spread = gun?.stats?.spread ?? 0.03;
+  const damageMultiplier = ammo?.damageMultiplier ?? 1;
+  const instantKill = ammo?.instantKill ?? false;
+  const outrangeMulti = Math.max(0, Math.min(2, Number(gun?.stats?.outrangeMulti) || 0.5));
+
+  const effectiveDamage = damage * damageMultiplier;
+  const dps = cooldown > 0 ? effectiveDamage / cooldown : 0;
+  const clipDamage = effectiveDamage * clipSize;
+  const burstTime = cooldown * clipSize;
+  const sustainedDps = (clipSize * effectiveDamage) / (burstTime + reloadTime);
+
+  const consumableDef = getSimItemDef(loadout.consumable);
+  const consumableCount = loadout.consumableCount || 0;
+  const healRate = consumableDef ? (Number(consumableDef.healRate) > 0 ? Number(consumableDef.healRate) : (CONSUMABLE_HEAL_RATE_BY_RARITY[consumableDef.rarity] || 1)) : 0;
+  const healingMoveSpeed = consumableDef ? (Number(consumableDef.healingMoveSpeed) >= 0 ? Number(consumableDef.healingMoveSpeed) : SIM_CONSTANTS.DEFAULT_HEALING_MOVE_SPEED) : 0;
+
+  return { maxHp, speed, damage, effectiveDamage, cooldown, bulletSpeed, range, clipSize, reloadTime, spread, damageMultiplier, instantKill, outrangeMulti, dps, clipDamage, sustainedDps, gun, gun2, ammo, consumableDef, consumableCount, healRate, healingMoveSpeed };
+}
+
+function updateSimPreview(side) {
+  const loadout = getSimLoadout(side);
+  const s = computeSimStats(loadout);
+  const el = document.getElementById(`sim_${side}_preview`);
+  const healInfo = s.consumableDef ? ` · <strong>Heal:</strong> ${s.healRate} HP/s × ${s.consumableCount} uses` : '';
+  el.innerHTML = `<strong>HP:</strong> ${s.maxHp} · <strong>Speed:</strong> ${s.speed} · <strong>Dmg:</strong> ${s.effectiveDamage.toFixed(1)} · <strong>DPS:</strong> ${s.dps.toFixed(1)} · <strong>Sustained DPS:</strong> ${s.sustainedDps.toFixed(1)}${healInfo}<br>`
+    + `<strong>Clip:</strong> ${s.clipSize} · <strong>Reload:</strong> ${s.reloadTime}s · <strong>Range:</strong> ${s.range}px · <strong>Spread:</strong> ${s.spread} · <strong>Ammo Multi:</strong> ${s.damageMultiplier}x${s.instantKill ? ' ⚡IK' : ''} · <strong>Outrange×:</strong> ${s.outrangeMulti}` + `<br><strong>Arena:</strong> ${SIM_CONSTANTS.ARENA_SIZE}×${SIM_CONSTANTS.ARENA_SIZE}px`;
+}
+
+// ─── Simulation Engine ───────────────────
+function createSimFighter(loadout, x, y, teamId) {
+  const gun = getSimItemDef(loadout.gun1);
+  const gun2Def = getSimItemDef(loadout.gun2);
+  const armor = getSimItemDef(loadout.armor);
+  const helmet = getSimItemDef(loadout.helmet);
+  const shoes = getSimItemDef(loadout.shoes);
+  const ammoDef = getSimItemDef(loadout.ammo);
+
+  let maxHp = SIM_CONSTANTS.PLAYER_MAX_HP;
+  let speed = SIM_CONSTANTS.PLAYER_SPEED;
+  let shootCooldownMult = 1;
+  for (const item of [armor, helmet, shoes]) {
+    if (!item) continue;
+    maxHp += item.modifiers?.maxHp || 0;
+    speed += item.modifiers?.speed || 0;
+    if (item.modifiers?.shootCooldownMultiplier) shootCooldownMult *= item.modifiers.shootCooldownMultiplier;
+  }
+
+  // Pick the higher-value gun as primary (like the real game)
+  let activeGun = gun;
+  if (gun2Def && (!gun || (gun2Def.sellValue||0) > (gun?.sellValue||0))) activeGun = gun2Def;
+
+  const damage = activeGun?.stats?.damage ?? 0;
+  const cooldown = (activeGun?.stats?.cooldown ?? 0.25) * shootCooldownMult;
+  const bulletSpeed = activeGun?.stats?.bulletSpeed ?? 500;
+  const range = activeGun?.stats?.range ?? 350;
+  const clipSize = activeGun?.stats?.clipSize ?? 0;
+  const reloadTime = activeGun?.stats?.reloadTime ?? 1;
+  const spread = activeGun?.stats?.spread ?? 0.03;
+  const damageMultiplier = ammoDef?.damageMultiplier ?? 1;
+  const instantKill = ammoDef?.instantKill ?? false;
+  const outrangeMulti = Math.max(0, Math.min(2, Number(activeGun?.stats?.outrangeMulti) || 0.5));
+
+  // Consumable / healing
+  const consumableDef = getSimItemDef(loadout.consumable);
+  const consumableCount = loadout.consumableCount || 0;
+  const healRate = consumableDef ? (Number(consumableDef.healRate) > 0 ? Number(consumableDef.healRate) : (CONSUMABLE_HEAL_RATE_BY_RARITY[consumableDef.rarity] || 1)) : 0;
+  const healingMoveSpeed = consumableDef ? (Number(consumableDef.healingMoveSpeed) >= 0 ? Number(consumableDef.healingMoveSpeed) : SIM_CONSTANTS.DEFAULT_HEALING_MOVE_SPEED) : 0;
+
+  return {
+    x, y, hp: maxHp, maxHp, speed, teamId, alive: true,
+    damage: damage * damageMultiplier, cooldown, bulletSpeed, range, clipSize,
+    reloadTime, spread, instantKill, outrangeMulti,
+    currentAmmo: clipSize, shootCooldown: 0, reloadTimer: 0, isReloading: false,
+    strafeDir: Math.random() < 0.5 ? -1 : 1, strafeTimer: 0,
+    angle: 0, damageDealt: 0, killCount: 0,
+    // Healing
+    isHealing: false, healRate, healingMoveSpeed, healingProgress: 0,
+    consumableUnits: consumableCount, hpHealed: 0,
+  };
+}
+
+function simOneFight(loadoutA, loadoutB, squadSize, engagementRange) {
+  const dt = SIM_CONSTANTS.TICK_RATE;
+  const fighters = [];
+  const bullets = [];
+
+  // Place squads in center of arena, facing each other
+  const AS = SIM_CONSTANTS.ARENA_SIZE;
+  const cx = AS / 2, cy = AS / 2;
+  const halfRange = engagementRange / 2;
+  const spreadY = 40;
+  for (let i = 0; i < squadSize; i++) {
+    const yOffset = cy + (i - (squadSize - 1) / 2) * spreadY;
+    fighters.push(createSimFighter(loadoutA, cx - halfRange, yOffset, 'A'));
+    fighters.push(createSimFighter(loadoutB, cx + halfRange, yOffset, 'B'));
+  }
+
+  let ticks = 0;
+  while (ticks < SIM_CONSTANTS.MAX_TICKS) {
+    ticks++;
+    const aliveA = fighters.filter(f => f.alive && f.teamId === 'A');
+    const aliveB = fighters.filter(f => f.alive && f.teamId === 'B');
+    if (!aliveA.length || !aliveB.length) break;
+
+    // Update fighters
+    for (const f of fighters) {
+      if (!f.alive) continue;
+
+      // Find closest enemy
+      const enemies = fighters.filter(e => e.alive && e.teamId !== f.teamId);
+      if (!enemies.length) continue;
+      let target = enemies[0], bestDist = Infinity;
+      for (const e of enemies) {
+        const d = Math.hypot(e.x - f.x, e.y - f.y);
+        if (d < bestDist) { bestDist = d; target = e; }
+      }
+
+      // Aim at target
+      f.angle = Math.atan2(target.y - f.y, target.x - f.x);
+
+      // AI strafe movement
+      f.strafeTimer -= dt;
+      if (f.strafeTimer <= 0) {
+        f.strafeDir = Math.random() < 0.5 ? -1 : 1;
+        f.strafeTimer = SIM_CONSTANTS.AI_STRAFE_CHANGE_INTERVAL * (0.6 + Math.random() * 0.8);
+      }
+      const strafeAngle = f.angle + Math.PI / 2 * f.strafeDir;
+      // Move towards optimal range + strafe
+      const optimalRange = f.range * 0.65;
+      let moveAngle;
+      if (bestDist > optimalRange + 30) {
+        // Approach + slight strafe
+        moveAngle = f.angle + (Math.PI / 6) * f.strafeDir;
+      } else if (bestDist < optimalRange - 30) {
+        // Retreat + strafe
+        moveAngle = f.angle + Math.PI + (Math.PI / 6) * f.strafeDir;
+      } else {
+        // Pure strafe
+        moveAngle = strafeAngle;
+      }
+      // Healing AI: if low HP, has consumable units, and not too close to enemy
+      if (!f.isHealing && f.consumableUnits > 0 && f.hp < f.maxHp * SIM_CONSTANTS.HEAL_HP_THRESHOLD && bestDist > f.range * 0.4) {
+        f.isHealing = true;
+        f.healingProgress = 0;
+      }
+      // Stop healing to fight if enemy very close
+      if (f.isHealing && bestDist < f.range * 0.25) {
+        f.isHealing = false;
+      }
+
+      // Move: slower when healing
+      const moveSpeed = f.isHealing ? f.healingMoveSpeed : f.speed;
+      f.x += Math.cos(moveAngle) * moveSpeed * dt;
+      f.y += Math.sin(moveAngle) * moveSpeed * dt;
+
+      // Clamp to arena bounds
+      const PR = SIM_CONSTANTS.PLAYER_RADIUS;
+      f.x = Math.max(PR, Math.min(SIM_CONSTANTS.ARENA_SIZE - PR, f.x));
+      f.y = Math.max(PR, Math.min(SIM_CONSTANTS.ARENA_SIZE - PR, f.y));
+
+      // Healing tick
+      if (f.isHealing) {
+        f.healingProgress += f.healRate * dt;
+        while (f.healingProgress >= 1 && f.hp < f.maxHp && f.consumableUnits > 0) {
+          f.consumableUnits--;
+          f.hp = Math.min(f.maxHp, f.hp + 1);
+          f.hpHealed++;
+          f.healingProgress -= 1;
+        }
+        if (f.hp >= f.maxHp || f.consumableUnits <= 0) {
+          f.isHealing = false;
+        }
+        continue; // can't shoot/reload while healing
+      }
+
+      // Reload logic
+      if (f.isReloading) {
+        f.reloadTimer -= dt;
+        if (f.reloadTimer <= 0) {
+          f.isReloading = false;
+          f.currentAmmo = f.clipSize;
+        }
+        continue; // can't shoot while reloading
+      }
+
+      // Shooting cooldown
+      f.shootCooldown = Math.max(0, f.shootCooldown - dt);
+
+      // Auto-reload when empty
+      if (f.currentAmmo <= 0 && f.clipSize > 0) {
+        f.isReloading = true;
+        f.reloadTimer = f.reloadTime;
+        continue;
+      }
+
+      // Shoot
+      if (f.shootCooldown <= 0 && f.currentAmmo > 0 && bestDist <= f.range * 1.1 && Math.random() < SIM_CONSTANTS.AI_SHOOT_PROBABILITY) {
+        const aimJitter = (Math.random() * 2 - 1) * SIM_CONSTANTS.AI_AIM_JITTER;
+        const spreadJitter = (Math.random() * 2 - 1) * f.spread;
+        const finalAngle = f.angle + aimJitter + spreadJitter;
+        bullets.push({
+          x: f.x + Math.cos(finalAngle) * (SIM_CONSTANTS.PLAYER_RADIUS + 4),
+          y: f.y + Math.sin(finalAngle) * (SIM_CONSTANTS.PLAYER_RADIUS + 4),
+          vx: Math.cos(finalAngle) * f.bulletSpeed,
+          vy: Math.sin(finalAngle) * f.bulletSpeed,
+          damage: f.damage,
+          instantKill: f.instantKill,
+          ownerId: f,
+          teamId: f.teamId,
+          life: (f.range * 2) / f.bulletSpeed,
+          maxLife: (f.range * 2) / f.bulletSpeed,
+          baseRange: f.range,
+          outrangeMulti: f.outrangeMulti,
+        });
+        f.currentAmmo--;
+        f.shootCooldown = f.cooldown;
+      }
+    }
+
+    // Update bullets
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const b = bullets[i];
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.life -= dt;
+      if (b.life <= 0 || b.x < 0 || b.x > SIM_CONSTANTS.ARENA_SIZE || b.y < 0 || b.y > SIM_CONSTANTS.ARENA_SIZE) { bullets.splice(i, 1); continue; }
+
+      // Check hits
+      for (const f of fighters) {
+        if (!f.alive || f.teamId === b.teamId) continue;
+        const dx = f.x - b.x, dy = f.y - b.y;
+        if (dx * dx + dy * dy < (SIM_CONSTANTS.PLAYER_RADIUS + SIM_CONSTANTS.BULLET_RADIUS) ** 2) {
+          const attDmg = (() => {
+            if (!b.baseRange || !b.outrangeMulti) return b.damage;
+            const spd = Math.hypot(b.vx, b.vy) || 1;
+            const dist = (b.maxLife - b.life) * spd;
+            if (dist <= b.baseRange) return b.damage;
+            const prog = (dist - b.baseRange) / b.baseRange;
+            return b.damage * b.outrangeMulti * Math.max(0, 1 - prog);
+          })();
+          if (b.instantKill) {
+            f.hp = 0;
+          } else {
+            f.hp -= attDmg;
+          }
+          b.ownerId.damageDealt += b.instantKill ? f.maxHp : attDmg;
+          if (f.hp <= 0) {
+            f.hp = 0;
+            f.alive = false;
+            b.ownerId.killCount++;
+          }
+          bullets.splice(i, 1);
+          break;
+        }
+      }
+    }
+  }
+
+  const aliveA = fighters.filter(f => f.alive && f.teamId === 'A');
+  const aliveB = fighters.filter(f => f.alive && f.teamId === 'B');
+  const winner = aliveA.length > 0 ? 'A' : aliveB.length > 0 ? 'B' : 'draw';
+  const survivorsA = aliveA.length;
+  const survivorsB = aliveB.length;
+  const totalHpA = aliveA.reduce((s,f) => s + f.hp, 0);
+  const totalHpB = aliveB.reduce((s,f) => s + f.hp, 0);
+  return { winner, survivorsA, survivorsB, totalHpA, totalHpB, ticks, fighters };
+}
+
+function runCombatSim() {
+  const loadoutA = getSimLoadout('a');
+  const loadoutB = getSimLoadout('b');
+  const matchCount = Math.min(100000, Math.max(1, parseInt(document.getElementById('sim_matches').value) || 1000));
+  const squadSize = parseInt(document.getElementById('sim_squad_size').value) || 3;
+  const engagementRange = parseInt(document.getElementById('sim_range').value) || 250;
+
+  if (!loadoutA.gun1 && !loadoutA.gun2) return toast('Squad A needs at least one gun', true);
+  if (!loadoutB.gun1 && !loadoutB.gun2) return toast('Squad B needs at least one gun', true);
+
+  const btn = document.getElementById('sim_run_btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Simulating...';
+
+  // Run async to keep UI responsive
+  setTimeout(() => {
+    const t0 = performance.now();
+    let winsA = 0, winsB = 0, draws = 0;
+    let totalSurvivorsA = 0, totalSurvivorsB = 0;
+    let totalHpLeftA = 0, totalHpLeftB = 0;
+    let totalTicks = 0;
+    // Track per-match for distributions
+    const survivorCountsA = new Array(squadSize + 1).fill(0);
+    const survivorCountsB = new Array(squadSize + 1).fill(0);
+
+    for (let m = 0; m < matchCount; m++) {
+      const r = simOneFight(loadoutA, loadoutB, squadSize, engagementRange);
+      if (r.winner === 'A') winsA++;
+      else if (r.winner === 'B') winsB++;
+      else draws++;
+      totalSurvivorsA += r.survivorsA;
+      totalSurvivorsB += r.survivorsB;
+      totalHpLeftA += r.totalHpA;
+      totalHpLeftB += r.totalHpB;
+      totalTicks += r.ticks;
+      survivorCountsA[r.survivorsA]++;
+      survivorCountsB[r.survivorsB]++;
+    }
+
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
+    const avgTicks = (totalTicks / matchCount).toFixed(0);
+    const avgTimeS = ((totalTicks / matchCount) * SIM_CONSTANTS.TICK_RATE).toFixed(1);
+    const statsA = computeSimStats(loadoutA);
+    const statsB = computeSimStats(loadoutB);
+    const nameA = statsA.gun?.name || 'Unarmed';
+    const nameB = statsB.gun?.name || 'Unarmed';
+
+    function pct(v) { return ((v / matchCount) * 100).toFixed(1); }
+    function bar(val, max, color) {
+      const w = max > 0 ? (val / max) * 100 : 0;
+      return `<div style="background:var(--surface2);border-radius:4px;height:22px;position:relative;overflow:hidden;min-width:200px">
+        <div style="background:${color};height:100%;width:${w}%;border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)">${val.toFixed ? val.toFixed(1) : val}%</span>
+      </div>`;
+    }
+
+    // Survivor distribution bars
+    function distBars(counts, color) {
+      return counts.map((c, i) => {
+        const pctVal = matchCount > 0 ? (c / matchCount * 100) : 0;
+        return `<div style="display:flex;align-items:center;gap:6px;font-size:11px">
+          <span style="width:16px;text-align:right;color:var(--text2)">${i}</span>
+          ${bar(pctVal, 100, color)}
+        </div>`;
+      }).join('');
+    }
+
+    const html = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center">
+          <div style="font-size:13px;color:var(--text2);margin-bottom:4px">🔵 Squad A Wins</div>
+          <div style="font-size:32px;font-weight:800;color:var(--accent)">${pct(winsA)}%</div>
+          <div style="font-size:12px;color:var(--text2)">${winsA} / ${matchCount}</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center">
+          <div style="font-size:13px;color:var(--text2);margin-bottom:4px">🔴 Squad B Wins</div>
+          <div style="font-size:32px;font-weight:800;color:var(--red)">${pct(winsB)}%</div>
+          <div style="font-size:12px;color:var(--text2)">${winsB} / ${matchCount}</div>
+        </div>
+      </div>
+      ${draws > 0 ? `<div style="text-align:center;font-size:12px;color:var(--text2);margin-bottom:12px">Draws (timeout): ${draws} (${pct(draws)}%)</div>` : ''}
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:4px">Win Rate Comparison</div>
+        <div style="display:flex;height:28px;border-radius:6px;overflow:hidden">
+          <div style="background:var(--accent);width:${pct(winsA)}%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;transition:width .3s">${winsA > 0 ? 'A ' + pct(winsA) + '%' : ''}</div>
+          ${draws > 0 ? `<div style="background:var(--text2);width:${pct(draws)}%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff">${pct(draws)}%</div>` : ''}
+          <div style="background:var(--red);width:${pct(winsB)}%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;transition:width .3s">${winsB > 0 ? 'B ' + pct(winsB) + '%' : ''}</div>
+        </div>
+      </div>
+      <table class="data-table" style="margin-bottom:20px">
+        <thead><tr><th></th><th>🔵 Squad A</th><th>🔴 Squad B</th></tr></thead>
+        <tbody>
+          <tr><td style="color:var(--text2)">Loadout</td><td>${nameA}${statsA.gun2 ? ' + ' + (getSimItemDef(loadoutA.gun2)?.name||'') : ''}</td><td>${nameB}${statsB.gun2 ? ' + ' + (getSimItemDef(loadoutB.gun2)?.name||'') : ''}</td></tr>
+          <tr><td style="color:var(--text2)">Max HP</td><td>${statsA.maxHp}</td><td>${statsB.maxHp}</td></tr>
+          <tr><td style="color:var(--text2)">Speed</td><td>${statsA.speed}</td><td>${statsB.speed}</td></tr>
+          <tr><td style="color:var(--text2)">DPS (burst)</td><td>${statsA.dps.toFixed(1)}</td><td>${statsB.dps.toFixed(1)}</td></tr>
+          <tr><td style="color:var(--text2)">DPS (sustained)</td><td>${statsA.sustainedDps.toFixed(1)}</td><td>${statsB.sustainedDps.toFixed(1)}</td></tr>
+          <tr><td style="color:var(--text2)">Time-to-Kill (burst)</td><td>${statsA.dps > 0 ? (statsB.maxHp / statsA.dps).toFixed(2) + 's' : '∞'}</td><td>${statsB.dps > 0 ? (statsA.maxHp / statsB.dps).toFixed(2) + 's' : '∞'}</td></tr>
+          <tr><td style="color:var(--text2)">Win Rate</td><td style="font-weight:700;color:var(--accent)">${pct(winsA)}%</td><td style="font-weight:700;color:var(--red)">${pct(winsB)}%</td></tr>
+          <tr><td style="color:var(--text2)">Avg Survivors</td><td>${(totalSurvivorsA / matchCount).toFixed(2)} / ${squadSize}</td><td>${(totalSurvivorsB / matchCount).toFixed(2)} / ${squadSize}</td></tr>
+          <tr><td style="color:var(--text2)">Avg HP Left (winners)</td><td>${winsA > 0 ? (totalHpLeftA / winsA).toFixed(1) : '—'}</td><td>${winsB > 0 ? (totalHpLeftB / winsB).toFixed(1) : '—'}</td></tr>
+          <tr><td style="color:var(--text2)">Consumable</td><td>${statsA.consumableDef ? statsA.consumableDef.name + ' ×' + statsA.consumableCount : 'None'}</td><td>${statsB.consumableDef ? statsB.consumableDef.name + ' ×' + statsB.consumableCount : 'None'}</td></tr>
+          <tr><td style="color:var(--text2)">Outrange Multi</td><td>${statsA.outrangeMulti}</td><td>${statsB.outrangeMulti}</td></tr>
+          <tr><td style="color:var(--text2)">Heal Rate</td><td>${statsA.healRate ? statsA.healRate + ' HP/s' : '—'}</td><td>${statsB.healRate ? statsB.healRate + ' HP/s' : '—'}</td></tr>
+        </tbody>
+      </table>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:16px">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">🔵 Squad A — Survivors Distribution</div>
+          ${distBars(survivorCountsA, 'var(--accent)')}
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">🔴 Squad B — Survivors Distribution</div>
+          ${distBars(survivorCountsB, 'var(--red)')}
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text2)">Simulated ${matchCount.toLocaleString()} matches in ${elapsed}s · Avg fight duration: ${avgTimeS}s (${avgTicks} ticks) · Squad size: ${squadSize}v${squadSize} · Range: ${engagementRange}px · Arena: ${SIM_CONSTANTS.ARENA_SIZE}×${SIM_CONSTANTS.ARENA_SIZE}px</div>
+    `;
+
+    document.getElementById('sim_results').innerHTML = html;
+    btn.disabled = false;
+    btn.textContent = '⚔️ Run Simulation';
+    toast(`Simulation complete: A ${pct(winsA)}% vs B ${pct(winsB)}%`);
+  }, 50);
 }
 
 // ─── Overlay ──────────────────────────────

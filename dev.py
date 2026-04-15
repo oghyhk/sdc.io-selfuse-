@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parent
 CONFIG_FILE = ROOT / 'data' / 'dev-config.json'
 
 RARITY_ORDER = ['gray', 'white', 'green', 'blue', 'purple', 'gold', 'red']
-CATEGORIES = ['gun', 'melee', 'armor', 'helmet', 'shoes', 'backpack']
+CATEGORIES = ['gun', 'armor', 'helmet', 'shoes', 'backpack']
 RARITY_COLORS = {
     'white': '\033[97m', 'gray': '\033[90m', 'green': '\033[92m',
     'blue': '\033[94m', 'purple': '\033[95m', 'gold': '\033[93m',
@@ -40,9 +40,35 @@ BOLD = '\033[1m'
 DIM = '\033[2m'
 
 
+def _parse_value(raw: str):
+    lowered = raw.lower()
+    if lowered in ('true', 'false'):
+        return lowered == 'true'
+    try:
+        if '.' in raw:
+            return float(raw)
+        return int(raw)
+    except ValueError:
+        return raw
+
+
+def _get_nested_value(entry: dict, path: str):
+    current = entry
+    parts = path.split('.')
+    for part in parts[:-1]:
+        if not isinstance(current, dict):
+            return None, None
+        current = current.get(part)
+        if current is None:
+            return None, None
+    if not isinstance(current, dict):
+        return None, None
+    return current, parts[-1]
+
+
 def load_config() -> dict:
     if not CONFIG_FILE.exists():
-        return {"version": 1, "items": {}, "enemies": {}, "crate_tiers": {}, "ammo": {}}
+        return {"version": 1, "items": {}, "enemies": {}, "crate_tiers": {}, "ammo": {}, "player_level_rewards": {}}
     with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
         return json.load(f)
 
@@ -166,11 +192,6 @@ def cmd_add_item(args):
             'reloadTime': args.reload_time or 1.5,
             'spread': args.spread or 0.08
         }
-    elif item['category'] == 'melee':
-        item['stats'] = {
-            'meleeDamage': args.melee_damage or 25,
-            'meleeCooldown': args.melee_cooldown or 0.4
-        }
     elif item['category'] in ('armor', 'helmet'):
         item['modifiers'] = {'maxHp': args.hp_bonus or 10}
     elif item['category'] == 'shoes':
@@ -224,19 +245,34 @@ def cmd_edit(args):
         sys.exit(1)
     
     entry = config[target][args.id]
-    old_val = entry.get(args.field)
-    
-    # Auto-type conversion
-    if isinstance(old_val, int):
+    parent, leaf = _get_nested_value(entry, args.field)
+    if parent is None:
+        if '.' in args.field:
+            parts = args.field.split('.')
+            parent = entry
+            for part in parts[:-1]:
+                if part not in parent or not isinstance(parent.get(part), dict):
+                    parent[part] = {}
+                parent = parent[part]
+            leaf = parts[-1]
+            old_val = parent.get(leaf)
+        else:
+            parent = entry
+            leaf = args.field
+            old_val = entry.get(args.field)
+    else:
+        old_val = parent.get(leaf)
+
+    if isinstance(old_val, bool):
+        new_val = str(args.value).lower() in ('true', '1', 'yes')
+    elif isinstance(old_val, int):
         new_val = int(args.value)
     elif isinstance(old_val, float):
         new_val = float(args.value)
-    elif isinstance(old_val, bool):
-        new_val = args.value.lower() in ('true', '1', 'yes')
     else:
-        new_val = args.value
-    
-    entry[args.field] = new_val
+        new_val = _parse_value(args.value)
+
+    parent[leaf] = new_val
     save_config(config)
     print(f"✅ Updated {args.command} '{args.id}': {args.field} = {new_val} (was {old_val})")
 
@@ -269,7 +305,8 @@ def cmd_import(args):
     save_config(new_config)
     items = len(new_config.get('items', {}))
     enemies = len(new_config.get('enemies', {}))
-    print(f"✅ Imported config: {items} items, {enemies} enemies")
+    rewards = len(new_config.get('player_level_rewards', {}))
+    print(f"✅ Imported config: {items} items, {enemies} enemies, {rewards} level rewards")
 
 
 def cmd_stats(args):
@@ -277,6 +314,7 @@ def cmd_stats(args):
     items = config.get('items', {})
     enemies = config.get('enemies', {})
     crates = config.get('crate_tiers', {})
+    rewards = config.get('player_level_rewards', {})
     
     equipment = {k: v for k, v in items.items() if v.get('lootType') != 'ammo'}
     ammo = {k: v for k, v in items.items() if v.get('lootType') == 'ammo'}
@@ -291,6 +329,7 @@ def cmd_stats(args):
     print(f"  Ammo types: {len(ammo)}")
     print(f"  Enemies: {len(enemies)}")
     print(f"  Crate tiers: {len(crates)}")
+    print(f"  Level rewards: {len(rewards)}")
     
     by_rarity = {}
     for v in equipment.values():
@@ -382,8 +421,6 @@ def main():
     add_item.add_argument('--clip_size', type=int)
     add_item.add_argument('--reload_time', type=float)
     add_item.add_argument('--spread', type=float)
-    add_item.add_argument('--melee_damage', type=int)
-    add_item.add_argument('--melee_cooldown', type=float)
     add_item.add_argument('--hp_bonus', type=int)
     add_item.add_argument('--speed_bonus', type=int)
     add_item.add_argument('--carry_slots', type=int)

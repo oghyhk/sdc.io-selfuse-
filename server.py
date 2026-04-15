@@ -56,8 +56,12 @@ def build_profile(username: str, password: str, source_profile: dict | None = No
     return {
         'username': username,
         'coins': source_profile.get('coins', 0),
+        'elo': source_profile.get('elo', 1000),
         'loadout': source_profile.get('loadout', {}),
         'stashItems': source_profile.get('stashItems', []),
+        'stashAmmo': source_profile.get('stashAmmo', {}),
+        'backpackItems': source_profile.get('backpackItems', []),
+        'safeboxItems': source_profile.get('safeboxItems', []),
         'extractedRuns': source_profile.get('extractedRuns', []),
         'stats': {
             'totalRuns': source_stats.get('totalRuns', 0),
@@ -73,6 +77,15 @@ def build_profile(username: str, password: str, source_profile: dict | None = No
 class ApiHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
+
+    def end_headers(self):
+        if self.path.startswith('/api/'):
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
+            self.send_header('Pragma', 'no-cache')
+        super().end_headers()
 
     def _send_json(self, payload: dict, status: int = HTTPStatus.OK) -> None:
         data = json.dumps(payload).encode('utf-8')
@@ -91,6 +104,14 @@ class ApiHandler(SimpleHTTPRequestHandler):
 
     def log_message(self, format: str, *args):
         super().log_message(format, *args)
+
+    def do_OPTIONS(self):
+        parsed = urlparse(self.path)
+        if parsed.path.startswith('/api/'):
+            self.send_response(HTTPStatus.NO_CONTENT)
+            self.end_headers()
+            return
+        self.send_error(HTTPStatus.NOT_FOUND, 'Endpoint not found.')
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -115,6 +136,54 @@ class ApiHandler(SimpleHTTPRequestHandler):
             except (FileNotFoundError, json.JSONDecodeError) as e:
                 self._send_json({'ok': False, 'message': str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
             return
+
+        if parsed.path == '/api/leaderboard':
+            store = read_store()
+            users = store.get('users', {})
+            ai_roster = store.get('aiRoster', {})
+            entries = []
+            for _key, user in users.items():
+                username = user.get('username', _key)
+                elo = int(user.get('elo', 1000))
+                stats = user.get('stats') or {}
+                entries.append({
+                    'username': username,
+                    'elo': elo,
+                    'totalRuns': stats.get('totalRuns', 0),
+                    'totalExtractions': stats.get('totalExtractions', 0),
+                    'totalKills': stats.get('totalKills', 0),
+                    'isAI': False,
+                })
+            for _key, ai in ai_roster.items():
+                entries.append({
+                    'username': ai.get('username', _key),
+                    'elo': int(ai.get('elo', 1000)),
+                    'totalRuns': int(ai.get('totalRuns', 0)),
+                    'totalExtractions': int(ai.get('totalExtractions', 0)),
+                    'totalKills': int(ai.get('totalKills', 0)),
+                    'isAI': True,
+                })
+            entries.sort(key=lambda e: -e['elo'])
+            for i, entry in enumerate(entries):
+                entry['rank'] = i + 1
+            params = parse_qs(parsed.query)
+            requesting_username = (params.get('username') or [''])[0]
+            player_entry = None
+            if requesting_username:
+                norm_name = normalize_username_key(requesting_username)
+                player_entry = next(
+                    (e for e in entries if normalize_username_key(e['username']) == norm_name),
+                    None
+                )
+            top_entries = entries[:100]
+            self._send_json({
+                'ok': True,
+                'leaderboard': top_entries,
+                'total': len(entries),
+                'player': player_entry,
+            })
+            return
+
         return super().do_GET()
 
     def do_POST(self):
@@ -123,6 +192,33 @@ class ApiHandler(SimpleHTTPRequestHandler):
             body = self._read_json_body()
         except json.JSONDecodeError:
             self._send_json({'ok': False, 'message': 'Invalid JSON body.'}, HTTPStatus.BAD_REQUEST)
+            return
+
+        if parsed.path == '/api/ai-roster':
+            roster_entries = body.get('entries')
+            if not isinstance(roster_entries, list):
+                self._send_json({'ok': False, 'message': 'Invalid entries.'}, HTTPStatus.BAD_REQUEST)
+                return
+            store = read_store()
+            ai_roster = store.get('aiRoster', {})
+            for entry in roster_entries:
+                if not isinstance(entry, dict):
+                    continue
+                name = str(entry.get('username', '')).strip()
+                if not name:
+                    continue
+                key = normalize_username_key(name)
+                ai_roster[key] = {
+                    'username': name,
+                    'elo': int(entry.get('elo', 1000)),
+                    'totalRuns': int(entry.get('totalRuns', 0)),
+                    'totalExtractions': int(entry.get('totalExtractions', 0)),
+                    'totalKills': int(entry.get('totalKills', 0)),
+                    'isAI': True,
+                }
+            store['aiRoster'] = ai_roster
+            write_store(store)
+            self._send_json({'ok': True, 'saved': len(roster_entries)})
             return
 
         if parsed.path == '/api/auth':

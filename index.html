@@ -18,6 +18,18 @@
         }
         button:hover:not(.loadout-slot-card) { transform: translateY(-1px); }
         .primary-button { background: linear-gradient(135deg, #00e676, #00b86b); color: #03140d; }
+        .primary-button[data-difficulty="easy"] { background: linear-gradient(135deg, #00e676, #00b86b); color: #03140d; }
+        .primary-button[data-difficulty="advanced"] { background: linear-gradient(135deg, #ffd54f, #ffb300); color: #2b1a00; }
+        .primary-button[data-difficulty="hell"] { background: linear-gradient(135deg, #ff6b6b, #d50000); color: #2a0000; }
+        .primary-button[data-difficulty="chaos"] {
+            background: linear-gradient(135deg, #d500f9, #ff1744);
+            color: #ffd27a;
+            border: 1px solid rgba(255, 102, 102, 0.9);
+            box-shadow: 0 0 22px rgba(213, 0, 249, 0.28), 0 0 38px rgba(255, 23, 68, 0.2);
+            text-shadow: 0 0 4px rgba(255, 159, 26, 0.5), 0 0 10px rgba(255, 77, 77, 0.25);
+            letter-spacing: 0.04em;
+            animation: ap-frame-pulse 1.8s ease-in-out infinite, legend-text-shimmer 1.8s ease-in-out infinite;
+        }
         .secondary-button { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.08); }
         .hidden { display: none !important; }
         #loading {
@@ -29,10 +41,171 @@
         #uiRoot { position: fixed; inset: 0; pointer-events: none; }
         #topBar {
             position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between;
-            align-items: center; padding: 20px 24px; pointer-events: auto; z-index: 20;
+            align-items: center; padding: 20px 24px; pointer-events: none; z-index: 20;
         }
-        .topbar-left { display: flex; align-items: center; gap: 12px; }
+        .topbar-left { display: flex; align-items: flex-start; gap: 12px; pointer-events: none; }
+        .topbar-brand-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 220px;
+        }
+        .topbar-account {
+            position: relative; display: flex; flex-direction: column; align-items: flex-end; pointer-events: none;
+        }
         .brand { color: #fff; letter-spacing: 0.3em; font-size: 12px; text-transform: uppercase; }
+        #redeemButton,
+        #authButton,
+        #authDropdown {
+            pointer-events: auto;
+        }
+        .topbar-level-box {
+            border: 1px solid rgba(100, 181, 246, 0.32);
+            background: linear-gradient(180deg, rgba(13, 26, 51, 0.92), rgba(8, 16, 34, 0.92));
+            border-radius: 14px;
+            padding: 10px 12px;
+            min-width: 220px;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25), inset 0 0 0 1px rgba(255,255,255,0.03);
+        }
+        .topbar-level-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 10px;
+            color: #fff;
+        }
+        .topbar-level-title {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.68);
+        }
+        .topbar-level-value {
+            font-size: 16px;
+            font-weight: 900;
+            color: #dff1ff;
+        }
+        .topbar-level-meta {
+            margin-top: 5px;
+            font-size: 11px;
+            color: rgba(255,255,255,0.7);
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .topbar-level-bar {
+            margin-top: 8px;
+            height: 8px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(255,255,255,0.08);
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+        }
+        .topbar-level-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #1e88e5, #42a5f5 55%, #7cc8ff);
+            box-shadow: 0 0 14px rgba(66, 165, 245, 0.45);
+        }
+        .topbar-leaderboard-box {
+            border: 1px solid rgba(255, 193, 7, 0.28);
+            background: linear-gradient(180deg, rgba(30, 24, 8, 0.92), rgba(12, 10, 4, 0.92));
+            border-radius: 14px;
+            padding: 10px 12px;
+            min-width: 220px;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: border-color 0.18s, box-shadow 0.18s;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25), inset 0 0 0 1px rgba(255,255,255,0.03);
+        }
+        .topbar-leaderboard-box:hover {
+            border-color: rgba(255, 193, 7, 0.52);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25), 0 0 18px rgba(255, 193, 7, 0.12), inset 0 0 0 1px rgba(255,255,255,0.05);
+        }
+        .topbar-lb-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 10px;
+            color: #fff;
+        }
+        .topbar-lb-title {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: rgba(255, 193, 7, 0.72);
+        }
+        .topbar-lb-elo {
+            font-size: 16px;
+            font-weight: 900;
+            color: #ffe082;
+        }
+        .topbar-lb-meta {
+            margin-top: 5px;
+            font-size: 11px;
+            color: rgba(255,255,255,0.58);
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .topbar-lb-rank {
+            color: rgba(255, 193, 7, 0.85);
+            font-weight: 700;
+        }
+
+        /* ── Leaderboard Page Table ── */
+        .leaderboard-shell { padding: 0; max-height: 60vh; overflow-y: auto; border-radius: 10px; }
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .leaderboard-table thead th {
+            position: sticky; top: 0;
+            background: rgba(10,13,28,0.98);
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 700;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: rgba(255,255,255,0.55);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .leaderboard-table tbody td {
+            padding: 9px 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            color: rgba(255,255,255,0.82);
+        }
+        .lb-col-rank { width: 52px; text-align: center; font-weight: 800; }
+        .lb-col-name { min-width: 120px; font-weight: 600; }
+        .lb-col-elo  { width: 70px; font-weight: 900; color: #ffe082; }
+        .lb-col-stat { width: 80px; text-align: center; color: rgba(255,255,255,0.6); }
+        .lb-row:hover { background: rgba(255,255,255,0.04); }
+        .lb-row-you {
+            background: rgba(255,193,7,0.08) !important;
+            border-left: 3px solid #ffc107;
+        }
+        .lb-row-you td { color: #fff; font-weight: 700; }
+        .lb-you-tag { font-size: 10px; color: #ffc107; font-weight: 800; margin-left: 4px; }
+        .lb-rank-1 .lb-col-rank { color: #ffd700; }
+        .lb-rank-2 .lb-col-rank { color: #c0c0c0; }
+        .lb-rank-3 .lb-col-rank { color: #cd7f32; }
+        .lb-your-row-footer {
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px dashed rgba(255,193,7,0.25);
+        }
+        .lb-footer-table { margin-top: 0; }
+        .lb-ai-tag {
+            font-size: 9px; font-weight: 800; color: #81d4fa; background: rgba(129,212,250,0.12);
+            padding: 1px 5px; border-radius: 4px; margin-left: 5px; vertical-align: middle;
+            letter-spacing: 0.04em;
+        }
+        .lb-row-ai .lb-col-name { color: rgba(255,255,255,0.6); }
+
         .auth-status-button {
             display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 180px;
             text-align: right; line-height: 1.15;
@@ -40,9 +213,32 @@
         .auth-status-name { font-size: 13px; font-weight: 800; color: #fff; }
         .auth-status-meta { font-size: 11px; color: rgba(255,255,255,0.72); }
         .auth-status-value { font-size: 13px; font-weight: 900; color: #ffca28; }
+        .auth-dropdown {
+            position: absolute; top: calc(100% + 10px); right: 0; min-width: 220px; padding: 10px;
+            border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); background: rgba(10,13,28,0.96);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.35); display: grid; gap: 8px;
+        }
+        .auth-dropdown-button {
+            width: 100%; text-align: left; background: rgba(255,255,255,0.04); color: #fff;
+            border: 1px solid rgba(255,255,255,0.08); padding: 12px 14px; border-radius: 12px;
+        }
+        .auth-dropdown-button.active {
+            background: rgba(0,230,118,0.12); border-color: rgba(0,230,118,0.45); color: #d7ffe8;
+        }
+        .coin-inline {
+            display: inline-flex; align-items: center; gap: 0.35em; white-space: nowrap;
+        }
+        .coin-inline-icon {
+            width: 1em; height: 1em; object-fit: contain; flex: 0 0 auto;
+        }
         .screen {
             position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
             padding: 40px; pointer-events: auto; z-index: 10;
+        }
+        #placeholderScreen {
+            z-index: 30;
+            overflow-y: auto;
+            align-items: flex-start;
         }
         .panel {
             width: min(1180px, 100%); border: 1px solid rgba(255,255,255,0.08); background: rgba(10,13,28,0.84);
@@ -52,23 +248,348 @@
         .hero-panel h1 { font-size: 56px; margin-bottom: 10px; letter-spacing: 0.08em; }
         .hero-panel p, .section-subtitle, .muted, .item-card p { color: rgba(255,255,255,0.68); line-height: 1.6; }
         .menu-actions { display: flex; justify-content: center; gap: 16px; margin: 28px 0 32px; flex-wrap: wrap; }
-        .menu-controls {
-            display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 24px 0 4px;
+        .menu-difficulty-inline {
+            display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 14px;
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
         }
-        .menu-controls label {
-            font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.65);
+        .menu-difficulty-inline label {
+            font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.65);
+            white-space: nowrap;
         }
-        .menu-controls select {
-            min-width: 220px; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px 14px;
-            background: rgba(255,255,255,0.06); color: #fff; font-weight: 700;
+        .menu-difficulty-inline select {
+            min-width: 150px; border: 0; outline: none; padding: 12px 0;
+            background: transparent; color: #fff; font-weight: 700;
         }
-        .menu-controls select option { color: #111; }
+        .menu-difficulty-inline select option { color: #111; }
+        .menu-loadout-space {
+            margin: -8px auto 24px; max-width: 760px; display: grid; gap: 14px;
+        }
+        .menu-loadout-buttons {
+            display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px;
+        }
+        .menu-loadout-button {
+            background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.08);
+            padding: 8px 10px; font-size: 12px; min-height: 40px;
+        }
+        .menu-loadout-button.active {
+            background: rgba(0,230,118,0.14); border-color: rgba(0,230,118,0.6); color: #d7ffe8;
+            box-shadow: inset 0 0 0 1px rgba(0,230,118,0.18);
+        }
+        .menu-loadout-button:disabled {
+            opacity: 0.45; cursor: not-allowed;
+        }
+        .menu-loadout-preview {
+            text-align: left; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04);
+            border-radius: 14px; padding: 16px;
+        }
+        .menu-loadout-preview-grid {
+            display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px;
+        }
+        .placeholder-panel { max-width: 860px; padding: 32px; text-align: left; }
+        .placeholder-header {
+            display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px;
+        }
+        .placeholder-actions {
+            display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px;
+        }
         .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; text-align: left; }
         .summary-tile {
             border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04);
             border-radius: 14px; padding: 14px; min-height: 82px;
         }
         .summary-wide { grid-column: span 4; }
+        .raid-history-shell {
+            display: block;
+            max-height: 420px;
+            overflow: auto;
+        }
+        .raid-history-list {
+            display: grid;
+            gap: 12px;
+        }
+        .raid-history-card {
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.035);
+            border-radius: 16px;
+            padding: 14px;
+            display: grid;
+            gap: 12px;
+        }
+        .raid-history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .raid-history-date {
+            font-size: 15px;
+            font-weight: 800;
+            color: #fff;
+        }
+        .raid-history-meta {
+            margin-top: 4px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+            letter-spacing: 0.08em;
+        }
+        .difficulty-text {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3px 9px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            border: 1px solid transparent;
+            margin-left: 2px;
+        }
+        .difficulty-easy {
+            background: linear-gradient(135deg, #00e676, #00b86b);
+            color: #03140d;
+            box-shadow: 0 0 12px rgba(0, 230, 118, 0.18);
+        }
+        .difficulty-advanced {
+            background: linear-gradient(135deg, #ffd54f, #ffb300);
+            color: #2b1a00;
+            box-shadow: 0 0 12px rgba(255, 179, 0, 0.2);
+        }
+        .difficulty-hell {
+            background: linear-gradient(135deg, #ff6b6b, #d50000);
+            color: #2a0000;
+            box-shadow: 0 0 14px rgba(213, 0, 0, 0.24);
+        }
+        .difficulty-chaos {
+            background: linear-gradient(135deg, #d500f9, #ff1744);
+            color: #ffd27a;
+            border: 1px solid rgba(255, 102, 102, 0.9);
+            box-shadow: 0 0 16px rgba(213, 0, 249, 0.28), 0 0 24px rgba(255, 23, 68, 0.2);
+            text-shadow: 0 0 4px rgba(255, 159, 26, 0.5), 0 0 10px rgba(255, 77, 77, 0.25);
+            animation: ap-frame-pulse 1.8s ease-in-out infinite, legend-text-shimmer 1.8s ease-in-out infinite;
+        }
+        .stats-shell {
+            display: block;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .stats-card {
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.035);
+            border-radius: 16px;
+            padding: 16px;
+            display: grid;
+            gap: 14px;
+        }
+        .stats-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        .stats-card-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .stats-card-metric {
+            border-radius: 12px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+            padding: 12px;
+            display: grid;
+            gap: 6px;
+        }
+        .stats-card-metric span {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(255,255,255,0.55);
+        }
+        .stats-card-metric strong {
+            font-size: 18px;
+            color: #fff;
+        }
+        .stats-card-metric.kd-tier-white strong {
+            color: #eceff1;
+        }
+        .stats-card-metric.kd-tier-green strong {
+            color: #81c784;
+            text-shadow: 0 0 10px rgba(129, 199, 132, 0.18);
+        }
+        .stats-card-metric.kd-tier-blue strong {
+            color: #64b5f6;
+            text-shadow: 0 0 12px rgba(100, 181, 246, 0.22);
+        }
+        .stats-card-metric.kd-tier-purple strong {
+            color: #b388ff;
+            text-shadow: 0 0 14px rgba(179, 136, 255, 0.26);
+        }
+        .stats-card-metric.kd-tier-gold strong {
+            color: #ffca28;
+            text-shadow: 0 0 14px rgba(255, 202, 40, 0.28);
+        }
+        .stats-card-metric.kd-tier-red strong {
+            color: #ff4d4d;
+            text-shadow: 0 0 16px rgba(255, 77, 77, 0.34);
+        }
+        .stats-card-metric.kd-tier-legend strong {
+            color: #ff9f1a;
+            text-shadow: 0 0 6px rgba(255, 159, 26, 0.4), 0 0 16px rgba(255, 77, 77, 0.28);
+            animation: ap-frame-pulse 1.8s ease-in-out infinite, legend-text-shimmer 1.8s ease-in-out infinite;
+        }
+        .player-level-shell {
+            display: block;
+        }
+        .player-level-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .player-level-card {
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.035);
+            border-radius: 16px;
+            padding: 18px;
+            display: grid;
+            gap: 8px;
+        }
+        .player-level-card strong {
+            font-size: 22px;
+            color: #fff;
+        }
+        .player-level-card span {
+            color: rgba(255,255,255,0.68);
+            line-height: 1.55;
+            font-size: 13px;
+        }
+        .player-level-hero {
+            grid-column: span 2;
+            background:
+                radial-gradient(circle at top right, rgba(0, 230, 118, 0.14), transparent 42%),
+                rgba(255,255,255,0.035);
+        }
+        .player-level-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: fit-content;
+            min-width: 132px;
+            padding: 12px 20px;
+            border-radius: 999px;
+            font-size: 28px;
+            font-weight: 900;
+            color: #d7ffe8;
+            background: linear-gradient(135deg, rgba(0,230,118,0.18), rgba(0,184,107,0.14));
+            border: 1px solid rgba(0,230,118,0.35);
+            box-shadow: 0 0 22px rgba(0,230,118,0.12);
+        }
+        .player-level-progress-copy {
+            display: grid;
+            gap: 6px;
+        }
+        .player-level-progress-bar {
+            width: 100%;
+            height: 16px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: inset 0 1px 8px rgba(0,0,0,0.28);
+        }
+        .player-level-progress-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(135deg, #00e676, #00b86b);
+            box-shadow: 0 0 18px rgba(0,230,118,0.28);
+        }
+        .player-level-reward-card {
+            background:
+                radial-gradient(circle at top right, rgba(30, 136, 229, 0.18), transparent 42%),
+                rgba(255,255,255,0.035);
+        }
+        .player-level-reward-value {
+            font-size: 24px;
+            font-weight: 900;
+            color: #8fd0ff;
+        }
+        .player-level-reward-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+        }
+        .player-level-claim-button {
+            margin-top: 4px;
+            width: 100%;
+            justify-content: center;
+            background: linear-gradient(135deg, #1e88e5, #42a5f5);
+            color: #eef8ff;
+            box-shadow: 0 10px 24px rgba(30, 136, 229, 0.26);
+        }
+        .player-level-claim-button:hover:not(:disabled) {
+            background: linear-gradient(135deg, #2196f3, #64b5f6);
+        }
+        .player-level-claim-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+            box-shadow: none;
+        }
+        .player-level-rules strong {
+            font-size: 18px;
+        }
+        .raid-history-status {
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            white-space: nowrap;
+        }
+        .raid-history-status.success {
+            background: rgba(0,230,118,0.14);
+            color: #9effc1;
+            border: 1px solid rgba(0,230,118,0.35);
+        }
+        .raid-history-status.failure {
+            background: rgba(255,82,82,0.14);
+            color: #ff9a9a;
+            border: 1px solid rgba(255,82,82,0.35);
+        }
+        .raid-history-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .raid-history-metric {
+            border-radius: 12px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+            padding: 12px;
+            display: grid;
+            gap: 6px;
+        }
+        .raid-history-metric span {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(255,255,255,0.55);
+        }
+        .raid-history-metric strong {
+            font-size: 15px;
+            color: #fff;
+        }
+        .raid-history-metric.positive strong {
+            color: #9effc1;
+        }
+        .raid-history-metric.negative strong {
+            color: #ff9a9a;
+        }
         .summary-label {
             display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
             color: rgba(255,255,255,0.55); margin-bottom: 8px;
@@ -90,10 +611,31 @@
         .inventory-header, .item-card-header, .run-card-row {
             display: flex; justify-content: space-between; align-items: center; gap: 12px;
         }
+        .header-actions {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        }
         .item-list, .run-history, #loadoutSections { display: grid; gap: 12px; }
         #loadoutSections { flex: 1; min-height: 0; }
         .loadout-visual {
             height: 100%; min-height: 420px; display: flex; align-items: center; justify-content: center;
+        }
+        .preset-save-grid {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px;
+        }
+        .preset-save-option {
+            width: 100%; text-align: left; border-radius: 16px; padding: 16px;
+            background: rgba(255,255,255,0.04); color: #fff; border: 1px solid rgba(255,255,255,0.08);
+            display: grid; gap: 8px;
+        }
+        .preset-save-option.empty {
+            border-style: dashed;
+        }
+        .preset-save-option strong {
+            font-size: 18px;
+        }
+        .preset-save-option .section-subtitle {
+            font-size: 12px;
+            line-height: 1.5;
         }
         .operator-layout {
             position: relative; width: min(100%, 300px); height: min(100%, 430px); margin: 0 auto;
@@ -138,8 +680,8 @@
         .slot-armor { top: 118px; left: 50%; transform: translateX(-50%); }
         .slot-shoes { bottom: 0; left: 50%; transform: translateX(-50%); }
         .slot-backpack { top: 110px; left: 0; }
-        .slot-gun { top: 106px; right: 0; }
-        .slot-melee { bottom: 88px; left: 4px; }
+        .slot-gun-primary { top: 82px; right: 0; }
+        .slot-gun-secondary { top: 208px; right: 0; }
         .item-card, .crate-item-card {
             width: 100%; text-align: left; padding: 16px; background: rgba(255,255,255,0.04); color: #fff;
             border: 1px solid rgba(255,255,255,0.08);
@@ -149,11 +691,54 @@
             width: 64px; height: 64px; border-radius: 10px; object-fit: cover;
             background: rgba(255,255,255,0.06); flex-shrink: 0;
         }
+        @keyframes ap-frame-pulse {
+            0% {
+                box-shadow:
+                    0 0 0 1px rgba(255, 76, 76, 0.75),
+                    0 0 10px rgba(255, 76, 76, 0.5),
+                    0 0 24px rgba(255, 196, 0, 0.15);
+                filter: drop-shadow(0 0 6px rgba(255, 76, 76, 0.45));
+            }
+            50% {
+                box-shadow:
+                    0 0 0 1px rgba(255, 210, 64, 0.95),
+                    0 0 16px rgba(255, 76, 76, 0.8),
+                    0 0 30px rgba(255, 210, 64, 0.32);
+                filter: drop-shadow(0 0 12px rgba(255, 210, 64, 0.6));
+            }
+            100% {
+                box-shadow:
+                    0 0 0 1px rgba(255, 76, 76, 0.75),
+                    0 0 10px rgba(255, 76, 76, 0.5),
+                    0 0 24px rgba(255, 196, 0, 0.15);
+                filter: drop-shadow(0 0 6px rgba(255, 76, 76, 0.45));
+            }
+        }
+        @keyframes legend-text-shimmer {
+            0% { text-shadow: 0 0 4px rgba(255, 159, 26, 0.5), 0 0 10px rgba(255, 77, 77, 0.25); }
+            50% { text-shadow: 0 0 10px rgba(255, 220, 120, 0.95), 0 0 18px rgba(255, 77, 77, 0.45); }
+            100% { text-shadow: 0 0 4px rgba(255, 159, 26, 0.5), 0 0 10px rgba(255, 77, 77, 0.25); }
+        }
+        .legend-frame {
+            border: 1px solid rgba(255, 102, 102, 0.9) !important;
+            background:
+                linear-gradient(135deg, rgba(255, 90, 90, 0.18), rgba(255, 196, 0, 0.12)),
+                rgba(12, 14, 24, 0.92) !important;
+            animation: ap-frame-pulse 1.8s ease-in-out infinite;
+        }
+        .legend-text {
+            color: #ffd27a !important;
+            animation: legend-text-shimmer 1.8s ease-in-out infinite;
+            letter-spacing: 0.04em;
+        }
         .item-card-info { flex: 1; min-width: 0; }
         .market-card .item-card-img,
         .crate-item-card .item-card-img {
-            width: 100%; height: 120px; border-radius: 10px; object-fit: contain;
+            width: min(100%, 120px); aspect-ratio: 1 / 1; height: auto; border-radius: 10px; object-fit: contain;
             background: rgba(255,255,255,0.06); margin-bottom: 10px;
+        }
+        .market-card .item-card-img {
+            display: block; margin-left: auto; margin-right: auto;
         }
         .market-card {
             padding: 16px; background: rgba(255,255,255,0.04); color: #fff; border: 1px solid rgba(255,255,255,0.08);
@@ -232,8 +817,9 @@
         .auth-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
         .detail-modal-panel { width: min(460px, calc(100% - 32px)); padding: 24px; }
         .detail-media {
-            width: 100%; height: 220px; object-fit: contain; border-radius: 16px; margin: 16px 0;
+            width: min(100%, 220px); aspect-ratio: 1 / 1; height: auto; object-fit: contain; border-radius: 16px; margin: 16px auto;
             background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+            display: block;
         }
         .detail-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
         .detail-actions button { flex: 1 1 140px; }
@@ -241,6 +827,16 @@
         .trade-form { display: grid; gap: 14px; margin-top: 18px; }
         .trade-form input {
             border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; background: rgba(255,255,255,0.05); color: #fff;
+        }
+        .trade-slider-wrap {
+            display: grid; gap: 8px;
+        }
+        .trade-slider {
+            width: 100%; accent-color: #00e676;
+        }
+        .trade-slider-labels {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 12px; color: rgba(255,255,255,0.7); font-weight: 700;
         }
         #cratePanel {
             position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
@@ -280,6 +876,9 @@
         @media (max-width: 1000px) {
             .summary-grid, .inventory-layout, .market-grid, .market-layout { grid-template-columns: 1fr; }
             .summary-wide { grid-column: span 1; }
+            .player-level-grid { grid-template-columns: 1fr; }
+            .player-level-hero { grid-column: span 1; }
+            .menu-loadout-buttons, .menu-loadout-preview-grid, .preset-save-grid { grid-template-columns: 1fr; }
             #cratePanel { width: min(420px, calc(100% - 24px)); }
             .loadout-visual { min-height: 420px; }
             .raid-side-panel {
@@ -301,10 +900,17 @@
     <div id="uiRoot">
         <header id="topBar" class="hidden">
             <div class="topbar-left">
-                <div class="brand">Operator Control</div>
+                <div class="topbar-brand-stack">
+                    <div class="brand">Operator Control</div>
+                    <div id="topbarLevelBox" class="topbar-level-box"></div>
+                    <div id="topbarLeaderboardBox" class="topbar-leaderboard-box"></div>
+                </div>
                 <button id="redeemButton" class="secondary-button">Redeem</button>
             </div>
-            <button id="authButton" class="secondary-button">Login / Sign Up</button>
+            <div id="authMenuWrap" class="topbar-account">
+                <button id="authButton" class="secondary-button">Login / Sign Up</button>
+                <div id="authDropdown" class="auth-dropdown hidden"></div>
+            </div>
         </header>
 
         <section id="menuScreen" class="screen hidden">
@@ -314,18 +920,24 @@
                     Configure a six-slot raid kit, inspect loot crates in the field with <strong>F</strong>,
                     click items to grab them, and extract alive to bank equipment into your stash before trading it for coins in the market.
                 </p>
-                <div class="menu-controls">
-                    <label for="difficultySelect">Raid Difficulty</label>
-                    <select id="difficultySelect">
-                        <option value="easy">Easy</option>
-                        <option value="advanced" selected>Advanced</option>
-                        <option value="hell">Hell</option>
-                    </select>
-                </div>
                 <div class="menu-actions">
+                    <div class="menu-difficulty-inline">
+                        <label for="difficultySelect">Difficulty</label>
+                        <select id="difficultySelect">
+                            <option value="easy">Easy</option>
+                            <option value="advanced" selected>Advanced</option>
+                            <option value="hell">Hell</option>
+                            <option value="chaos">Chaos</option>
+                        </select>
+                    </div>
                     <button id="startButton" class="primary-button">Start Game</button>
                     <button id="inventoryButton" class="secondary-button">Inventory</button>
                     <button id="marketButton" class="secondary-button">Market</button>
+                </div>
+                <div class="menu-loadout-space">
+                    <div class="section-subtitle">Raid Loadout Selection</div>
+                    <div id="menuLoadoutButtons" class="menu-loadout-buttons"></div>
+                    <div id="menuLoadoutPreview" class="menu-loadout-preview"></div>
                 </div>
                 <div id="menuSummary" class="summary-grid"></div>
             </div>
@@ -345,6 +957,9 @@
                         <div>
                             <h2>Loadout</h2>
                             <div class="section-subtitle">Equipped gear is shown on the operator. Equip items from the right-side equipment grid.</div>
+                        </div>
+                        <div class="header-actions">
+                            <button id="openPresetSaveButton" class="secondary-button">Save as presets</button>
                         </div>
                     </div>
                     <div id="loadoutSections"></div>
@@ -378,6 +993,10 @@
                         <div id="itemCollection" class="collection-grid"></div>
                     </section>
                     <section class="collection-section">
+                        <h3>Guns</h3>
+                        <div id="gunCollection" class="collection-grid"></div>
+                    </section>
+                    <section class="collection-section">
                         <h3>Equipments</h3>
                         <div id="equipmentCollection" class="collection-grid"></div>
                     </section>
@@ -403,6 +1022,22 @@
                         <aside id="marketTypeNav" class="market-type-nav"></aside>
                         <div id="marketSections" class="market-sections"></div>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="placeholderScreen" class="screen hidden">
+            <div class="panel placeholder-panel">
+                <div class="placeholder-header">
+                    <div>
+                        <h2 id="placeholderTitle">Raid History</h2>
+                        <div id="placeholderSubtitle" class="section-subtitle">This page will be implemented later.</div>
+                    </div>
+                    <button id="placeholderBackButton" type="button" class="secondary-button">Back</button>
+                </div>
+                <div id="placeholderSummary" class="summary-grid"></div>
+                <div class="placeholder-actions">
+                    <button class="secondary-button" disabled>Content coming soon</button>
                 </div>
             </div>
         </section>
@@ -506,10 +1141,49 @@
                 </div>
                 <form id="tradeForm" class="trade-form">
                     <input id="tradeQuantity" type="number" min="1" step="1" required>
+                    <div class="trade-slider-wrap">
+                        <input id="tradeQuantitySlider" class="trade-slider" type="range" min="1" max="1" step="1" value="1">
+                        <div class="trade-slider-labels">
+                            <span id="tradeMinLabel">Min 1</span>
+                            <span id="tradeMaxLabel">Max 1</span>
+                        </div>
+                    </div>
                     <div id="tradeHint" class="section-subtitle"></div>
                     <button id="tradeSubmit" type="submit" class="primary-button">Confirm</button>
                 </form>
                 <div id="tradeMessage" class="detail-message section-subtitle"></div>
+            </div>
+        </div>
+
+        <div id="presetSaveModal" class="modal hidden">
+            <div class="panel modal-panel">
+                <div class="inventory-header">
+                    <div>
+                        <h2>Save Current Loadout</h2>
+                        <div class="section-subtitle">Choose which preset slot should be overwritten by your currently equipped loadout, backpack, and safebox setup.</div>
+                    </div>
+                    <button id="presetSaveClose" class="secondary-button">Close</button>
+                </div>
+                <div id="presetSaveOptions" class="preset-save-grid"></div>
+            </div>
+        </div>
+
+        <div id="chaosStartModal" class="modal hidden">
+            <div class="panel modal-panel">
+                <div class="inventory-header">
+                    <div>
+                        <h2 class="legend-text">Chaos Warning</h2>
+                        <div class="section-subtitle">High-risk raid confirmation</div>
+                    </div>
+                    <button id="chaosStartClose" class="secondary-button">Back</button>
+                </div>
+                <p class="section-subtitle" style="margin-top:16px; line-height:1.8;">
+                    Chaos is the most difficult game mode, even a random AI enemy in this mode can kill you easily if you don't have good enough equipments! Also you have chances to lose items even if they are in your SAFEBOX. You may choose to proceed or fallback to safety now:
+                </p>
+                <div class="detail-actions" style="margin-top:22px;">
+                    <button id="chaosStartBack" class="secondary-button">Back</button>
+                    <button id="chaosStartContinue" class="primary-button" data-difficulty="chaos">Continue</button>
+                </div>
             </div>
         </div>
     </div>

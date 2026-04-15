@@ -54,6 +54,16 @@ const DIFFICULTY_MODIFIERS = {
         shootRange: 1.1,
         bulletSpeed: 1.15,
     },
+    chaos: {
+        hp: 2.4,
+        damage: 2.0,
+        speed: 1.5,
+        attackCooldown: 0.5,
+        sightRange: 1.6,
+        chaseRange: 1.6,
+        shootRange: 1.35,
+        bulletSpeed: 1.5,
+    },
 };
 
 export class Enemy {
@@ -98,11 +108,16 @@ export class Enemy {
         this.state = STATE.PATROL;
         this.attackTimer = 0;
         this.damageFlash = 0;
+        this.isChaos = difficulty === 'chaos';
 
         // Patrol waypoint
         this.patrolTargetX = x;
         this.patrolTargetY = y;
         this.patrolWaitTimer = 0;
+        this.chaosBurstShots = this.isChaos && this.canShoot ? 2 : 1;
+        this.chaosBurstDelay = 0.08;
+        this.chaosBurstTimer = 0;
+        this.chaosBurstRemaining = 0;
 
         // Death animation
         this.deathTimer = 0;
@@ -116,6 +131,7 @@ export class Enemy {
 
         this.attackTimer = Math.max(0, this.attackTimer - dt);
         this.damageFlash = Math.max(0, this.damageFlash - dt);
+        this.chaosBurstTimer = Math.max(0, this.chaosBurstTimer - dt);
 
         const dToPlayer = dist(this.x, this.y, player.x, player.y);
         const canSee = player.alive && dToPlayer < this.sightRange &&
@@ -189,16 +205,39 @@ export class Enemy {
             this.patrolTargetY = this.spawnY + randFloat(-this.patrolRange, this.patrolRange);
             this.patrolTargetX = clamp(this.patrolTargetX, this.radius, MAP_WIDTH - this.radius);
             this.patrolTargetY = clamp(this.patrolTargetY, this.radius, MAP_HEIGHT - this.radius);
-            this.patrolWaitTimer = randFloat(0.5, 2.0);
+            this.patrolWaitTimer = this.isChaos ? randFloat(0.2, 0.9) : randFloat(0.5, 2.0);
             return;
         }
 
-        this._moveTo(dt, this.patrolTargetX, this.patrolTargetY, wallGrid, 0.5);
+        this._moveTo(dt, this.patrolTargetX, this.patrolTargetY, wallGrid, this.isChaos ? 0.72 : 0.5);
     }
 
     _chase(dt, player, wallGrid) {
-        this._moveTo(dt, player.x, player.y, wallGrid, 1.0);
+        const chaseSpeed = this.isChaos ? (this.canShoot ? 1.08 : 1.18) : 1.0;
+        this._moveTo(dt, player.x, player.y, wallGrid, chaseSpeed);
         this.angle = angleBetween(this.x, this.y, player.x, player.y);
+    }
+
+    _fireAtPlayer(player, bullets, spread = 0) {
+        const leadTime = this.isChaos ? Math.min(0.32, dist(this.x, this.y, player.x, player.y) / Math.max(1, this.bulletSpeed || 1)) : 0;
+        const targetX = player.x + (player.vx || 0) * leadTime;
+        const targetY = player.y + (player.vy || 0) * leadTime;
+        const baseAngle = angleBetween(this.x, this.y, targetX, targetY);
+        const angle = baseAngle + randFloat(-spread, spread);
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        bullets.push({
+            id: generateId(),
+            x: this.x + cos * (this.radius + 4),
+            y: this.y + sin * (this.radius + 4),
+            vx: cos * this.bulletSpeed,
+            vy: sin * this.bulletSpeed,
+            damage: this.damage,
+            owner: 'enemy',
+            radius: this.isChaos ? 6 : 5,
+            life: this.isChaos ? 1.75 : 1.5,
+            maxLife: this.isChaos ? 1.75 : 1.5
+        });
     }
 
     _attack(dt, player, wallGrid, bullets) {
@@ -207,32 +246,33 @@ export class Enemy {
         if (this.canShoot) {
             // Ranged attack (sentinel)
             if (this.attackTimer <= 0) {
-                const angle = angleBetween(this.x, this.y, player.x, player.y);
-                const cos = Math.cos(angle);
-                const sin = Math.sin(angle);
-                bullets.push({
-                    id: generateId(),
-                    x: this.x + cos * (this.radius + 4),
-                    y: this.y + sin * (this.radius + 4),
-                    vx: cos * this.bulletSpeed,
-                    vy: sin * this.bulletSpeed,
-                    damage: this.damage,
-                    owner: 'enemy',
-                    radius: 5,
-                    life: 1.5,
-                    maxLife: 1.5
-                });
+                this._fireAtPlayer(player, bullets, this.isChaos ? 0.03 : 0);
+                if (this.isChaos) {
+                    this.chaosBurstRemaining = this.chaosBurstShots - 1;
+                    this.chaosBurstTimer = this.chaosBurstDelay;
+                }
                 this.attackTimer = this.attackCooldown;
             }
+            if (this.isChaos && this.chaosBurstRemaining > 0 && this.chaosBurstTimer <= 0) {
+                this._fireAtPlayer(player, bullets, 0.04);
+                this.chaosBurstRemaining -= 1;
+                this.chaosBurstTimer = this.chaosBurstDelay;
+            }
+            if (this.isChaos) {
+                const orbitAngle = angleBetween(player.x, player.y, this.x, this.y) + Math.PI / 2;
+                const strafeX = player.x + Math.cos(orbitAngle) * 72;
+                const strafeY = player.y + Math.sin(orbitAngle) * 72;
+                this._moveTo(dt, strafeX, strafeY, wallGrid, 0.92);
+            }
         } else {
-            // Melee attack (drone) — move into player and deal contact damage
+            // Contact attack (drone) — move into player and deal damage
             if (circleCollision(this.x, this.y, this.radius, player.x, player.y, player.radius)) {
                 if (this.attackTimer <= 0) {
                     player.takeDamage(this.damage);
                     this.attackTimer = this.attackCooldown;
                 }
             } else {
-                this._moveTo(dt, player.x, player.y, wallGrid, 1.0);
+                this._moveTo(dt, player.x, player.y, wallGrid, this.isChaos ? 1.32 : 1.0);
             }
         }
     }

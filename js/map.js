@@ -5,7 +5,8 @@
 import {
     TILE_SIZE, MAP_COLS, MAP_ROWS, MAP_WIDTH, MAP_HEIGHT,
     TILE, ZONE, EXTRACTION_RADIUS,
-    HEALTHPACK_RADIUS, CRATE_WIDTH, CRATE_HEIGHT
+    HEALTHPACK_RADIUS, CRATE_WIDTH, CRATE_HEIGHT,
+    setMapSize
 } from './constants.js';
 import { randInt, generateId } from './utils.js';
 import { createLootItemsForCrateRarity, getCrateTierMeta } from './profile.js';
@@ -57,7 +58,19 @@ const DIFFICULTY_CRATE_POOLS = {
         [ZONE.HIGH_VALUE]: [
             { rarity: 'red', weight: 1 }
         ]
+    },
+    chaos: {
+        [ZONE.SAFE]: [],
+        [ZONE.COMBAT]: [],
+        [ZONE.HIGH_VALUE]: []
     }
+};
+
+const DIFFICULTY_ENEMY_COUNTS = {
+    easy: { combatDrones: 15, safeDrones: 5, highSentinels: 6, combatSentinels: 3 },
+    advanced: { combatDrones: 15, safeDrones: 5, highSentinels: 6, combatSentinels: 3 },
+    hell: { combatDrones: 60, safeDrones: 20, highSentinels: 28, combatSentinels: 14 },
+    chaos: { combatDrones: 320, safeDrones: 100, highSentinels: 140, combatSentinels: 90 },
 };
 
 function pickWeightedRarity(pool) {
@@ -70,10 +83,34 @@ function pickWeightedRarity(pool) {
     return pool[pool.length - 1]?.rarity || 'white';
 }
 
+// Map dimension presets per difficulty (base 80×60)
+const MAP_SIZE_PRESETS = {
+    easy:     { cols: 80,  rows: 60  },  // 1×
+    advanced: { cols: 80,  rows: 60  },  // 1×
+    hell:     { cols: 160, rows: 120 },  // 4× area
+    chaos:    { cols: 320, rows: 240 },  // 16× area
+};
+
+// How many extraction points per difficulty
+const EXTRACTION_COUNTS = {
+    easy: 4,
+    advanced: 4,
+    hell: 2,
+    chaos: 1,
+};
+
 // Generate the map — returns { tiles[][], walls[], lootCrates[], extractionPoints[], enemySpawns[], playerSpawn }
 export function generateMap(options = {}) {
     const difficulty = typeof options === 'string' ? options : options?.difficulty || 'advanced';
     const cratePools = DIFFICULTY_CRATE_POOLS[difficulty] || DIFFICULTY_CRATE_POOLS.advanced;
+    const enemyCounts = DIFFICULTY_ENEMY_COUNTS[difficulty] || DIFFICULTY_ENEMY_COUNTS.advanced;
+
+    // ── Set map dimensions for this difficulty ──
+    const preset = MAP_SIZE_PRESETS[difficulty] || MAP_SIZE_PRESETS.advanced;
+    setMapSize(preset.cols, preset.rows);
+
+    // Area scale factor relative to base (80×60 = 4800 tiles)
+    const areaScale = (MAP_COLS * MAP_ROWS) / (80 * 60);
 
     // Seeded RNG not critical for MVP — using Math.random
     const tiles = [];
@@ -96,7 +133,7 @@ export function generateMap(options = {}) {
 
     // ---------- Rooms & structures ----------
     const rooms = [];
-    const numRooms = randInt(12, 18);
+    const numRooms = randInt(Math.round(12 * areaScale), Math.round(18 * areaScale));
 
     for (let i = 0; i < numRooms; i++) {
         const rw = randInt(4, 10);
@@ -144,7 +181,7 @@ export function generateMap(options = {}) {
     }
 
     // ---------- Scatter some random wall clusters ----------
-    const clusterCount = randInt(20, 35);
+    const clusterCount = randInt(Math.round(20 * areaScale), Math.round(35 * areaScale));
     for (let i = 0; i < clusterCount; i++) {
         const cx = randInt(3, MAP_COLS - 4);
         const cy = randInt(3, MAP_ROWS - 4);
@@ -159,6 +196,9 @@ export function generateMap(options = {}) {
             }
         }
     }
+
+    // ---------- Connectivity fix: ensure no closed-off areas ----------
+    ensureConnectivity(tiles, MAP_ROWS, MAP_COLS);
 
     // ---------- Build walls array (rects for collision) ----------
     const walls = [];
@@ -233,13 +273,18 @@ export function generateMap(options = {}) {
             });
         }
     };
-    addCrates(10, ZONE.SAFE);
-    addCrates(11, ZONE.COMBAT);
-    addCrates(8, ZONE.HIGH_VALUE);
+    if (difficulty === 'chaos') {
+        addCrates(1, ZONE.COMBAT);
+    } else {
+        addCrates(Math.round(10 * areaScale), ZONE.SAFE);
+        addCrates(Math.round(11 * areaScale), ZONE.COMBAT);
+        addCrates(Math.round(8 * areaScale), ZONE.HIGH_VALUE);
+    }
 
     // ---------- Health packs ----------
     const healthPacks = [];
-    for (let i = 0; i < 10; i++) {
+    const healthPackCount = Math.round(10 * areaScale);
+    for (let i = 0; i < healthPackCount; i++) {
         const pos = randomOpenPos();
         healthPacks.push({
             id: generateId(), ...pos, radius: HEALTHPACK_RADIUS, collected: false
@@ -248,6 +293,7 @@ export function generateMap(options = {}) {
 
     // ---------- Extraction points (on map edges, in safe zone) ----------
     const extractionPoints = [];
+    const extractCount = EXTRACTION_COUNTS[difficulty] || 4;
     const edgePositions = [
         () => randomOpenPos(ZONE.SAFE, 2),
         () => ({ x: randInt(3, 8) * TILE_SIZE, y: randInt(10, MAP_ROWS - 10) * TILE_SIZE }),
@@ -255,8 +301,8 @@ export function generateMap(options = {}) {
         () => ({ x: randInt(10, MAP_COLS - 10) * TILE_SIZE, y: randInt(3, 8) * TILE_SIZE }),
         () => ({ x: randInt(10, MAP_COLS - 10) * TILE_SIZE, y: (MAP_ROWS - randInt(3, 8)) * TILE_SIZE }),
     ];
-    // Place 3 extraction points near edges
-    for (let i = 1; i <= 4; i++) {
+    // Place extraction points near edges (skip index 0 which is a random safe-zone point)
+    for (let i = 1; i <= Math.min(extractCount, edgePositions.length - 1); i++) {
         const pos = edgePositions[i]();
         // Make sure it's on open floor
         const col = Math.floor(pos.x / TILE_SIZE);
@@ -279,22 +325,22 @@ export function generateMap(options = {}) {
     // ---------- Enemy spawns ----------
     const enemySpawns = [];
     // Drones in combat zone
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < enemyCounts.combatDrones; i++) {
         const pos = randomOpenPos(ZONE.COMBAT);
         enemySpawns.push({ ...pos, type: 'drone' });
     }
     // A few drones in safe
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < enemyCounts.safeDrones; i++) {
         const pos = randomOpenPos(ZONE.SAFE);
         enemySpawns.push({ ...pos, type: 'drone' });
     }
     // Sentinels in high value
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < enemyCounts.highSentinels; i++) {
         const pos = randomOpenPos(ZONE.HIGH_VALUE);
         enemySpawns.push({ ...pos, type: 'sentinel' });
     }
     // A couple sentinels in combat
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < enemyCounts.combatSentinels; i++) {
         const pos = randomOpenPos(ZONE.COMBAT);
         enemySpawns.push({ ...pos, type: 'sentinel' });
     }
@@ -319,10 +365,16 @@ export function generateMap(options = {}) {
         }
     }
 
+    // Build navigation grid for A* pathfinding
+    const navGrid = buildNavGrid(tiles, MAP_ROWS, MAP_COLS);
+
     return {
         tiles,
         zones,
         walls: wallsFinal,
+        navGrid,
+        navRows: MAP_ROWS,
+        navCols: MAP_COLS,
         lootCrates,
         healthPacks,
         extractionPoints,
@@ -379,4 +431,130 @@ export class WallGrid {
         }
         return Array.from(result);
     }
+}
+
+// ── Connectivity: flood-fill & corridor carving ──────────────────
+
+/**
+ * Flood-fill from (startR, startC). Returns a Set of "r,c" keys for all
+ * reachable floor tiles.
+ */
+function floodFill(tiles, rows, cols, startR, startC) {
+    const visited = new Set();
+    const stack = [[startR, startC]];
+    while (stack.length) {
+        const [r, c] = stack.pop();
+        const key = `${r},${c}`;
+        if (visited.has(key)) continue;
+        if (r <= 0 || r >= rows - 1 || c <= 0 || c >= cols - 1) continue;
+        if (tiles[r][c] === TILE.WALL) continue;
+        visited.add(key);
+        stack.push([r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]);
+    }
+    return visited;
+}
+
+/**
+ * Find all connected components of non-wall tiles.
+ * Returns an array of Sets, each containing "r,c" keys.
+ */
+function findConnectedComponents(tiles, rows, cols) {
+    const globalVisited = new Set();
+    const components = [];
+    for (let r = 1; r < rows - 1; r++) {
+        for (let c = 1; c < cols - 1; c++) {
+            if (tiles[r][c] === TILE.WALL) continue;
+            const key = `${r},${c}`;
+            if (globalVisited.has(key)) continue;
+            const comp = floodFill(tiles, rows, cols, r, c);
+            comp.forEach(k => globalVisited.add(k));
+            components.push(comp);
+        }
+    }
+    return components;
+}
+
+/**
+ * Carve a straight-line corridor between two tile positions, clearing walls.
+ * Uses L-shaped path (horizontal then vertical).
+ */
+function carveCorridor(tiles, rows, cols, r1, c1, r2, c2) {
+    // Horizontal segment
+    const cMin = Math.min(c1, c2);
+    const cMax = Math.max(c1, c2);
+    for (let c = cMin; c <= cMax; c++) {
+        if (r1 > 0 && r1 < rows - 1 && c > 0 && c < cols - 1) {
+            if (tiles[r1][c] === TILE.WALL) tiles[r1][c] = TILE.FLOOR;
+        }
+    }
+    // Vertical segment
+    const rMin = Math.min(r1, r2);
+    const rMax = Math.max(r1, r2);
+    for (let r = rMin; r <= rMax; r++) {
+        if (r > 0 && r < rows - 1 && c2 > 0 && c2 < cols - 1) {
+            if (tiles[r][c2] === TILE.WALL) tiles[r][c2] = TILE.FLOOR;
+        }
+    }
+}
+
+/**
+ * Ensure all walkable areas are connected. Finds connected components,
+ * picks the largest as the main region, and carves corridors from each
+ * smaller region to the main one.
+ */
+function ensureConnectivity(tiles, rows, cols) {
+    const components = findConnectedComponents(tiles, rows, cols);
+    if (components.length <= 1) return; // already connected
+
+    // Find largest component
+    let mainIdx = 0;
+    for (let i = 1; i < components.length; i++) {
+        if (components[i].size > components[mainIdx].size) mainIdx = i;
+    }
+    const mainComp = components[mainIdx];
+
+    // For each other component, carve a corridor to the main one
+    for (let i = 0; i < components.length; i++) {
+        if (i === mainIdx) continue;
+        const island = components[i];
+
+        // Pick a representative tile from the island
+        const islandTile = island.values().next().value;
+        const [ir, ic] = islandTile.split(',').map(Number);
+
+        // Find the closest tile in the main component
+        let bestKey = null;
+        let bestDist = Infinity;
+        for (const key of mainComp) {
+            const [mr, mc] = key.split(',').map(Number);
+            const d = Math.abs(mr - ir) + Math.abs(mc - ic); // Manhattan distance
+            if (d < bestDist) {
+                bestDist = d;
+                bestKey = key;
+            }
+        }
+
+        if (bestKey) {
+            const [mr, mc] = bestKey.split(',').map(Number);
+            carveCorridor(tiles, rows, cols, ir, ic, mr, mc);
+            // After carving, add island tiles to main so subsequent corridors
+            // can connect through it
+            for (const key of island) mainComp.add(key);
+        }
+    }
+}
+
+/**
+ * Build a compact navigation grid from the tile map for A* pathfinding.
+ * Returns a Uint8Array where 0 = walkable, 1 = blocked.
+ * Access: navGrid[row * cols + col]
+ */
+export function buildNavGrid(tiles, rows, cols) {
+    const grid = new Uint8Array(rows * cols);
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            grid[r * cols + c] = tiles[r][c] === TILE.WALL ? 1 : 0;
+        }
+    }
+    return grid;
 }

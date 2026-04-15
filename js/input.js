@@ -17,6 +17,7 @@ export class InputManager {
         this.interactRequested = false;
         this.modeToggleRequested = false;
         this.useConsumableRequested = false;
+        this.weaponSwitchRequested = false;
 
         this._onKeyDown = this._onKeyDown.bind(this);
         this._onKeyUp = this._onKeyUp.bind(this);
@@ -46,6 +47,9 @@ export class InputManager {
         }
         if (e.code === 'KeyQ') {
             this.useConsumableRequested = true;
+        }
+        if (e.code === 'KeyE') {
+            this.weaponSwitchRequested = true;
         }
     }
 
@@ -113,6 +117,7 @@ export class InputManager {
         this.interactRequested = false;
         this.modeToggleRequested = false;
         this.useConsumableRequested = false;
+        this.weaponSwitchRequested = false;
         this.rightClicked = false;
     }
 

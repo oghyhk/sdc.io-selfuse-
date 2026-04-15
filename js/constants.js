@@ -2,12 +2,20 @@
 // constants.js — Game-wide configuration constants
 // ============================================================
 
-// Map
+// Map (defaults — overridden per-difficulty by setMapSize)
 export const TILE_SIZE = 48;
-export const MAP_COLS = 80;        // 80 * 48 = 3840 px
-export const MAP_ROWS = 60;        // 60 * 48 = 2880 px
-export const MAP_WIDTH = MAP_COLS * TILE_SIZE;
-export const MAP_HEIGHT = MAP_ROWS * TILE_SIZE;
+export let MAP_COLS = 80;        // 80 * 48 = 3840 px
+export let MAP_ROWS = 60;        // 60 * 48 = 2880 px
+export let MAP_WIDTH = MAP_COLS * TILE_SIZE;
+export let MAP_HEIGHT = MAP_ROWS * TILE_SIZE;
+
+/** Reconfigure map dimensions before generation. */
+export function setMapSize(cols, rows) {
+    MAP_COLS = cols;
+    MAP_ROWS = rows;
+    MAP_WIDTH = cols * TILE_SIZE;
+    MAP_HEIGHT = rows * TILE_SIZE;
+}
 
 // Tile types
 export const TILE = {
@@ -27,9 +35,6 @@ export const ZONE = {
 export const PLAYER_RADIUS = 14;
 export const PLAYER_SPEED = 180;          // px/s
 export const PLAYER_MAX_HP = 100;
-export const PLAYER_MELEE_RANGE = 40;
-export const PLAYER_MELEE_DAMAGE = 25;
-export const PLAYER_MELEE_COOLDOWN = 0.4; // seconds
 export const PLAYER_SHOOT_DAMAGE = 18;
 export const PLAYER_SHOOT_COOLDOWN = 0.25;
 export const PLAYER_BULLET_SPEED = 500;
@@ -89,14 +94,20 @@ export const CAMERA_LERP = 0.08;
 // Colors
 export const COLORS = {
     BG: '#1a1a2e',
-    FLOOR: '#16213e',
-    FLOOR_DARK: '#0f1a30',
+    FLOOR: '#7c848f',
+    FLOOR_DARK: '#a9e7b0',
+    FLOOR_HIGH_VALUE: '#d7b8ff',
     WALL: '#3a3a5c',
     WALL_STROKE: '#5a5a8c',
     GRID: 'rgba(255,255,255,0.03)',
-    PLAYER: '#00e676',
-    PLAYER_STROKE: '#00c853',
+    PLAYER: '#8d6e63',
+    PLAYER_STROKE: '#5d4037',
     PLAYER_DASH: '#b9f6ca',
+    AI_PLAYER: '#8d6e63',
+    AI_PLAYER_STROKE: '#5d4037',
+    OPERATOR_NAME_SELF: '#6dff7a',
+    OPERATOR_NAME_TEAM: '#64b5f6',
+    OPERATOR_NAME_ENEMY: '#ff6b6b',
     ENEMY_DRONE: '#ff5252',
     ENEMY_DRONE_STROKE: '#d32f2f',
     ENEMY_SENTINEL: '#ff6f00',
@@ -117,14 +128,16 @@ export const COLORS = {
     HP_BAR_BG: '#333',
     HP_BAR: '#00e676',
     HP_BAR_LOW: '#ff5252',
+    SHIELD_BAR: '#80d8ff',
     MINIMAP_BG: 'rgba(0,0,0,0.6)',
     MINIMAP_WALL: '#5a5a8c',
     MINIMAP_PLAYER: '#00e676',
+    MINIMAP_AI_PLAYER: '#64b5f6',
     MINIMAP_ENEMY: '#ff5252',
     MINIMAP_LOOT: '#ffd740',
     MINIMAP_EXTRACTION: '#448aff',
     HUD_TEXT: '#ffffff',
     HUD_SHADOW: 'rgba(0,0,0,0.5)',
-    CROSSHAIR: 'rgba(255,255,255,0.7)',
+    CROSSHAIR: 'rgba(0,0,0,0.92)',
     DAMAGE_FLASH: 'rgba(255,0,0,0.3)',
 };
