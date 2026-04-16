@@ -977,6 +977,90 @@
             }
             .market-type-nav { flex-direction: row; flex-wrap: wrap; padding-right: 0; }
         }
+        /* Mail button */
+        .mail-button {
+            pointer-events: auto;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            padding: 6px 10px;
+            cursor: pointer;
+            color: #fff;
+            font-size: 16px;
+            position: relative;
+            transition: background 0.15s;
+        }
+        .mail-button:hover { background: rgba(255,255,255,0.12); }
+        .mail-icon { display: inline-block; }
+        .mail-badge {
+            position: absolute;
+            top: -5px; right: -5px;
+            background: #e53935;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+        }
+        /* Mail list */
+        .mail-list { display: grid; gap: 10px; margin-top: 14px; max-height: 520px; overflow-y: auto; }
+        .mail-card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 12px 14px;
+            cursor: pointer;
+            transition: background 0.12s;
+        }
+        .mail-card:hover { background: rgba(255,255,255,0.07); }
+        .mail-card.claimed { border-color: rgba(255,215,0,0.15); }
+        .mail-card.expired { border-color: rgba(255,60,60,0.2); }
+        .mail-card-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+        .mail-card-preview { font-size: 12px; color: rgba(255,255,255,0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mail-card-meta { display: flex; gap: 10px; align-items: center; margin-top: 8px; font-size: 11px; color: rgba(255,255,255,0.4); }
+        .mail-card-meta .mail-reward-tag { color: #ffd700; }
+        .mail-card-meta .mail-expired-tag { color: #e53935; }
+        .mail-card-meta .mail-claimed-tag { color: rgba(255,255,255,0.3); }
+        .mail-card-meta .mail-timer-tag { color: #64b5f6; }
+        /* Mail detail */
+        .mail-detail { margin-top: 14px; }
+        .mail-detail-title { font-size: 20px; font-weight: 700; margin-bottom: 10px; }
+        .mail-detail-content { font-size: 14px; color: rgba(255,255,255,0.75); line-height: 1.7; margin-bottom: 18px; white-space: pre-wrap; }
+        .mail-rewards-section { margin-bottom: 16px; }
+        .mail-rewards-label { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.45); margin-bottom: 10px; }
+        .mail-rewards-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+        .mail-reward-item {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+            min-width: 64px;
+        }
+        .mail-reward-item img { width: 48px; height: 48px; object-fit: contain; }
+        .mail-reward-item .mail-reward-name { font-size: 11px; color: rgba(255,255,255,0.65); margin-top: 4px; }
+        .mail-reward-item .mail-reward-qty { font-size: 11px; color: #ffd700; font-weight: 700; }
+        .mail-claim-btn {
+            background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,165,0,0.08));
+            border: 1px solid rgba(255,215,0,0.3);
+            color: #ffd700;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.15s;
+        }
+        .mail-claim-btn:hover { background: linear-gradient(135deg, rgba(255,215,0,0.25), rgba(255,165,0,0.18)); }
+        .mail-claim-btn:disabled { opacity: 0.4; cursor: default; }
+        .mail-claimed-label { font-size: 13px; color: rgba(255,255,255,0.35); font-style: italic; }
+        .mail-expired-label { font-size: 13px; color: rgba(229,57,53,0.7); font-style: italic; }
+        .mail-countdown { font-size: 12px; color: #64b5f6; margin-top: 8px; }
         @media (max-width: 720px) {
             .hero-panel h1 { font-size: 42px; }
             .screen { padding: 18px; }
@@ -999,6 +1083,12 @@
                 <button id="redeemButton" class="secondary-button">Redeem</button>
             </div>
             <div id="authMenuWrap" class="topbar-account">
+                <div style="display:flex;gap:8px;align-items:center;pointer-events:auto">
+                    <button id="mailButton" class="mail-button hidden" title="Mail">
+                        <span class="mail-icon">✉</span>
+                        <span id="mailBadge" class="mail-badge hidden">0</span>
+                    </button>
+                </div>
                 <button id="authButton" class="secondary-button">Login / Sign Up</button>
                 <div id="authDropdown" class="auth-dropdown hidden"></div>
             </div>
@@ -1131,6 +1221,20 @@
                 <div class="placeholder-actions">
                     <button class="secondary-button" disabled>Content coming soon</button>
                 </div>
+            </div>
+        </section>
+
+        <!-- Mail Screen -->
+        <section id="mailScreen" class="screen hidden">
+            <div class="panel placeholder-panel">
+                <div class="placeholder-header">
+                    <div>
+                        <h2>Mail</h2>
+                        <div id="mailSubtitle" class="section-subtitle">Unread messages and rewards.</div>
+                    </div>
+                    <button id="mailBackButton" type="button" class="secondary-button">Back</button>
+                </div>
+                <div id="mailList" class="mail-list"></div>
             </div>
         </section>
 

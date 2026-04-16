@@ -69,6 +69,12 @@ const placeholderSubtitle = document.getElementById('placeholderSubtitle');
 const placeholderSummary = document.getElementById('placeholderSummary');
 const placeholderContent = document.getElementById('placeholderContent');
 const placeholderBackButton = document.getElementById('placeholderBackButton');
+const mailButton = document.getElementById('mailButton');
+const mailBadge = document.getElementById('mailBadge');
+const mailScreen = document.getElementById('mailScreen');
+const mailList = document.getElementById('mailList');
+const mailSubtitle = document.getElementById('mailSubtitle');
+const mailBackButton = document.getElementById('mailBackButton');
 const menuSummary = document.getElementById('menuSummary');
 const inventoryCoins = document.getElementById('inventoryCoins');
 const inventoryStats = document.getElementById('inventoryStats');
@@ -893,9 +899,10 @@ function setView(view) {
     if (view === 'inventory') renderInventory();
     else if (view === 'market') renderMarket();
     else if (view === 'placeholder') renderPlaceholderScreen();
+    else if (view === 'mail') renderMailScreen();
     else renderMenu();
 
-    if (view === 'menu' || view === 'inventory' || view === 'market' || view === 'placeholder') {
+    if (view === 'menu' || view === 'inventory' || view === 'market' || view === 'placeholder' || view === 'mail') {
         scheduleRuntimeConfigRefresh();
     }
 }
@@ -907,6 +914,7 @@ function renderVisibility() {
     inventoryScreen.classList.toggle('hidden', !showOverlay || currentView !== 'inventory');
     marketScreen.classList.toggle('hidden', !showOverlay || currentView !== 'market');
     placeholderScreen.classList.toggle('hidden', !showOverlay || currentView !== 'placeholder');
+    mailScreen.classList.toggle('hidden', !showOverlay || currentView !== 'mail');
     document.body.classList.toggle('playing', game.state === GAME_STATE.PLAYING);
 }
 
@@ -1810,6 +1818,7 @@ function renderAll() {
     renderMarket();
     renderPlaceholderScreen();
     renderVisibility();
+    fetchMail();
     if (!authModal.classList.contains('hidden')) {
         renderAuthModal();
     }
@@ -1876,6 +1885,242 @@ async function startRaidWithSelectedLoadout() {
     renderVisibility();
 }
 
+// ─── Mail System ──────────────────────────
+let _cachedMail = [];
+let _mailCountdownInterval = null;
+
+function _formatTimeRemaining(ms) {
+    if (ms <= 0) return 'Expired';
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+}
+
+async function fetchMail() {
+    const profile = store.getCurrentProfile();
+    if (!store.isAuthenticated() || !profile) {
+        _cachedMail = [];
+        updateMailBadge();
+        return _cachedMail;
+    }
+    try {
+        const res = await apiFetch('/mail', {
+            method: 'POST',
+            body: JSON.stringify({ username: profile.username })
+        });
+        _cachedMail = res.mail || [];
+    } catch (e) {
+        console.warn('Mail fetch failed:', e);
+    }
+    updateMailBadge();
+    return _cachedMail;
+}
+
+function updateMailBadge() {
+    const now = Date.now();
+    const unclaimed = _cachedMail.filter(m => !m.claimedAt && !m.expiredAt && (now - m.createdAt) < 86400000).length;
+    if (unclaimed > 0) {
+        mailBadge.textContent = unclaimed > 99 ? '99+' : unclaimed;
+        mailBadge.classList.remove('hidden');
+        mailButton.classList.remove('hidden');
+    } else {
+        mailBadge.classList.add('hidden');
+    }
+    mailButton.classList.toggle('hidden', !store.isAuthenticated());
+}
+
+function _startMailCountdowns() {
+    if (_mailCountdownInterval) clearInterval(_mailCountdownInterval);
+    _mailCountdownInterval = setInterval(() => {
+        document.querySelectorAll('.mail-countdown[data-expires-at]').forEach(el => {
+            const expiresAt = parseInt(el.dataset.expiresAt, 10);
+            const remaining = expiresAt - Date.now();
+            if (remaining <= 0) {
+                el.textContent = 'Expired';
+                el.style.color = '#e53935';
+                // Re-render to update claim button state
+                const mailId = el.closest('.mail-detail')?.querySelector('.mail-claim-btn')?.dataset.mailId
+                    || el.closest('.mail-card')?.dataset.mailId;
+                if (mailId) {
+                    const mailItem = _cachedMail.find(m => m.id === mailId);
+                    if (mailItem && !mailItem.expiredAt) {
+                        mailItem.expiredAt = Date.now();
+                        if (currentView === 'mail') renderMailScreen();
+                    }
+                }
+            } else {
+                el.textContent = _formatTimeRemaining(remaining);
+            }
+        });
+    }, 30000);
+}
+
+function _stopMailCountdowns() {
+    if (_mailCountdownInterval) {
+        clearInterval(_mailCountdownInterval);
+        _mailCountdownInterval = null;
+    }
+}
+
+async function renderMailScreen() {
+    const mail = await fetchMail();
+    const now = Date.now();
+    const unclaimed = mail.filter(m => !m.claimedAt && !m.expiredAt && (now - m.createdAt) < 86400000).length;
+    const expired = mail.filter(m => m.expiredAt && !m.claimedAt).length;
+    const claimed = mail.filter(m => m.claimedAt).length;
+    const parts = [];
+    if (unclaimed) parts.push(`${unclaimed} unclaimed`);
+    if (expired) parts.push(`${expired} expired`);
+    if (claimed) parts.push(`${claimed} claimed`);
+    mailSubtitle.textContent = parts.length ? parts.join(', ') : 'Your mailbox is empty.';
+
+    if (!mail.length) {
+        mailList.innerHTML = '<div style="color:rgba(255,255,255,0.35);text-align:center;padding:40px 0;font-size:14px">No mail.</div>';
+        _stopMailCountdowns();
+        return;
+    }
+
+    mail.sort((a, b) => {
+        // Unclaimed first, then by creation time descending
+        if (!a.claimedAt && !a.expiredAt && (b.claimedAt || b.expiredAt)) return -1;
+        if ((a.claimedAt || a.expiredAt) && !b.claimedAt && !b.expiredAt) return 1;
+        return b.createdAt - a.createdAt;
+    });
+
+    mailList.innerHTML = mail.map(m => {
+        const isClaimed = !!m.claimedAt;
+        const isExpired = !!m.expiredAt || (!m.claimedAt && (now - m.createdAt) >= 86400000);
+        const hasRewards = m.rewards && m.rewards.length > 0;
+        const cardClass = isExpired ? 'expired' : (isClaimed ? 'claimed' : '');
+        let statusTag = '';
+        if (isExpired && !isClaimed) {
+            statusTag = '<span class="mail-expired-tag">⏰ Expired</span>';
+        } else if (isClaimed) {
+            statusTag = '<span class="mail-claimed-tag">✓ Claimed</span>';
+        } else if (hasRewards) {
+            const expiresAt = m.createdAt + 86400000;
+            const remaining = expiresAt - now;
+            statusTag = `<span class="mail-timer-tag" data-expires-at="${expiresAt}">⏳ ${_formatTimeRemaining(remaining)}</span>`;
+        }
+        return `
+            <div class="mail-card ${cardClass}" data-mail-id="${m.id}">
+                <div class="mail-card-title">${escapeHtml(m.title)}</div>
+                <div class="mail-card-preview">${escapeHtml(m.content || '')}</div>
+                <div class="mail-card-meta">
+                    ${hasRewards ? `<span class="mail-reward-tag">🎁 ${m.rewards.length} reward${m.rewards.length > 1 ? 's' : ''}</span>` : ''}
+                    ${statusTag}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    mailList.querySelectorAll('.mail-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const mailId = card.dataset.mailId;
+            const mailItem = _cachedMail.find(m => m.id === mailId);
+            if (mailItem) renderMailDetail(mailItem);
+        });
+    });
+
+    _startMailCountdowns();
+}
+
+function renderMailDetail(mail) {
+    const now = Date.now();
+    const isClaimed = !!mail.claimedAt;
+    const isExpired = !!mail.expiredAt || (!mail.claimedAt && (now - mail.createdAt) >= 86400000);
+    const hasRewards = mail.rewards && mail.rewards.length > 0;
+    const expiresAt = mail.createdAt + 86400000;
+    const remaining = expiresAt - now;
+
+    let rewardsHtml = '';
+    if (hasRewards) {
+        rewardsHtml = `
+            <div class="mail-rewards-section">
+                <div class="mail-rewards-label">Rewards</div>
+                <div class="mail-rewards-grid">
+                    ${mail.rewards.map(r => {
+                        const def = ITEM_DEFS[r.definitionId] || itemDefs[r.definitionId] || {};
+                        const name = def.name || r.definitionId;
+                        const img = def.image ? `<img src="${def.image}" alt="${escapeHtml(name)}">` : '';
+                        const qty = r.quantity || 1;
+                        return `
+                            <div class="mail-reward-item">
+                                ${img}
+                                <div class="mail-reward-name">${escapeHtml(name)}</div>
+                                ${qty > 1 ? `<div class="mail-reward-qty">x${qty}</div>` : ''}
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    let actionHtml = '';
+    if (hasRewards) {
+        if (isExpired && !isClaimed) {
+            actionHtml = '<div class="mail-expired-label">Rewards expired — claim period has passed</div>';
+        } else if (isClaimed) {
+            actionHtml = '<div class="mail-claimed-label">Rewards claimed</div>';
+        } else {
+            actionHtml = `<button class="mail-claim-btn" id="mailClaimBtn" data-mail-id="${mail.id}">Claim Rewards</button>`;
+        }
+    }
+
+    let countdownHtml = '';
+    if (!isClaimed && !isExpired) {
+        countdownHtml = `<div class="mail-countdown" data-expires-at="${expiresAt}">Expires in ${_formatTimeRemaining(remaining)}</div>`;
+    } else if (isExpired && !isClaimed) {
+        countdownHtml = '<div class="mail-countdown" style="color:#e53935">Expired</div>';
+    }
+
+    mailList.innerHTML = `
+        <div class="mail-detail">
+            <div style="margin-bottom:12px"><button class="secondary-button" id="mailBackToList">← Back to Mail</button></div>
+            <div class="mail-detail-title">${escapeHtml(mail.title)}</div>
+            <div class="mail-detail-content">${escapeHtml(mail.content || 'No content.')}</div>
+            ${rewardsHtml}
+            ${actionHtml}
+            ${countdownHtml}
+        </div>
+    `;
+
+    document.getElementById('mailBackToList')?.addEventListener('click', () => renderMailScreen());
+
+    document.getElementById('mailClaimBtn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('mailClaimBtn');
+        if (btn.disabled) return;
+        btn.disabled = true;
+        btn.textContent = 'Claiming...';
+        try {
+            const profile = store.getCurrentProfile();
+            const res = await apiFetch('/mail/claim', {
+                method: 'POST',
+                body: JSON.stringify({ username: profile.username, mailId: mail.id })
+            });
+            if (res.ok) {
+                store.currentProfile = res.profile;
+                await fetchMail();
+                renderMailDetail({ ...mail, claimedAt: Date.now() });
+                renderAuthButton();
+                renderTopbarLevelBox();
+            } else {
+                window.alert(res.message || 'Failed to claim.');
+                btn.disabled = false;
+                btn.textContent = 'Claim Rewards';
+            }
+        } catch (e) {
+            window.alert('Network error.');
+            btn.disabled = false;
+            btn.textContent = 'Claim Rewards';
+        }
+    });
+
+    _startMailCountdowns();
+}
+
 startButton.addEventListener('click', () => {
     startRaidWithSelectedLoadout().catch((error) => {
         window.alert(error.message || 'Failed to start raid.');
@@ -1889,6 +2134,8 @@ marketButton.addEventListener('click', () => setView('market'));
 backButton.addEventListener('click', () => setView('menu'));
 marketBackButton.addEventListener('click', () => setView('menu'));
 placeholderBackButton.addEventListener('click', () => setView('menu'));
+mailButton.addEventListener('click', () => setView('mail'));
+mailBackButton.addEventListener('click', () => setView('menu'));
 placeholderScreen.addEventListener('click', (event) => {
     if (event.target.closest('#placeholderBackButton')) {
         event.preventDefault();
