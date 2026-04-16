@@ -226,6 +226,13 @@ export class Game {
         this.totalPlayersInRaid = (raidCountByDifficulty[this.activeDifficulty] || raidCountByDifficulty.advanced)();
         this.aiPlayers = this._spawnAiPlayers(this.totalPlayersInRaid - 1);
 
+        // Boss spawning logic
+        if (this.activeDifficulty === 'chaos' && Math.random() < 0.30) {
+            this._spawnBoss();
+        } else if (this.activeDifficulty === 'hell' && Math.random() < 0.05) {
+            this._spawnBoss();
+        }
+
         // Track death count for extraction gating (chaos)
         this.totalOperatorDeaths = 0;
         this.extractionGateOpen = this.activeDifficulty !== 'chaos';
@@ -284,6 +291,32 @@ export class Game {
         });
 
         return bots;
+    }
+
+    _spawnBoss() {
+        const anchor = this._getRandomOperatorSpawn([{ x: this.player.x, y: this.player.y }]);
+        const bossProfile = { type: 'fighter', level: 'boss', maxRarity: 'red' };
+        const BOSS_NAMES = ['WARLORD', 'TITAN', 'OVERLORD', 'APEX', 'DOMINATOR', 'REAPER-PRIME', 'SENTINEL', 'OBLIVION'];
+        const bossName = `BOSS ${BOSS_NAMES[Math.floor(Math.random() * BOSS_NAMES.length)]}`;
+        const bot = createAIPlayer(anchor.x, anchor.y, this.activeDifficulty, 99, {
+            aiProfile: bossProfile,
+            displayName: bossName,
+            squadId: 'boss-squad',
+            squadIndex: 0,
+            squadSize: 1,
+        });
+        bot.onDamageTaken = (entity, amount) => this._spawnFloatingDamageNumber(entity.x, entity.y, amount);
+        bot.elo = 1500; // bosses have high ELO
+        this.aiPlayers.push(bot);
+
+        this.killFeed.unshift({
+            text: `${bossName} HAS ENTERED THE RAID`,
+            detail: '',
+            color: '#ff4444',
+            life: 3,
+            maxLife: 3,
+        });
+        this.killFeed = this.killFeed.slice(0, 4);
     }
 
     _buildAiSquadSizes(count) {
@@ -702,6 +735,45 @@ export class Game {
             ...bot.inventoryItems.map((item) => ({ ...item })),
             ...bot.safeboxItems.map((item) => ({ ...item })),
         ];
+
+        // Boss-specific drops
+        if (bot.aiLevel === 'boss') {
+            // Drop 1 red consumable
+            const redConsumables = Object.keys(ITEM_DEFS).filter(
+                (id) => ITEM_DEFS[id].category === 'consumable' && ITEM_DEFS[id].rarity === 'red'
+            );
+            if (redConsumables.length) {
+                const pick = redConsumables[Math.floor(Math.random() * redConsumables.length)];
+                const item = createLootItem(pick);
+                if (item) droppedItems.push(item);
+            }
+
+            // Drop 1 red ammo
+            const redAmmo = Object.keys(ITEM_DEFS).filter(
+                (id) => ITEM_DEFS[id].category === 'ammo' && ITEM_DEFS[id].rarity === 'red'
+            );
+            if (redAmmo.length) {
+                const pick = redAmmo[Math.floor(Math.random() * redAmmo.length)];
+                const item = createLootItem(pick);
+                if (item) droppedItems.push(item);
+            }
+
+            // 3% chance to drop bitcoin
+            if (Math.random() < 0.03 && ITEM_DEFS['btc']) {
+                const item = createLootItem('btc');
+                if (item) droppedItems.push(item);
+            }
+
+            // Boss kill notification
+            this.killFeed.unshift({
+                text: `${bot.displayName || 'BOSS'} ELIMINATED`,
+                detail: '',
+                color: '#ff6600',
+                life: 3,
+                maxLife: 3,
+            });
+            this.killFeed = this.killFeed.slice(0, 6);
+        }
 
         bot.inventoryItems = [];
         bot.safeboxItems = [];

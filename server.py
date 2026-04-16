@@ -383,6 +383,33 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 self._send_json({'ok': False, 'message': str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
             return
 
+        if parsed.path == '/api/upload-image':
+            # Accept base64-encoded image data and save to assets/dev/
+            import base64, os
+            image_data = str(body.get('data', '')).strip()
+            filename = str(body.get('filename', 'upload.png')).strip()
+            item_id = str(body.get('itemId', 'unknown')).strip()
+            if not image_data:
+                self._send_json({'ok': False, 'message': 'No image data provided.'}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                # Handle data URL prefix (e.g., "data:image/png;base64,...")
+                if ',' in image_data:
+                    image_data = image_data.split(',', 1)[1]
+                img_bytes = base64.b64decode(image_data)
+                safe_id = re.sub(r'[^a-zA-Z0-9_]', '_', item_id)
+                ext = os.path.splitext(filename)[1] or '.png'
+                if ext.lower() not in ('.png', '.jpg', '.jpeg', '.gif', '.webp'):
+                    ext = '.png'
+                out_dir = ROOT / 'assets' / 'dev'
+                out_dir.mkdir(parents=True, exist_ok=True)
+                out_path = out_dir / f'{safe_id}{ext}'
+                out_path.write_bytes(img_bytes)
+                self._send_json({'ok': True, 'path': f'/assets/dev/{safe_id}{ext}', 'size': len(img_bytes)})
+            except Exception as e:
+                self._send_json({'ok': False, 'message': str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
         # ─── Mail System ──────────────────────────
         MAIL_EXPIRE_MS = 24 * 60 * 60 * 1000   # 24 hours — rewards unclaimable after this
         MAIL_DELETE_MS = 48 * 60 * 60 * 1000   # 48 hours — auto-delete after claim or expiry

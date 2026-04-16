@@ -154,6 +154,30 @@ const AI_LEVEL_CONFIG = {
         secondaryChance: { easy: 0, advanced: 0, hell: 0.62, chaos: 0.72 },
         awkwardOffsetMagnitude: 0.34,
     },
+    boss: {
+        maxRarity: 'red',
+        rarityWeights: { red: 100 },
+        aimError: [2, 5],
+        predictionFactor: 1.2,
+        aimDistanceScale: 0.35,
+        decisionDelay: [0.08, 0.18],
+        lootDelay: [0.15, 0.3],
+        switchDelay: [0.6, 1.2],
+        strafeDelay: [0.25, 0.6],
+        aggroRange: [600, 1000],
+        wanderRadius: [100, 300],
+        preferredRange: [0.4, 0.65],
+        movementNoise: 0.08,
+        hesitationChance: 0,
+        dashChance: 0.25,
+        combatConfidence: 1.5,
+        disengageBias: 0.6,
+        ammoReserve: [9999, 9999],
+        consumableAmount: [9999, 9999],
+        secondaryChance: { easy: 0, advanced: 0, hell: 0, chaos: 0 },
+        isBoss: true,
+        bossHealCooldown: 15,
+    },
 };
 
 const AI_TYPE_CONFIG = {
@@ -292,6 +316,7 @@ export function createAIOperatorProfile(difficulty = 'advanced') {
 function buildBotLoadout(difficulty = 'advanced', aiProfile = createAIOperatorProfile(difficulty)) {
     const levelConfig = AI_LEVEL_CONFIG[aiProfile.level] || AI_LEVEL_CONFIG.lv2;
     const isLv4 = aiProfile.level === 'lv4';
+    const isBoss = aiProfile.level === 'boss';
     const primaryGun = pickGunDefinition(levelConfig);
     const secondaryChance = getSecondaryGunChance(levelConfig, difficulty);
     const secondaryGun = Math.random() < secondaryChance ? pickGunDefinition(levelConfig) : null;
@@ -305,20 +330,29 @@ function buildBotLoadout(difficulty = 'advanced', aiProfile = createAIOperatorPr
     };
 
     // Lv4: always gold ammo + gold consumable, 1998 each
-    const ammoDefinitionId = isLv4
-        ? 'ammo_gold'
-        : pickAmmoDefinition(levelConfig, primaryGun);
-    const spareAmmo = isLv4
-        ? 1998
-        : (primaryGun === 'awm'
-            ? randInt(8, Math.max(12, Math.floor(levelConfig.ammoReserve[1] * 0.18)))
-            : randInt(levelConfig.ammoReserve[0], levelConfig.ammoReserve[1]));
-    const consumableDefinitionId = isLv4
+    // Boss: always red ammo + red consumable, 9999 each
+    const ammoDefinitionId = isBoss
+        ? 'ammo_red'
+        : isLv4
+            ? 'ammo_gold'
+            : pickAmmoDefinition(levelConfig, primaryGun);
+    const spareAmmo = isBoss
+        ? 9999
+        : isLv4
+            ? 1998
+            : (primaryGun === 'awm'
+                ? randInt(8, Math.max(12, Math.floor(levelConfig.ammoReserve[1] * 0.18)))
+                : randInt(levelConfig.ammoReserve[0], levelConfig.ammoReserve[1]));
+    const consumableDefinitionId = isBoss
         ? 'regen_injector'
-        : pickConsumableDefinition(levelConfig);
-    const consumableAmount = isLv4
-        ? 1998
-        : randInt(levelConfig.consumableAmount[0], levelConfig.consumableAmount[1]);
+        : isLv4
+            ? 'regen_injector'
+            : pickConsumableDefinition(levelConfig);
+    const consumableAmount = isBoss
+        ? 9999
+        : isLv4
+            ? 1998
+            : randInt(levelConfig.consumableAmount[0], levelConfig.consumableAmount[1]);
     const backpackItems = [
         { definitionId: ammoDefinitionId, quantity: spareAmmo },
         { definitionId: consumableDefinitionId, quantity: consumableAmount },
@@ -394,6 +428,9 @@ export class AIPlayer extends Player {
         this.aiExtractTimer = 0;
         this.aiExtractCheckTimer = randFloat(8, 18); // first check after some time in raid
         this.aiExtracted = false;
+
+        // Boss heal cooldown
+        this.aiBossLastHealTime = -999; // allow healing immediately on spawn
     }
 
     updateAI(dt, context) {
@@ -509,7 +546,12 @@ export class AIPlayer extends Player {
         }
 
         if (this._shouldUseConsumable(context)) {
-            this._useAllowedConsumable();
+            if (this._useAllowedConsumable()) {
+                // Record boss heal time for cooldown
+                if (this.aiLevelConfig.isBoss) {
+                    this.aiBossLastHealTime = context.gameTime;
+                }
+            }
         }
 
         const input = this._buildInput(context);
@@ -836,11 +878,18 @@ export class AIPlayer extends Player {
     _shouldUseConsumable(context) {
         if (this.isHealing) return false;
         if (!this._hasAllowedConsumable()) return false;
+
+        // Boss: check heal cooldown
+        if (this.aiLevelConfig.isBoss) {
+            const cooldown = this.aiLevelConfig.bossHealCooldown || 15;
+            if (context.gameTime - this.aiBossLastHealTime < cooldown) return false;
+        }
+
         const useThreshold = this.aiType === 'runner' ? 0.82 : this.aiType === 'searcher' ? 0.68 : 0.6;
         if (this.hp >= this.maxHp * useThreshold) return false;
 
-        // Lv3/Lv4: only heal when no enemy has line-of-sight (behind cover)
-        if (this.aiLevel === 'lv3' || this.aiLevel === 'lv4') {
+        // Boss/Lv3/Lv4: only heal when no enemy has line-of-sight (behind cover)
+        if (this.aiLevel === 'boss' || this.aiLevel === 'lv3' || this.aiLevel === 'lv4') {
             const visibleThreats = this._getVisibleThreats(context);
             return visibleThreats.length === 0;
         }

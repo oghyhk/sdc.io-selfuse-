@@ -165,6 +165,55 @@ def cmd_list_crates(args):
             print(f"    {DIM}{v['description']}{RESET}")
 
 
+def cmd_list_operators(args):
+    config = load_config()
+    operators = config.get('ai_operators', {})
+    if not operators:
+        print("No AI operators found.")
+        return
+    
+    for level, cfg in operators.items():
+        label = {'lv1': 'Recruit', 'lv2': 'Veteran', 'lv3': 'Elite', 'lv4': 'Legendary', 'boss': 'BOSS'}.get(level, level)
+        rw = ', '.join(f"{r}:{w}" for r, w in cfg.get('rarityWeights', {}).items())
+        ae = cfg.get('aimError', [0, 0])
+        print(f"  {BOLD}{level:6s} ({label}){RESET} maxRarity={cfg.get('maxRarity','?')} aimError={ae} aggro={cfg.get('aggroRange','?')}")
+        print(f"    confidence={cfg.get('combatConfidence','?')} disengage={cfg.get('disengageBias','?')} prediction={cfg.get('predictionFactor','?')}")
+        print(f"    rarityWeights: {rw}")
+
+
+def cmd_edit_operator(args):
+    config = load_config()
+    operators = config.get('ai_operators', {})
+    
+    if args.id not in operators:
+        print(f"Error: operator level '{args.id}' not found. Available: {', '.join(operators.keys())}", file=sys.stderr)
+        sys.exit(1)
+    
+    entry = operators[args.id]
+    parent, leaf = _get_nested_value(entry, args.field)
+    if parent is None:
+        if '.' in args.field:
+            parts = args.field.split('.')
+            parent = entry
+            for part in parts[:-1]:
+                if part not in parent or not isinstance(parent.get(part), dict):
+                    parent[part] = {}
+                parent = parent[part]
+            leaf = parts[-1]
+            old_val = parent.get(leaf)
+        else:
+            parent = entry
+            leaf = args.field
+            old_val = entry.get(args.field)
+    else:
+        old_val = parent.get(leaf)
+
+    new_val = _parse_value(args.value)
+    parent[leaf] = new_val
+    save_config(config)
+    print(f"✅ Updated operator '{args.id}': {args.field} = {new_val} (was {old_val})")
+
+
 def cmd_add_item(args):
     config = load_config()
     if args.id in config.get('items', {}):
@@ -398,7 +447,7 @@ def main():
     
     # list
     list_parser = sub.add_parser('list', help='List game content')
-    list_parser.add_argument('type', choices=['items', 'enemies', 'ammo', 'crates'])
+    list_parser.add_argument('type', choices=['items', 'enemies', 'ammo', 'crates', 'operators'])
     list_parser.add_argument('--category', '-c')
     list_parser.add_argument('--rarity', '-r')
     list_parser.add_argument('--search', '-s')
@@ -455,6 +504,10 @@ def main():
     edit_enemy.add_argument('--id', required=True)
     edit_enemy.add_argument('--field', '-f', required=True)
     edit_enemy.add_argument('--value', '-v', required=True)
+    edit_operator = edit_sub.add_parser('operator')
+    edit_operator.add_argument('--id', required=True, help='Operator level: lv1, lv2, lv3, lv4, boss')
+    edit_operator.add_argument('--field', '-f', required=True)
+    edit_operator.add_argument('--value', '-v', required=True)
     
     # delete
     del_parser = sub.add_parser('delete', help='Delete content')
@@ -492,9 +545,10 @@ def main():
             'enemies': cmd_list_enemies,
             'ammo': cmd_list_ammo,
             'crates': cmd_list_crates,
+            'operators': cmd_list_operators,
         }[args.type](args),
         'add': lambda: cmd_add_item(args) if args.command == 'item' else cmd_add_enemy(args),
-        'edit': lambda: cmd_edit(args),
+        'edit': lambda: cmd_edit_operator(args) if args.command == 'operator' else cmd_edit(args),
         'delete': lambda: cmd_delete(args),
         'export': lambda: cmd_export(args),
         'import': lambda: cmd_import(args),

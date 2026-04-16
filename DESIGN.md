@@ -689,3 +689,85 @@ The live game is now materially different from the earlier pulled version in fou
 2. **Bots are now a persistent competitive layer** with identities, levels, ELO, and stronger navigation.
 3. **Gear depth is broader** through shields, premium AI tiers, improved ammo interactions, and richer item art/content support.
 4. **Tooling is stronger** thanks to the dev UI/CLI workflow that now supports future balancing without direct code editing for every content change.
+
+---
+
+## 18. ELO System Rework
+
+### 18.1 Easy Mode Exclusion
+Easy difficulty runs are completely excluded from ELO calculations. The `computeEloChange` function returns 0 for easy difficulty, meaning no ELO gain or loss regardless of outcome.
+
+### 18.2 Difficulty K Values
+New ELO difficulty K values (base gain/loss per raid):
+
+| Difficulty | K Value |
+|-----------|---------|
+| Easy      | 0       |
+| Advanced  | 5       |
+| Hell      | 12      |
+| Chaos     | 30      |
+
+### 18.3 Kill Bonus Multiplier
+A per-difficulty multiplier is applied to kill bonuses:
+
+| Difficulty | Multiplier |
+|-----------|-----------|
+| Easy      | 0x        |
+| Advanced  | 1x        |
+| Hell      | 2x        |
+| Chaos     | 4x        |
+
+The extraction gain formula: `K + (eloKillBonus * multiplier)`
+
+### 18.4 Death Formula
+New death ELO formula: `-(K - max(0, eloKillBonus * multiplier))`
+
+This means if a player gets enough kills, their death penalty is reduced — potentially even gaining ELO on death if kills outweigh the base penalty.
+
+## 19. Boss AI Operator
+
+### 19.1 Boss Configuration
+A new `boss` AI operator level has been added after lv4 with the following characteristics:
+- **Max Rarity**: Red items only
+- **Aim Error**: [2, 5] — extremely accurate
+- **Prediction Factor**: 1.2 — superior target leading
+- **Aggro Range**: [600, 1000] — detects players from far away
+- **Combat Confidence**: 1.5 — never backs down
+- **Ammo/Consumables**: Unlimited (9999 each)
+- **Healing Cooldown**: 15 seconds between heals
+- **Type**: Always fighter (highest aggression)
+
+### 19.2 Boss Spawn Rates
+- **Chaos difficulty**: 30% chance to spawn 1 boss per raid
+- **Hell difficulty**: 5% chance to spawn 1 boss per raid
+- **Easy/Advanced**: No boss spawns
+
+### 19.3 Boss Drops
+When killed, the boss drops:
+- 1 random red rarity consumable
+- 1 random red rarity ammo
+- All equipped items (existing loot system)
+- 3% chance to drop Bitcoin (legendary item)
+
+### 19.4 Bitcoin (BTC)
+Bitcoin is a legendary rarity loot item that:
+- Can **only** be obtained by killing a boss (3% drop chance)
+- Is **not purchasable** from the market/shop
+- Has a sell value of 1,314,520,000 coins
+
+## 20. Dev Tool Updates
+
+### 20.1 AI Operator Management
+New `🤖 AI Operators` tab in dev.html shows all operator level configs (lv1-lv4, boss) with their stats. CLI commands:
+- `python dev.py list operators` — list all operator profiles
+- `python dev.py edit operator --id lv1 --field aimError --value [20,40]` — edit operator config
+
+### 20.2 Image Upload
+Item image editing now uses a file upload button instead of text path entry. Selected images are uploaded to the server via `/api/upload-image` endpoint and saved to `assets/dev/`.
+
+## 21. Equipment Descriptions Update
+All item descriptions in dev-config.json have been updated to include stat summaries appended after the original description text. Format examples:
+- Gun: `... | DMG:45 | SPD:0.18s | CLIP:30 | RNG:400 | RLD:2.1s`
+- Armor: `... | DEF:+25 | SHIELD:50`
+- Consumable: `... | HEAL:3HP | SPEED:0.5s`
+- Ammo: `... | DMG:x1.5`

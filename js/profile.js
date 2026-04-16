@@ -1241,7 +1241,8 @@ export function getExpRewardForRunSummary(summary = {}) {
     return Math.max(0, Math.floor(Number(summary?.kills) || 0));
 }
 
-const ELO_DIFFICULTY_K = { easy: 12, advanced: 18, hell: 28, chaos: 40 };
+const ELO_DIFFICULTY_K = { easy: 0, advanced: 5, hell: 12, chaos: 30 };
+export const ELO_KILL_BONUS_MULT = { easy: 0, advanced: 1, hell: 2, chaos: 4 };
 const PER_KILL_K = 8;
 
 /**
@@ -1266,10 +1267,12 @@ export function computeDeathPenaltyScale(myElo = 1000, killerElo = null) {
 }
 
 export function computeEloChange(difficulty = 'advanced', extracted = false, eloKillBonus = 0, deathPenaltyScale = 1.0) {
+    if (difficulty === 'easy') return 0;
     const K = ELO_DIFFICULTY_K[difficulty] || ELO_DIFFICULTY_K.advanced;
-    if (extracted) return K + eloKillBonus;
-    const scaledK = Math.max(1, Math.round(K * deathPenaltyScale));
-    return -(scaledK - Math.min(eloKillBonus, Math.floor(scaledK * 0.4)));
+    const mult = ELO_KILL_BONUS_MULT[difficulty] || 0;
+    const adjustedKillBonus = eloKillBonus * mult;
+    if (extracted) return K + adjustedKillBonus;
+    return -(K - Math.max(0, adjustedKillBonus));
 }
 
 function applyEloChange(profile, change) {

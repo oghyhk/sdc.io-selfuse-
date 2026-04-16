@@ -1644,6 +1644,8 @@ function renderMarket() {
         category,
         items: Object.values(ITEM_DEFS)
             .filter((item) => {
+                // Exclude unbuyable items (bitcoin is drop-only)
+                if (item.id === 'btc') return false;
                 if (category === 'goods') return item.lootType === 'goods';
                 if (category === 'ammo') return item.lootType === 'ammo' && item.id !== 'ammo_white';
                 return item.category === category;
@@ -1888,6 +1890,7 @@ async function startRaidWithSelectedLoadout() {
 // ─── Mail System ──────────────────────────
 let _cachedMail = [];
 let _mailCountdownInterval = null;
+let _mailDelegationBound = false;
 
 function _formatTimeRemaining(ms) {
     if (ms <= 0) return 'Expired';
@@ -1918,16 +1921,17 @@ async function fetchMail() {
 }
 
 function updateMailBadge() {
+    if (!mailButton || !mailBadge) return;
+    mailButton.classList.toggle('hidden', !store.isAuthenticated());
+    if (!store.isAuthenticated()) return;
     const now = Date.now();
     const unclaimed = _cachedMail.filter(m => !m.claimedAt && !m.expiredAt && (now - m.createdAt) < 86400000).length;
     if (unclaimed > 0) {
         mailBadge.textContent = unclaimed > 99 ? '99+' : unclaimed;
         mailBadge.classList.remove('hidden');
-        mailButton.classList.remove('hidden');
     } else {
         mailBadge.classList.add('hidden');
     }
-    mailButton.classList.toggle('hidden', !store.isAuthenticated());
 }
 
 function _startMailCountdowns() {
@@ -1939,7 +1943,6 @@ function _startMailCountdowns() {
             if (remaining <= 0) {
                 el.textContent = 'Expired';
                 el.style.color = '#e53935';
-                // Re-render to update claim button state
                 const mailId = el.closest('.mail-detail')?.querySelector('.mail-claim-btn')?.dataset.mailId
                     || el.closest('.mail-card')?.dataset.mailId;
                 if (mailId) {
@@ -1963,8 +1966,81 @@ function _stopMailCountdowns() {
     }
 }
 
-async function renderMailScreen() {
-    const mail = await fetchMail();
+function _bindMailDelegation() {
+    if (_mailDelegationBound) return;
+    _mailDelegationBound = true;
+    mailList.addEventListener('click', (event) => {
+        // Card click → open detail
+        const card = event.target.closest('.mail-card');
+        if (card) {
+            const mailId = card.dataset.mailId;
+            const mailItem = _cachedMail.find(m => m.id === mailId);
+            if (mailItem) renderMailDetail(mailItem);
+            return;
+        }
+        // Back to list
+        if (event.target.closest('#mailBackToList')) {
+            renderMailScreen();
+            return;
+        }
+        // Claim button
+        const claimBtn = event.target.closest('.mail-claim-btn');
+        if (claimBtn && !claimBtn.disabled) {
+            handleMailClaim(claimBtn);
+        }
+    });
+}
+
+async function handleMailClaim(btn) {
+    const mailId = btn.dataset.mailId;
+    btn.disabled = true;
+    btn.textContent = 'Claiming...';
+    try {
+        const profile = store.getCurrentProfile();
+        const res = await apiFetch('/mail/claim', {
+            method: 'POST',
+            body: JSON.stringify({ username: profile.username, mailId })
+        });
+        if (res.ok) {
+            store.currentProfile = res.profile;
+            await fetchMail();
+            // Update just this card's state instead of full re-render
+            const mailItem = _cachedMail.find(m => m.id === mailId);
+            if (mailItem) {
+                mailItem.claimedAt = Date.now();
+                renderMailDetail(mailItem);
+            } else {
+                renderMailScreen();
+            }
+            renderAuthButton();
+            renderTopbarLevelBox();
+        } else {
+            window.alert(res.message || 'Failed to claim.');
+            btn.disabled = false;
+            btn.textContent = 'Claim Rewards';
+        }
+    } catch (e) {
+        window.alert('Network error.');
+        btn.disabled = false;
+        btn.textContent = 'Claim Rewards';
+    }
+}
+
+function renderMailScreen() {
+    // Use cached data immediately — no async fetch needed for rendering
+    const profile = store.getCurrentProfile();
+    if (store.isAuthenticated() && profile) {
+        // Kick off a fresh fetch in the background
+        fetchMail().then(() => {
+            if (currentView === 'mail') _renderMailList();
+        });
+    }
+    _bindMailDelegation();
+    _renderMailList();
+}
+
+function _renderMailList() {
+    const mail = _cachedMail;
     const now = Date.now();
     const unclaimed = mail.filter(m => !m.claimedAt && !m.expiredAt && (now - m.createdAt) < 86400000).length;
     const expired = mail.filter(m => m.expiredAt && !m.claimedAt).length;
@@ -1982,7 +2058,6 @@ async function renderMailScreen() {
     }
 
     mail.sort((a, b) => {
-        // Unclaimed first, then by creation time descending
         if (!a.claimedAt && !a.expiredAt && (b.claimedAt || b.expiredAt)) return -1;
         if ((a.claimedAt || a.expiredAt) && !b.claimedAt && !b.expiredAt) return 1;
         return b.createdAt - a.createdAt;
@@ -1995,33 +2070,23 @@ async function renderMailScreen() {
         const cardClass = isExpired ? 'expired' : (isClaimed ? 'claimed' : '');
         let statusTag = '';
         if (isExpired && !isClaimed) {
-            statusTag = '<span class="mail-expired-tag">⏰ Expired</span>';
+            statusTag = '<span class="mail-expired-tag">\u23f0 Expired</span>';
         } else if (isClaimed) {
-            statusTag = '<span class="mail-claimed-tag">✓ Claimed</span>';
+            statusTag = '<span class="mail-claimed-tag">\u2713 Claimed</span>';
         } else if (hasRewards) {
             const expiresAt = m.createdAt + 86400000;
             const remaining = expiresAt - now;
-            statusTag = `<span class="mail-timer-tag" data-expires-at="${expiresAt}">⏳ ${_formatTimeRemaining(remaining)}</span>`;
+            statusTag = `<span class="mail-timer-tag" data-expires-at="${expiresAt}">\u23f3 ${_formatTimeRemaining(remaining)}</span>`;
         }
-        return `
-            <div class="mail-card ${cardClass}" data-mail-id="${m.id}">
-                <div class="mail-card-title">${escapeHtml(m.title)}</div>
-                <div class="mail-card-preview">${escapeHtml(m.content || '')}</div>
-                <div class="mail-card-meta">
-                    ${hasRewards ? `<span class="mail-reward-tag">🎁 ${m.rewards.length} reward${m.rewards.length > 1 ? 's' : ''}</span>` : ''}
-                    ${statusTag}
-                </div>
+        return `<div class="mail-card ${cardClass}" data-mail-id="${m.id}">
+            <div class="mail-card-title">${escapeHtml(m.title)}</div>
+            <div class="mail-card-preview">${escapeHtml(m.content || '')}</div>
+            <div class="mail-card-meta">
+                ${hasRewards ? `<span class="mail-reward-tag">\ud83c\udf81 ${m.rewards.length} reward${m.rewards.length > 1 ? 's' : ''}</span>` : ''}
+                ${statusTag}
             </div>
-        `;
+        </div>`;
     }).join('');
-
-    mailList.querySelectorAll('.mail-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const mailId = card.dataset.mailId;
-            const mailItem = _cachedMail.find(m => m.id === mailId);
-            if (mailItem) renderMailDetail(mailItem);
-        });
-    });
 
     _startMailCountdowns();
 }
@@ -2036,36 +2101,32 @@ function renderMailDetail(mail) {
 
     let rewardsHtml = '';
     if (hasRewards) {
-        rewardsHtml = `
-            <div class="mail-rewards-section">
-                <div class="mail-rewards-label">Rewards</div>
-                <div class="mail-rewards-grid">
-                    ${mail.rewards.map(r => {
-                        const def = ITEM_DEFS[r.definitionId] || itemDefs[r.definitionId] || {};
-                        const name = def.name || r.definitionId;
-                        const img = def.image ? `<img src="${def.image}" alt="${escapeHtml(name)}">` : '';
-                        const qty = r.quantity || 1;
-                        return `
-                            <div class="mail-reward-item">
-                                ${img}
-                                <div class="mail-reward-name">${escapeHtml(name)}</div>
-                                ${qty > 1 ? `<div class="mail-reward-qty">x${qty}</div>` : ''}
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
+        rewardsHtml = `<div class="mail-rewards-section">
+            <div class="mail-rewards-label">Rewards</div>
+            <div class="mail-rewards-grid">
+                ${mail.rewards.map(r => {
+                    const def = ITEM_DEFS[r.definitionId] || {};
+                    const name = def.name || r.definitionId;
+                    const img = def.image ? `<img src="${def.image}" alt="${escapeHtml(name)}">` : '';
+                    const qty = r.quantity || 1;
+                    return `<div class="mail-reward-item">
+                        ${img}
+                        <div class="mail-reward-name">${escapeHtml(name)}</div>
+                        ${qty > 1 ? `<div class="mail-reward-qty">x${qty}</div>` : ''}
+                    </div>`;
+                }).join('')}
             </div>
-        `;
+        </div>`;
     }
 
     let actionHtml = '';
     if (hasRewards) {
         if (isExpired && !isClaimed) {
-            actionHtml = '<div class="mail-expired-label">Rewards expired — claim period has passed</div>';
+            actionHtml = '<div class="mail-expired-label">Rewards expired \u2014 claim period has passed</div>';
         } else if (isClaimed) {
             actionHtml = '<div class="mail-claimed-label">Rewards claimed</div>';
         } else {
-            actionHtml = `<button class="mail-claim-btn" id="mailClaimBtn" data-mail-id="${mail.id}">Claim Rewards</button>`;
+            actionHtml = `<button class="mail-claim-btn" data-mail-id="${mail.id}">Claim Rewards</button>`;
         }
     }
 
@@ -2076,47 +2137,14 @@ function renderMailDetail(mail) {
         countdownHtml = '<div class="mail-countdown" style="color:#e53935">Expired</div>';
     }
 
-    mailList.innerHTML = `
-        <div class="mail-detail">
-            <div style="margin-bottom:12px"><button class="secondary-button" id="mailBackToList">← Back to Mail</button></div>
-            <div class="mail-detail-title">${escapeHtml(mail.title)}</div>
-            <div class="mail-detail-content">${escapeHtml(mail.content || 'No content.')}</div>
-            ${rewardsHtml}
-            ${actionHtml}
-            ${countdownHtml}
-        </div>
-    `;
-
-    document.getElementById('mailBackToList')?.addEventListener('click', () => renderMailScreen());
-
-    document.getElementById('mailClaimBtn')?.addEventListener('click', async () => {
-        const btn = document.getElementById('mailClaimBtn');
-        if (btn.disabled) return;
-        btn.disabled = true;
-        btn.textContent = 'Claiming...';
-        try {
-            const profile = store.getCurrentProfile();
-            const res = await apiFetch('/mail/claim', {
-                method: 'POST',
-                body: JSON.stringify({ username: profile.username, mailId: mail.id })
-            });
-            if (res.ok) {
-                store.currentProfile = res.profile;
-                await fetchMail();
-                renderMailDetail({ ...mail, claimedAt: Date.now() });
-                renderAuthButton();
-                renderTopbarLevelBox();
-            } else {
-                window.alert(res.message || 'Failed to claim.');
-                btn.disabled = false;
-                btn.textContent = 'Claim Rewards';
-            }
-        } catch (e) {
-            window.alert('Network error.');
-            btn.disabled = false;
-            btn.textContent = 'Claim Rewards';
-        }
-    });
+    mailList.innerHTML = `<div class="mail-detail">
+        <div style="margin-bottom:12px"><button class="secondary-button" id="mailBackToList">\u2190 Back to Mail</button></div>
+        <div class="mail-detail-title">${escapeHtml(mail.title)}</div>
+        <div class="mail-detail-content">${escapeHtml(mail.content || 'No content.')}</div>
+        ${rewardsHtml}
+        ${actionHtml}
+        ${countdownHtml}
+    </div>`;
 
     _startMailCountdowns();
 }

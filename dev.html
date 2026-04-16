@@ -137,6 +137,7 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
   <div class="tab" data-tab="level-rewards" onclick="switchTab('level-rewards')">🎁 Level Rewards</div>
   <div class="tab" data-tab="achievements" onclick="switchTab('achievements')">🏅 Achievements</div>
   <div class="tab" data-tab="sim" onclick="switchTab('sim')">⚔️ Combat Sim</div>
+  <div class="tab" data-tab="operators" onclick="switchTab('operators')">🤖 AI Operators</div>
 </div>
 
 <!-- ============= EQUIPMENTS PANEL ============= -->
@@ -340,6 +341,15 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
   <!-- Results -->
   <div id="sim_results" style="margin-top:24px"></div>
 </div>
+
+<!-- ============= AI OPERATORS PANEL ============= -->
+<div class="panel" id="panel-operators">
+  <div class="toolbar">
+    <button class="btn btn-primary" onclick="renderOperators()">🔄 Refresh</button>
+  </div>
+  <div id="operatorGrid"></div>
+</div>
+
 </div>
 
 <!-- ============= DETAIL OVERLAY ============= -->
@@ -864,14 +874,40 @@ async function deleteItem(id) {
 
 function editItemImage() {
   const input = document.getElementById('ed_image');
+  const itemIdInput = document.getElementById('ed_id');
+  const itemId = itemIdInput ? itemIdInput.value : 'unknown';
   if (!input) {
     toast('Image field is unavailable.', true);
     return;
   }
-  const current = input.value || '';
-  const next = prompt('Enter the image path for this item. Leave empty to clear it.', current);
-  if (next === null) return;
-  input.value = next.trim();
+  // Create a hidden file input
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*';
+  fileInput.onchange = async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const resp = await fetchApiJson('/api/upload-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: reader.result, filename: file.name, itemId })
+        });
+        if (resp.ok && resp.path) {
+          input.value = resp.path;
+          toast('Image uploaded successfully.');
+        } else {
+          toast(resp.message || 'Upload failed.', true);
+        }
+      } catch (err) {
+        toast('Upload error: ' + err.message, true);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+  fileInput.click();
 }
 
 // ─── Enemies ──────────────────────────────
@@ -2008,6 +2044,81 @@ function closeDetail() {
 document.getElementById('detailOverlay').addEventListener('click', e => {
   if (e.target === document.getElementById('detailOverlay')) closeDetail();
 });
+
+// ─── AI Operators ───────────────────────────
+const AI_OPERATOR_LEVELS = {
+  lv1: {
+    label: 'Level 1 (Recruit)',
+    maxRarity: 'purple',
+    rarityWeights: { gray: 16, white: 34, green: 28, blue: 16, purple: 6 },
+    aimError: [24, 52],
+    predictionFactor: 0,
+    aggroRange: [360, 620],
+    combatConfidence: 0.7,
+    disengageBias: 1.25,
+  },
+  lv2: {
+    label: 'Level 2 (Veteran)',
+    maxRarity: 'gold',
+    rarityWeights: { gray: 8, white: 16, green: 25, blue: 24, purple: 18, gold: 9 },
+    aimError: [10, 22],
+    predictionFactor: 0,
+    aggroRange: [440, 760],
+    combatConfidence: 1,
+    disengageBias: 1,
+  },
+  lv3: {
+    label: 'Level 3 (Elite)',
+    maxRarity: 'red',
+    rarityWeights: { white: 7, green: 14, blue: 23, purple: 24, gold: 22, red: 10 },
+    aimError: [5, 10],
+    predictionFactor: 1,
+    aggroRange: [520, 880],
+    combatConfidence: 1.18,
+    disengageBias: 0.92,
+  },
+  lv4: {
+    label: 'Level 4 (Legendary)',
+    maxRarity: 'red',
+    rarityWeights: { gold: 90, red: 10 },
+    aimError: [5, 10],
+    predictionFactor: 1,
+    aggroRange: [520, 880],
+    combatConfidence: 1.18,
+    disengageBias: 0.92,
+  },
+  boss: {
+    label: 'BOSS',
+    maxRarity: 'red',
+    rarityWeights: { red: 100 },
+    aimError: [2, 5],
+    predictionFactor: 1.2,
+    aggroRange: [600, 1000],
+    combatConfidence: 1.5,
+    disengageBias: 0.6,
+  }
+};
+
+function renderOperators() {
+  const grid = document.getElementById('operatorGrid');
+  grid.innerHTML = Object.entries(AI_OPERATOR_LEVELS).map(([level, cfg]) => {
+    const rw = Object.entries(cfg.rarityWeights).map(([r, w]) => `${r}:${w}`).join(', ');
+    return `
+      <div class="card" style="margin-bottom:12px">
+        <h3>${cfg.label} <span class="badge">${level}</span></h3>
+        <div class="stats">
+          <strong>Max Rarity:</strong> ${cfg.maxRarity} · 
+          <strong>Aim Error:</strong> [${cfg.aimError}] · 
+          <strong>Prediction:</strong> ${cfg.predictionFactor} · 
+          <strong>Aggro Range:</strong> [${cfg.aggroRange}]<br>
+          <strong>Confidence:</strong> ${cfg.combatConfidence} · 
+          <strong>Disengage:</strong> ${cfg.disengageBias}<br>
+          <strong>Rarity Weights:</strong> ${rw}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
 
 // ─── Boot ─────────────────────────────────
 init();
