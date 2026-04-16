@@ -53,55 +53,6 @@
         .topbar-account {
             position: relative; display: flex; flex-direction: column; align-items: flex-end; pointer-events: none;
         }
-        .topbar-account-row { display: flex; align-items: center; gap: 8px; pointer-events: auto; }
-        /* Mail button */
-        .mail-button {
-            position: relative; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-            border-radius: 10px; padding: 8px 12px; color: #fff; cursor: pointer; transition: background 0.15s;
-            font-size: 18px; line-height: 1;
-        }
-        .mail-button:hover { background: rgba(255,255,255,0.12); }
-        .mail-icon { display: inline-block; }
-        .mail-badge {
-            position: absolute; top: -4px; right: -4px; background: #ff4d4d; color: #fff;
-            font-size: 10px; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px;
-            display: flex; align-items: center; justify-content: center; padding: 0 4px;
-        }
-        /* Mail list */
-        .mail-list { display: grid; gap: 10px; margin-top: 14px; max-height: 520px; overflow-y: auto; }
-        .mail-card {
-            border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03);
-            border-radius: 12px; padding: 14px 16px; cursor: pointer; transition: background 0.15s;
-        }
-        .mail-card:hover { background: rgba(255,255,255,0.07); }
-        .mail-card.claimed { border-color: rgba(255,215,0,0.15); }
-        .mail-card-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
-        .mail-card-preview { font-size: 12px; color: rgba(255,255,255,0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .mail-card-meta { display: flex; gap: 10px; align-items: center; margin-top: 8px; font-size: 11px; color: rgba(255,255,255,0.4); }
-        .mail-card-meta .mail-reward-tag { color: #ffd700; }
-        /* Mail detail */
-        .mail-detail { margin-top: 14px; }
-        .mail-detail-title { font-size: 20px; font-weight: 700; margin-bottom: 10px; }
-        .mail-detail-content { font-size: 14px; color: rgba(255,255,255,0.75); line-height: 1.7; margin-bottom: 18px; white-space: pre-wrap; }
-        .mail-rewards-section { margin-bottom: 16px; }
-        .mail-rewards-label { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.45); margin-bottom: 10px; }
-        .mail-rewards-grid { display: flex; gap: 10px; flex-wrap: wrap; }
-        .mail-reward-item {
-            border: 1px solid rgba(255,215,0,0.2); background: rgba(255,215,0,0.04);
-            border-radius: 10px; padding: 8px; text-align: center; min-width: 72px;
-        }
-        .mail-reward-item img { width: 48px; height: 48px; object-fit: contain; }
-        .mail-reward-item .mail-reward-name { font-size: 11px; color: rgba(255,255,255,0.65); margin-top: 4px; }
-        .mail-reward-item .mail-reward-qty { font-size: 11px; color: #ffd700; font-weight: 700; }
-        .mail-claim-btn {
-            background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,165,0,0.1));
-            border: 1px solid rgba(255,215,0,0.35); border-radius: 10px;
-            padding: 10px 24px; color: #ffd700; font-size: 14px; font-weight: 700;
-            cursor: pointer; transition: background 0.15s;
-        }
-        .mail-claim-btn:hover { background: linear-gradient(135deg, rgba(255,215,0,0.25), rgba(255,165,0,0.18)); }
-        .mail-claim-btn:disabled { opacity: 0.4; cursor: default; }
-        .mail-claimed-label { font-size: 13px; color: rgba(255,255,255,0.35); font-style: italic; }
         .brand { color: #fff; letter-spacing: 0.3em; font-size: 12px; text-transform: uppercase; }
         #redeemButton,
         #authButton,
@@ -1048,13 +999,7 @@
                 <button id="redeemButton" class="secondary-button">Redeem</button>
             </div>
             <div id="authMenuWrap" class="topbar-account">
-                <div class="topbar-account-row">
-                    <button id="mailButton" class="mail-button hidden" title="Mail">
-                        <span class="mail-icon">✉</span>
-                        <span id="mailBadge" class="mail-badge hidden">0</span>
-                    </button>
-                    <button id="authButton" class="secondary-button">Login / Sign Up</button>
-                </div>
+                <button id="authButton" class="secondary-button">Login / Sign Up</button>
                 <div id="authDropdown" class="auth-dropdown hidden"></div>
             </div>
         </header>
@@ -1186,20 +1131,6 @@
                 <div class="placeholder-actions">
                     <button class="secondary-button" disabled>Content coming soon</button>
                 </div>
-            </div>
-        </section>
-
-        <!-- Mail Screen -->
-        <section id="mailScreen" class="screen hidden">
-            <div class="panel placeholder-panel">
-                <div class="placeholder-header">
-                    <div>
-                        <h2>Mail</h2>
-                        <div id="mailSubtitle" class="section-subtitle">Unread messages and rewards.</div>
-                    </div>
-                    <button id="mailBackButton" type="button" class="secondary-button">Back</button>
-                </div>
-                <div id="mailList" class="mail-list"></div>
             </div>
         </section>
 

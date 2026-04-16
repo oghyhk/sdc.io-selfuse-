@@ -1041,7 +1041,762 @@
         "totalKills": 87,
         "totalCoinsEarned": 415,
         "totalMarketTrades": 100003
-      }
+      },
+      "mail": [
+        {
+          "id": "mail_89750e20f85d",
+          "title": "Welcome!",
+          "content": "Here is your starter pack.",
+          "rewards": [
+            {
+              "definitionId": "coins",
+              "quantity": 5000
+            },
+            {
+              "definitionId": "ammo_gold",
+              "quantity": 30
+            }
+          ],
+          "createdAt": 1776335032243,
+          "claimedAt": null,
+          "expiredAt": null
+        }
+      ],
+      "playerExp": 0,
+      "elo": 1000,
+      "claimedPlayerLevelRewards": [],
+      "raidHistory": [],
+      "savedLoadouts": []
+    }
+  },
+  "aiRoster": {
+    "ghost-11": {
+      "username": "Ghost-11",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "brick-4": {
+      "username": "Brick-4",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "anvil-9": {
+      "username": "Anvil-9",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "badger-6": {
+      "username": "Badger-6",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "hound-12": {
+      "username": "Hound-12",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "ember-3": {
+      "username": "Ember-3",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "magpie-5": {
+      "username": "Magpie-5",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "rook-14": {
+      "username": "Rook-14",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "ferret-2": {
+      "username": "Ferret-2",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "cricket-8": {
+      "username": "Cricket-8",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "pebble-17": {
+      "username": "Pebble-17",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "sprout-10": {
+      "username": "Sprout-10",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "rabbit-7": {
+      "username": "Rabbit-7",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "flicker-16": {
+      "username": "Flicker-16",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "wisp-1": {
+      "username": "Wisp-1",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "dart-13": {
+      "username": "Dart-13",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "swift-20": {
+      "username": "Swift-20",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "viper-9": {
+      "username": "Viper-9",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "raven-2": {
+      "username": "Raven-2",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "mako-7": {
+      "username": "Mako-7",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "warden-1": {
+      "username": "Warden-1",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "titan-15": {
+      "username": "Titan-15",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "storm-22": {
+      "username": "Storm-22",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "blitz-12": {
+      "username": "Blitz-12",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "atlas-4": {
+      "username": "Atlas-4",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "cipher-8": {
+      "username": "Cipher-8",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "echo-6": {
+      "username": "Echo-6",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "nomad-18": {
+      "username": "Nomad-18",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "lynx-25": {
+      "username": "Lynx-25",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "pilgrim-21": {
+      "username": "Pilgrim-21",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "falcon-5": {
+      "username": "Falcon-5",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "nova-3": {
+      "username": "Nova-3",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "drift-17": {
+      "username": "Drift-17",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "zephyr-11": {
+      "username": "Zephyr-11",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "shade-28": {
+      "username": "Shade-28",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "breeze-19": {
+      "username": "Breeze-19",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "reaper-10": {
+      "username": "Reaper-10",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "phantom-13": {
+      "username": "Phantom-13",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "mantis-14": {
+      "username": "Mantis-14",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "cerberus-30": {
+      "username": "Cerberus-30",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "apex-26": {
+      "username": "Apex-26",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "hydra-31": {
+      "username": "Hydra-31",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "vulcan-32": {
+      "username": "Vulcan-32",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "onslaught-33": {
+      "username": "Onslaught-33",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "havoc-34": {
+      "username": "Havoc-34",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "fury-35": {
+      "username": "Fury-35",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "titan-x": {
+      "username": "Titan-X",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "warpath-36": {
+      "username": "Warpath-36",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "specter-18": {
+      "username": "Specter-18",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "orion-15": {
+      "username": "Orion-15",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "jackal-29": {
+      "username": "Jackal-29",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "sable-37": {
+      "username": "Sable-37",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "mirage-38": {
+      "username": "Mirage-38",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "crypt-39": {
+      "username": "Crypt-39",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "argus-40": {
+      "username": "Argus-40",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "nexus-41": {
+      "username": "Nexus-41",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "valkyrie-19": {
+      "username": "Valkyrie-19",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "ion-20": {
+      "username": "Ion-20",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "aegis-16": {
+      "username": "Aegis-16",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "wraith-27": {
+      "username": "Wraith-27",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "comet-24": {
+      "username": "Comet-24",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "mercury-42": {
+      "username": "Mercury-42",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "bolt-43": {
+      "username": "Bolt-43",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "pulse-44": {
+      "username": "Pulse-44",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "streak-45": {
+      "username": "Streak-45",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "glint-46": {
+      "username": "Glint-46",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "oblivion-47": {
+      "username": "Oblivion-47",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "ragnarok-48": {
+      "username": "Ragnarok-48",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "desolator-49": {
+      "username": "Desolator-49",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "inferno-50": {
+      "username": "Inferno-50",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "tyrant-51": {
+      "username": "Tyrant-51",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "dreadnought-52": {
+      "username": "Dreadnought-52",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "warlord-53": {
+      "username": "Warlord-53",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "juggernaut-54": {
+      "username": "Juggernaut-54",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "overlord-55": {
+      "username": "Overlord-55",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "executioner-56": {
+      "username": "Executioner-56",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "annihilator-57": {
+      "username": "Annihilator-57",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "colossus-58": {
+      "username": "Colossus-58",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "spectre-59": {
+      "username": "Spectre-59",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "revenant-60": {
+      "username": "Revenant-60",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "enigma-61": {
+      "username": "Enigma-61",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "phantom-x": {
+      "username": "Phantom-X",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "oracle-62": {
+      "username": "Oracle-62",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "wraith-x": {
+      "username": "Wraith-X",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "eclipse-63": {
+      "username": "Eclipse-63",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "tempest-64": {
+      "username": "Tempest-64",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "mirage-x": {
+      "username": "Mirage-X",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "blitz-x": {
+      "username": "Blitz-X",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "strider-65": {
+      "username": "Strider-65",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "neon-66": {
+      "username": "Neon-66",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
+    },
+    "quicksilver-67": {
+      "username": "Quicksilver-67",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "isAI": true
     }
   }
 }

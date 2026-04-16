@@ -153,6 +153,38 @@ The Account page (accessible from the top-right dropdown) consolidates all playe
 
 The previous separate "Profile" page in the dropdown has been removed; all settings now live under Account.
 
+### Player Profile Fields
+
+The player profile contains the following fields (server-validated via `build_profile()`):
+
+- **username** — account name (case-insensitive matching)
+- **isGuest** — guest mode flag
+- **coins** — in-game currency
+- **playerExp** — experience points for leveling
+- **elo** — ELO rating (starts at 1000)
+- **claimedPlayerLevelRewards** — array of claimed level rewards
+- **loadout** — equipped items (gun, melee, armor, helmet, shoes, backpack)
+- **stashItems** — persistent item inventory
+- **stashAmmo** — ammo storage (separate from items)
+- **backpackItems** — items carried in backpack during raids
+- **safeboxItems** — items stored in safebox (protected on death)
+- **savedLoadouts** — saved loadout presets
+- **extractedRuns** — history of successful extractions
+- **raidHistory** — history of all raids
+- **stats** — lifetime statistics (totalRuns, totalExtractions, totalKills, totalCoinsEarned, totalMarketTrades)
+- **mail** — inbox messages with rewards
+- **avatarDataUrl** — base64 profile picture
+
+### AI Operator Roster
+
+The game features 91 persistent AI operator accounts stored in `aiRoster` in the server's data store:
+
+- **49 fixed operators** across 4 levels (lv1-lv4) with 3 types (fighter, searcher, runner)
+- Each operator has: `username`, `elo`, `totalRuns`, `totalExtractions`, `totalKills`, `isAI: true`
+- Stats are synced from client localStorage to server via `POST /api/ai-roster`
+- Operators appear on the global leaderboard alongside human players
+- AI operator kills during raids count toward operator stats
+
 ### Achievements
 
 Achievements are managed through the dev tool (`dev.html` → 🏅 Achievements tab). Each achievement has:
@@ -164,25 +196,29 @@ Achievements are managed through the dev tool (`dev.html` → 🏅 Achievements 
 
 On the Account page, achievements display as a row of circular badge images. Hovering reveals a tooltip with the full image, name, and description. Only enabled achievements are shown to players.
 
+---
+
 ## 3c. Mail System
 
-Players access mail via the ✉ button in the topbar next to the account button.
+Players access mail via the ✉ button in the topbar next to the login button.
 
 ### Mail Structure
 Each mail contains:
 - **Title** — subject line
 - **Content** — body text
 - **Rewards** — up to 5 item/coin rewards, shown as icons at the bottom
-- **Claim Rewards** button (if rewards exist)
+- **Claim Rewards** button (if rewards exist and mail is not expired)
 
 ### Lifecycle
-- Unclaimed mail persists indefinitely
-- Claiming rewards stamps `claimedAt` timestamp
-- Mail auto-deletes **10 minutes** after rewards are claimed (server-side cleanup on next fetch)
+- Mail is created with a `createdAt` timestamp
+- **After 24 hours** — mail expires (`expiredAt` set). Rewards can no longer be claimed.
+- **After claiming OR expiry** — mail persists for **48 more hours**, then auto-deletes (server-side cleanup on next fetch)
+- Expired mail shows a red "Expired" label; the claim button is replaced with an expiry notice
+- A live countdown timer shows remaining time until the 24-hour claim deadline
 
 ### Server API
-- `POST /api/mail` — fetch player's mail (auto-cleans expired)
-- `POST /api/mail/claim` — claim rewards, adds items/coins to profile
+- `POST /api/mail` — fetch player's mail (auto-cleans fully-deleted mail)
+- `POST /api/mail/claim` — claim rewards (fails if expired or already claimed)
 - `POST /api/mail/send` — (admin) send mail with rewards to a player
 
 ---

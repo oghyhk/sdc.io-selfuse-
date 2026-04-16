@@ -69,12 +69,6 @@ const placeholderSubtitle = document.getElementById('placeholderSubtitle');
 const placeholderSummary = document.getElementById('placeholderSummary');
 const placeholderContent = document.getElementById('placeholderContent');
 const placeholderBackButton = document.getElementById('placeholderBackButton');
-const mailButton = document.getElementById('mailButton');
-const mailBadge = document.getElementById('mailBadge');
-const mailScreen = document.getElementById('mailScreen');
-const mailList = document.getElementById('mailList');
-const mailSubtitle = document.getElementById('mailSubtitle');
-const mailBackButton = document.getElementById('mailBackButton');
 const menuSummary = document.getElementById('menuSummary');
 const inventoryCoins = document.getElementById('inventoryCoins');
 const inventoryStats = document.getElementById('inventoryStats');
@@ -899,10 +893,9 @@ function setView(view) {
     if (view === 'inventory') renderInventory();
     else if (view === 'market') renderMarket();
     else if (view === 'placeholder') renderPlaceholderScreen();
-    else if (view === 'mail') renderMailScreen();
     else renderMenu();
 
-    if (view === 'menu' || view === 'inventory' || view === 'market' || view === 'placeholder' || view === 'mail') {
+    if (view === 'menu' || view === 'inventory' || view === 'market' || view === 'placeholder') {
         scheduleRuntimeConfigRefresh();
     }
 }
@@ -914,7 +907,6 @@ function renderVisibility() {
     inventoryScreen.classList.toggle('hidden', !showOverlay || currentView !== 'inventory');
     marketScreen.classList.toggle('hidden', !showOverlay || currentView !== 'market');
     placeholderScreen.classList.toggle('hidden', !showOverlay || currentView !== 'placeholder');
-    mailScreen.classList.toggle('hidden', !showOverlay || currentView !== 'mail');
     document.body.classList.toggle('playing', game.state === GAME_STATE.PLAYING);
 }
 
@@ -1033,153 +1025,6 @@ function renderAchievementBadges() {
             </div>
         `;
     }).join('');
-}
-
-// ─── Mail System ──────────────────────────
-let _cachedMail = [];
-
-async function fetchMail() {
-    if (!store.isAuthenticated()) return [];
-    const profile = store.getCurrentProfile();
-    try {
-        const res = await apiFetch('/mail', {
-            method: 'POST',
-            body: JSON.stringify({ username: profile.username })
-        });
-        _cachedMail = res.mail || [];
-    } catch (e) {
-        console.warn('Mail fetch failed:', e);
-    }
-    updateMailBadge();
-    return _cachedMail;
-}
-
-function updateMailBadge() {
-    const unclaimed = _cachedMail.filter(m => !m.claimedAt).length;
-    if (unclaimed > 0 && store.isAuthenticated()) {
-        mailBadge.textContent = unclaimed > 99 ? '99+' : unclaimed;
-        mailBadge.classList.remove('hidden');
-        mailButton.classList.remove('hidden');
-    } else {
-        mailBadge.classList.add('hidden');
-    }
-    // Show/hide mail button based on auth
-    mailButton.classList.toggle('hidden', !store.isAuthenticated());
-}
-
-async function renderMailScreen() {
-    const mail = await fetchMail();
-    mailSubtitle.textContent = mail.length
-        ? `${mail.filter(m => !m.claimedAt).length} unclaimed, ${mail.filter(m => m.claimedAt).length} claimed`
-        : 'Your mailbox is empty.';
-
-    if (!mail.length) {
-        mailList.innerHTML = '<div style="color:rgba(255,255,255,0.35);text-align:center;padding:40px 0;font-size:14px">No mail.</div>';
-        return;
-    }
-
-    // Sort: unclaimed first, then by date desc
-    mail.sort((a, b) => {
-        if (!a.claimedAt && b.claimedAt) return -1;
-        if (a.claimedAt && !b.claimedAt) return 1;
-        return (b.createdAt || 0) - (a.createdAt || 0);
-    });
-
-    mailList.innerHTML = mail.map(m => {
-        const hasRewards = m.rewards && m.rewards.length > 0;
-        const isClaimed = !!m.claimedAt;
-        const timeLeft = isClaimed ? Math.max(0, 10 * 60 * 1000 - (Date.now() - m.claimedAt)) : 0;
-        const timeLeftStr = isClaimed ? `${Math.ceil(timeLeft / 60000)}m left` : '';
-        return `
-            <div class="mail-card ${isClaimed ? 'claimed' : ''}" data-mail-id="${m.id}">
-                <div class="mail-card-title">${escapeHtml(m.title)}</div>
-                <div class="mail-card-preview">${escapeHtml(m.content || '')}</div>
-                <div class="mail-card-meta">
-                    ${hasRewards ? `<span class="mail-reward-tag">🎁 ${m.rewards.length} reward${m.rewards.length > 1 ? 's' : ''}</span>` : ''}
-                    ${isClaimed ? `<span>Claimed · ${timeLeftStr}</span>` : '<span style="color:#6f6">Unclaimed</span>'}
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    // Click handlers
-    mailList.querySelectorAll('.mail-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const mailId = card.dataset.mailId;
-            const mailItem = _cachedMail.find(m => m.id === mailId);
-            if (mailItem) renderMailDetail(mailItem);
-        });
-    });
-}
-
-async function renderMailDetail(mail) {
-    const isClaimed = !!mail.claimedAt;
-    const hasRewards = mail.rewards && mail.rewards.length > 0;
-
-    let rewardsHtml = '';
-    if (hasRewards) {
-        rewardsHtml = `
-            <div class="mail-rewards-section">
-                <div class="mail-rewards-label">Rewards</div>
-                <div class="mail-rewards-grid">
-                    ${mail.rewards.map(r => {
-                        const def = ITEM_DEFS[r.definitionId];
-                        const name = def?.name || r.definitionId;
-                        const img = def ? getItemImagePath(r.definitionId) : '';
-                        const qty = r.quantity || 1;
-                        return `
-                            <div class="mail-reward-item">
-                                ${img ? `<img src="${img}" alt="${escapeHtml(name)}">` : '<div style="width:48px;height:48px;background:rgba(255,255,255,0.06);border-radius:6px;margin:0 auto"></div>'}
-                                <div class="mail-reward-name">${escapeHtml(name)}</div>
-                                ${qty > 1 ? `<div class="mail-reward-qty">x${qty}</div>` : ''}
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-        `;
-    }
-
-    let actionHtml = '';
-    if (hasRewards && !isClaimed) {
-        actionHtml = `<button class="mail-claim-btn" id="mailClaimBtn" data-mail-id="${mail.id}">Claim Rewards</button>`;
-    } else if (isClaimed) {
-        actionHtml = '<div class="mail-claimed-label">Rewards claimed</div>';
-    }
-
-    mailList.innerHTML = `
-        <div class="mail-detail">
-            <div style="margin-bottom:12px"><button class="secondary-button" id="mailBackToList">← Back to Mail</button></div>
-            <div class="mail-detail-title">${escapeHtml(mail.title)}</div>
-            <div class="mail-detail-content">${escapeHtml(mail.content || 'No content.')}</div>
-            ${rewardsHtml}
-            ${actionHtml}
-        </div>
-    `;
-
-    document.getElementById('mailBackToList')?.addEventListener('click', () => renderMailScreen());
-
-    document.getElementById('mailClaimBtn')?.addEventListener('click', async () => {
-        const btn = document.getElementById('mailClaimBtn');
-        if (btn) { btn.disabled = true; btn.textContent = 'Claiming...'; }
-        try {
-            const profile = store.getCurrentProfile();
-            const res = await apiFetch('/mail/claim', {
-                method: 'POST',
-                body: JSON.stringify({ username: profile.username, mailId: mail.id })
-            });
-            if (res.ok && res.profile) {
-                store.currentProfile = res.profile;
-                // Re-fetch mail to get updated state
-                await fetchMail();
-                renderMailDetail({ ...mail, claimedAt: Date.now() });
-                renderMenu();
-            }
-        } catch (e) {
-            if (btn) { btn.disabled = false; btn.textContent = 'Claim Rewards'; }
-            console.error('Claim failed:', e);
-        }
-    });
 }
 
 function renderAccountPage(profile) {
@@ -1965,7 +1810,6 @@ function renderAll() {
     renderMarket();
     renderPlaceholderScreen();
     renderVisibility();
-    fetchMail();
     if (!authModal.classList.contains('hidden')) {
         renderAuthModal();
     }
@@ -2045,8 +1889,6 @@ marketButton.addEventListener('click', () => setView('market'));
 backButton.addEventListener('click', () => setView('menu'));
 marketBackButton.addEventListener('click', () => setView('menu'));
 placeholderBackButton.addEventListener('click', () => setView('menu'));
-mailButton.addEventListener('click', () => setView('mail'));
-mailBackButton.addEventListener('click', () => setView('menu'));
 placeholderScreen.addEventListener('click', (event) => {
     if (event.target.closest('#placeholderBackButton')) {
         event.preventDefault();
