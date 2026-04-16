@@ -17,10 +17,12 @@ Usage:
     python dev.py import --input config_export.json
     python dev.py stats
     python dev.py generate-image --id my_gun --prompt "tactical assault rifle"
+    python dev.py upload-image --id my_gun /path/to/image.png
 """
 
 import argparse
 import json
+import re
 import sys
 import os
 from pathlib import Path
@@ -393,7 +395,7 @@ def cmd_stats(args):
 def cmd_generate_image(args):
     """Generate an item image using Cloudflare Workers AI via the local server proxy."""
     import urllib.request
-    
+
     config = load_config()
     item = config.get('items', {}).get(args.id)
     prompt = args.prompt
@@ -401,18 +403,11 @@ def cmd_generate_image(args):
         prompt = f"Game item icon, {item.get('category','equipment')} weapon, {item.get('name',args.id)}, {item.get('rarity','common')} rarity, dark background, tactical military style, detailed 3D render, top-down game asset"
     elif not prompt:
         prompt = f"Game item icon, {args.id}, tactical military style"
-    
+
     print(f"Generating image for '{args.id}'...")
     print(f"Prompt: {prompt}")
-    
+
     try:
-        data = json.dumps({
-            'prompt': prompt,
-            'itemId': args.id,
-            'width': 512,
-            'height': 512
-        }).encode('utf-8')
-        
         req = urllib.request.Request(
             'https://hermesimggen.oghyhk.workers.dev/',
             data=json.dumps({
@@ -426,19 +421,62 @@ def cmd_generate_image(args):
             },
             method='POST'
         )
-        
+
         with urllib.request.urlopen(req, timeout=60) as resp:
             img_data = resp.read()
-        
+
         out_dir = ROOT / 'assets' / 'dev'
         out_dir.mkdir(parents=True, exist_ok=True)
-        safe_id = args.id.replace('/', '_')
+        safe_id = re.sub(r'[^a-zA-Z0-9_]', '_', args.id)
         out_path = out_dir / f'{safe_id}.jpg'
         out_path.write_bytes(img_data)
+        image_path = f'/assets/dev/{safe_id}.jpg'
         print(f"✅ Image saved: {out_path} ({len(img_data)} bytes)")
+
+        # Update item's image field in dev-config.json
+        if item:
+            item['image'] = image_path
+            config['items'][args.id] = item
+            save_config(config)
+            print(f"✅ Item '{args.id}' image field updated to: {image_path}")
+        else:
+            print(f"⚠️  Item '{args.id}' not found in config — image saved but not linked.")
+            print(f"   Set image manually: {image_path}")
     except Exception as e:
         print(f"❌ Error: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+def cmd_upload_image(args):
+    """Upload a local image file for an item and update dev-config.json."""
+    config = load_config()
+    item = config.get('items', {}).get(args.id)
+
+    src = Path(args.file)
+    if not src.is_file():
+        print(f"❌ File not found: {src}", file=sys.stderr)
+        sys.exit(1)
+
+    out_dir = ROOT / 'assets' / 'dev'
+    out_dir.mkdir(parents=True, exist_ok=True)
+    safe_id = re.sub(r'[^a-zA-Z0-9_]', '_', args.id)
+    ext = src.suffix.lower()
+    if ext not in ('.png', '.jpg', '.jpeg', '.gif', '.webp'):
+        ext = '.png'
+    out_path = out_dir / f'{safe_id}{ext}'
+    out_path.write_bytes(src.read_bytes())
+    image_path = f'/assets/dev/{safe_id}{ext}'
+    print(f"✅ Image saved: {out_path}")
+
+    # Update item's image field in dev-config.json
+    if item:
+        item['image'] = image_path
+        config['items'][args.id] = item
+        save_config(config)
+        print(f"✅ Item '{args.id}' image field updated to: {image_path}")
+    else:
+        print(f"⚠️  Item '{args.id}' not found in config — image saved but not linked.")
+        print(f"   Set image manually: {image_path}")
 
 
 def main():
@@ -532,7 +570,12 @@ def main():
     gen = sub.add_parser('generate-image', help='Generate item image')
     gen.add_argument('--id', required=True)
     gen.add_argument('--prompt', '-p')
-    
+
+    # upload-image
+    upl = sub.add_parser('upload-image', help='Upload a local image for an item')
+    upl.add_argument('--id', required=True, help='Item ID to set the image for')
+    upl.add_argument('file', help='Path to the image file')
+
     args = parser.parse_args()
     
     if not args.action:
@@ -554,6 +597,7 @@ def main():
         'import': lambda: cmd_import(args),
         'stats': lambda: cmd_stats(args),
         'generate-image': lambda: cmd_generate_image(args),
+        'upload-image': lambda: cmd_upload_image(args),
     }
     
     handlers[args.action]()
