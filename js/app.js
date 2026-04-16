@@ -44,7 +44,8 @@ import {
     getSellTradeTotal,
     getMinimumTradeQuantity,
     MIN_TRADE_TOTAL,
-    apiFetch
+    apiFetch,
+    runtimeAchievements
 } from './profile.js';
 import { getRosterLeaderboardEntries } from './ai_roster.js';
 
@@ -1004,6 +1005,28 @@ function syncAiRosterToServer() {
     store.pushAiRoster(entries).catch(() => {});
 }
 
+function renderAchievementBadges() {
+    const achievements = runtimeAchievements || {};
+    const entries = Object.entries(achievements).filter(([, a]) => a.enabled !== false);
+    if (!entries.length) return '<div style="color:rgba(255,255,255,0.4);font-size:13px">No achievements available.</div>';
+    return entries.map(([id, ach]) => {
+        const imgSrc = ach.image || '';
+        return `
+            <div class="achievement-badge" title="${escapeHtml(ach.name || id)}">
+                ${imgSrc
+                    ? `<img src="${imgSrc}" alt="${escapeHtml(ach.name || '')}">`
+                    : `<div class="achievement-badge-placeholder">?</div>`
+                }
+                <div class="achievement-tooltip">
+                    ${imgSrc ? `<img src="${imgSrc}" alt="">` : ''}
+                    <div class="achievement-tooltip-name">${escapeHtml(ach.name || id)}</div>
+                    <div class="achievement-tooltip-desc">${escapeHtml(ach.description || 'No description.')}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
 function renderAccountPage(profile) {
     const summary = summarizeProfile(profile);
     placeholderTitle.textContent = 'Account';
@@ -1014,9 +1037,6 @@ function renderAccountPage(profile) {
     const pfpHtml = avatarDataUrl
         ? `<img src="${avatarDataUrl}" alt="Avatar">`
         : `<div class="account-pfp-placeholder">?</div>`;
-
-    const stats = profile.stats || {};
-    const winRate = stats.totalRuns > 0 ? Math.round((stats.totalExtractions / stats.totalRuns) * 100) : 0;
 
     placeholderContent.innerHTML = `
         <div class="account-layout">
@@ -1063,14 +1083,9 @@ function renderAccountPage(profile) {
                     <div id="accountPwMsg" class="account-msg"></div>
                 </div>
                 <div class="account-section">
-                    <h3>Lifetime Stats</h3>
-                    <div class="account-stats-grid">
-                        <div class="summary-tile"><span class="summary-label">Total Runs</span><strong>${stats.totalRuns || 0}</strong></div>
-                        <div class="summary-tile"><span class="summary-label">Extractions</span><strong>${stats.totalExtractions || 0}</strong></div>
-                        <div class="summary-tile"><span class="summary-label">Win Rate</span><strong>${winRate}%</strong></div>
-                        <div class="summary-tile"><span class="summary-label">Total Kills</span><strong>${stats.totalKills || 0}</strong></div>
-                        <div class="summary-tile"><span class="summary-label">Coins Earned</span><strong>${formatCoinAmountMarkup(stats.totalCoinsEarned || 0)}</strong></div>
-                        <div class="summary-tile"><span class="summary-label">Market Trades</span><strong>${stats.totalMarketTrades || 0}</strong></div>
+                    <h3>Achievements</h3>
+                    <div class="achievements-grid">
+                        ${renderAchievementBadges()}
                     </div>
                 </div>
             </div>

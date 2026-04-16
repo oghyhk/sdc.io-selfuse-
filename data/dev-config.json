@@ -1585,5 +1585,37 @@
       "color": "#ff4d4d",
       "instantKill": true
     }
+  },
+  "achievements": {
+    "first_blood": {
+      "name": "First Blood",
+      "description": "Eliminate your first enemy operator in a raid.",
+      "image": "/assets/achievements/first_blood.png",
+      "enabled": true
+    },
+    "extract_king": {
+      "name": "Extraction King",
+      "description": "Successfully extract from 10 raids.",
+      "image": "/assets/achievements/extract_king.png",
+      "enabled": true
+    },
+    "sharpshooter": {
+      "name": "Sharpshooter",
+      "description": "Get 50 operator kills without dying.",
+      "image": "/assets/achievements/sharpshooter.png",
+      "enabled": true
+    },
+    "lucky_crate": {
+      "name": "Lucky Crate",
+      "description": "Open a High Value Crate dropped by an AI enemy.",
+      "image": "/assets/achievements/lucky_crate.png",
+      "enabled": true
+    },
+    "survivor": {
+      "name": "Survivor",
+      "description": "Extract from a Chaos difficulty raid.",
+      "image": "/assets/achievements/survivor.png",
+      "enabled": true
+    }
   }
 }

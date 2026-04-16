@@ -153,6 +153,17 @@ The Account page (accessible from the top-right dropdown) consolidates all playe
 
 The previous separate "Profile" page in the dropdown has been removed; all settings now live under Account.
 
+### Achievements
+
+Achievements are managed through the dev tool (`dev.html` → 🏅 Achievements tab). Each achievement has:
+- **ID** — unique slug (e.g. `first_blood`)
+- **Name** — display title
+- **Description** — shown on hover
+- **Image** — 512×512 badge image (auto-compressed on upload, transparent PNG recommended)
+- **Enabled** — toggle visibility
+
+On the Account page, achievements display as a row of circular badge images. Hovering reveals a tooltip with the full image, name, and description. Only enabled achievements are shown to players.
+
 ---
 
 ## 4. Visual Direction

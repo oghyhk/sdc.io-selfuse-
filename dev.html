@@ -135,6 +135,7 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
   <div class="tab" data-tab="crates" onclick="switchTab('crates')">📦 Crates</div>
   <div class="tab" data-tab="ammo" onclick="switchTab('ammo')">💥 Ammo</div>
   <div class="tab" data-tab="level-rewards" onclick="switchTab('level-rewards')">🎁 Level Rewards</div>
+  <div class="tab" data-tab="achievements" onclick="switchTab('achievements')">🏅 Achievements</div>
   <div class="tab" data-tab="sim" onclick="switchTab('sim')">⚔️ Combat Sim</div>
 </div>
 
@@ -273,6 +274,20 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
   <div class="grid" id="levelRewardGrid"></div>
 </div>
 
+<!-- ============= ACHIEVEMENTS PANEL ============= -->
+<div class="panel" id="panel-achievements">
+  <div class="toolbar">
+    <input type="text" id="achievementSearch" placeholder="Search achievements..." oninput="renderAchievements()">
+    <select id="achievementEnabledFilter" onchange="renderAchievements()">
+      <option value="">All Status</option>
+      <option value="enabled">Enabled</option>
+      <option value="disabled">Disabled</option>
+    </select>
+    <button class="btn btn-primary" onclick="openAchievementEditor()">+ New Achievement</button>
+  </div>
+  <div class="grid" id="achievementGrid"></div>
+</div>
+
 <!-- ============= COMBAT SIMULATOR PANEL ============= -->
 <div class="panel" id="panel-sim">
   <div style="display:flex;gap:24px;flex-wrap:wrap">
@@ -337,7 +352,7 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 
 <script>
 // ─── State ────────────────────────────────
-let config = { version:1, items:{}, enemies:{}, crate_tiers:{}, ammo:{}, player_level_rewards:{} };
+let config = { version:1, items:{}, enemies:{}, crate_tiers:{}, ammo:{}, player_level_rewards:{}, achievements:{} };
 const RARITY_COLORS = { legend:'#ff9f1a', white:'#eceff1', gray:'#9e9e9e', green:'#81c784', blue:'#64b5f6', purple:'#b388ff', gold:'#ffca28', red:'#ff4d4d' };
 const RARITY_SORT_ORDER = ['gray', 'white', 'green', 'blue', 'purple', 'gold', 'red', 'legend'];
 const CONSUMABLE_HEAL_RATE_BY_RARITY = { gray:1, white:1, green:1.5, blue:2, purple:3, gold:4, red:6, legend:8 };
@@ -351,7 +366,8 @@ function updateStatusText() {
   const goodsCount = Object.values(config.items || {}).filter(item => item.lootType === 'goods').length;
   const itemCount = Object.values(config.items || {}).filter(Boolean).length;
   const rewardCount = Object.keys(config.player_level_rewards || {}).length;
-  document.getElementById('statusText').textContent = `${itemCount} items, ${goodsCount} goods, ${consumableCount} consumables, ${Object.keys(config.enemies || {}).length} enemies, ${Object.keys(config.ammo || {}).length} ammo types, ${rewardCount} level rewards${resolvedApiBase ? ` · API ${resolvedApiBase}` : ''}`;
+  const achievementCount = Object.keys(config.achievements || {}).length;
+  document.getElementById('statusText').textContent = `${itemCount} items, ${goodsCount} goods, ${consumableCount} consumables, ${Object.keys(config.enemies || {}).length} enemies, ${Object.keys(config.ammo || {}).length} ammo types, ${rewardCount} level rewards, ${achievementCount} achievements${resolvedApiBase ? ` · API ${resolvedApiBase}` : ''}`;
 }
 
 function getRaritySortIndex(rarity) {
@@ -418,6 +434,7 @@ async function init() {
     if (d.config) {
       config = d.config;
       if (!config.player_level_rewards) config.player_level_rewards = {};
+      if (!config.achievements) config.achievements = {};
       config.items = Object.fromEntries(
         Object.entries(config.items || {}).filter(([, item]) => item?.category !== 'melee')
       );
@@ -440,6 +457,7 @@ async function init() {
   renderCrates();
   renderAmmo();
   renderLevelRewards();
+  renderAchievements();
   buildSimDropdowns();
 }
 
@@ -1337,6 +1355,144 @@ async function editAmmoField(id, field) {
   try {
     await persistConfig();
     renderAmmo();
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+// ─── Achievements ─────────────────────────
+function renderAchievements() {
+  const grid = document.getElementById('achievementGrid');
+  const search = String(document.getElementById('achievementSearch').value || '').toLowerCase();
+  const enabledFilter = document.getElementById('achievementEnabledFilter').value;
+
+  const entries = Object.entries(config.achievements || {})
+    .map(([id, a]) => ({ id, ...a }))
+    .filter(a => !search || a.id.includes(search) || (a.name || '').toLowerCase().includes(search) || (a.description || '').toLowerCase().includes(search))
+    .filter(a => !enabledFilter || (enabledFilter === 'enabled' ? a.enabled : !a.enabled));
+
+  entries.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  if (!entries.length) {
+    grid.innerHTML = '<div class="empty-state">No achievements found.</div>';
+    return;
+  }
+
+  grid.innerHTML = entries.map(a => `
+    <div class="card" onclick="openAchievementEditor('${a.id}')">
+      <div style="display:flex;gap:14px;align-items:center">
+        ${a.image ? `<img src="${a.image}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;background:rgba(255,255,255,0.05)">` : '<div style="width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center">?</div>'}
+        <div>
+          <h3>${a.name || a.id}</h3>
+          <div class="meta"><span class="reward-status ${a.enabled !== false ? 'enabled' : 'disabled'}">${a.enabled !== false ? 'enabled' : 'disabled'}</span> · ${a.id}</div>
+          <div class="stats">${a.description || 'No description.'}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openAchievementEditor(id = null) {
+  const isNew = id == null;
+  const existing = !isNew ? config.achievements?.[id] : null;
+  const ach = existing ? { ...existing } : { name: '', description: '', image: '', enabled: true };
+
+  document.getElementById('detailContent').innerHTML = `
+    <button class="close-btn" onclick="closeDetail()">✕</button>
+    <h2>${isNew ? 'Create Achievement' : `Edit: ${ach.name || id}`}</h2>
+    <div class="form-row">
+      <div class="form-group"><label>ID (slug)</label><input id="ach_id" type="text" value="${isNew ? '' : id}" ${isNew ? '' : 'readonly'} placeholder="e.g. first_blood"></div>
+      <div class="form-group"><label>Name</label><input id="ach_name" type="text" value="${(ach.name || '').replace(/"/g, '&quot;')}" placeholder="Achievement name"></div>
+    </div>
+    <div class="form-group"><label>Description</label><textarea id="ach_desc" rows="3">${ach.description || ''}</textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label>Status</label>
+        <select id="ach_enabled">
+          <option value="true" ${ach.enabled !== false ? 'selected' : ''}>Enabled</option>
+          <option value="false" ${ach.enabled === false ? 'selected' : ''}>Disabled</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Badge Image (512×512 recommended, transparent PNG)</label>
+      <div style="display:flex;gap:14px;align-items:center;margin-top:8px">
+        <div id="ach_preview" style="width:96px;height:96px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          ${ach.image ? `<img src="${ach.image}" style="width:100%;height:100%;object-fit:cover">` : '<span style="color:rgba(255,255,255,0.3)">No image</span>'}
+        </div>
+        <div>
+          <input type="file" id="ach_imageFile" accept="image/*" onchange="previewAchievementImage(this)">
+          <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px">Any size — auto-compressed to 512×512 PNG</div>
+        </div>
+      </div>
+      <input type="hidden" id="ach_image" value="${ach.image || ''}">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-save" onclick="saveAchievement(${isNew ? 'null' : `'${id}'`})">💾 Save</button>
+      ${!isNew ? `<button class="btn btn-delete" onclick="deleteAchievement('${id}')">🗑 Delete</button>` : ''}
+      <button class="btn btn-cancel" onclick="closeDetail()">Cancel</button>
+    </div>
+  `;
+  document.getElementById('detailOverlay').classList.add('open');
+}
+
+function previewAchievementImage(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512; canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      const size = Math.min(img.width, img.height);
+      ctx.drawImage(img, (img.width - size) / 2, (img.height - size) / 2, size, size, 0, 0, 512, 512);
+      const dataUrl = canvas.toDataURL('image/png');
+      document.getElementById('ach_image').value = dataUrl;
+      document.getElementById('ach_preview').innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover">`;
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveAchievement(oldId) {
+  const newId = document.getElementById('ach_id').value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  const name = document.getElementById('ach_name').value.trim();
+  const desc = document.getElementById('ach_desc').value.trim();
+  const image = document.getElementById('ach_image').value;
+  const enabled = document.getElementById('ach_enabled').value === 'true';
+
+  if (!newId) return toast('ID is required.', true);
+  if (!name) return toast('Name is required.', true);
+  if (oldId == null && config.achievements?.[newId]) return toast('An achievement with that ID already exists.', true);
+
+  // If renaming, delete old
+  if (oldId != null && oldId !== newId) {
+    delete config.achievements[oldId];
+  }
+
+  config.achievements[newId] = { name, description: desc, image, enabled };
+  try {
+    await persistConfig();
+    updateStatusText();
+    closeDetail();
+    renderAchievements();
+    toast(oldId == null ? 'Achievement created' : 'Achievement updated');
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+async function deleteAchievement(id) {
+  if (!confirm(`Delete achievement "${config.achievements[id]?.name || id}"?`)) return;
+  delete config.achievements[id];
+  try {
+    await persistConfig();
+    updateStatusText();
+    closeDetail();
+    renderAchievements();
+    toast('Achievement deleted');
   } catch (e) {
     toast(e.message, true);
   }

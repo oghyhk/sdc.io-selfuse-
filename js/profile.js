@@ -10,6 +10,7 @@ export const AMMO_PACK_LIMIT = 999;
 export const MAX_PLAYER_LEVEL = 9999;
 export const BASE_PLAYER_LEVEL_UP_EXP = 10;
 let resolvedApiBase = null;
+export let runtimeAchievements = {};
 
 export const RARITY_ORDER = ['legend', 'red', 'gold', 'purple', 'blue', 'green', 'white', 'gray'];
 
@@ -747,6 +748,7 @@ export async function loadRuntimeDevConfig() {
         const result = await apiFetch(`/dev-config?ts=${Date.now()}`);
         const configItems = result?.config?.items || {};
         const configPlayerLevelRewards = result?.config?.player_level_rewards || {};
+        const configAchievements = result?.config?.achievements || {};
         for (const [definitionId, overrideDefinition] of Object.entries(configItems)) {
             if (!overrideDefinition || typeof overrideDefinition !== 'object') continue;
             const definitionCategory = overrideDefinition.category || ITEM_DEFS[definitionId]?.category || 'loot';
@@ -769,6 +771,7 @@ export async function loadRuntimeDevConfig() {
         }
         syncPlayerLevelRewardOverrides(configPlayerLevelRewards);
         syncDynamicDefinitionCaches();
+        runtimeAchievements = configAchievements;
         return true;
     } catch (error) {
         console.warn('Failed to load runtime dev-config overrides:', error);
