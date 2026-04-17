@@ -169,6 +169,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                     'totalExtractions': int(ai.get('totalExtractions', 0)),
                     'totalKills': int(ai.get('totalKills', 0)),
                     'isAI': True,
+                    'isBoss': bool(ai.get('isBoss', False)),
                 })
             entries.sort(key=lambda e: -e['elo'])
             for i, entry in enumerate(entries):
@@ -222,6 +223,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                     'totalExtractions': int(entry.get('totalExtractions', 0)),
                     'totalKills': int(entry.get('totalKills', 0)),
                     'isAI': True,
+                    'isBoss': bool(entry.get('isBoss', False)),
                 }
             store['aiRoster'] = ai_roster
             write_store(store)

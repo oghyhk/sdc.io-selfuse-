@@ -890,7 +890,7 @@ function editItemImage() {
     const reader = new FileReader();
     reader.onload = async () => {
       try {
-        const resp = await fetchApiJson('/api/upload-image', {
+        const resp = await fetchApiJson('/upload-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: reader.result, filename: file.name, itemId })

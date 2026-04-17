@@ -124,6 +124,9 @@ const ROSTER = [
     { id: 'r89', name: 'Strider-65',  level: 'lv4', type: 'runner'   },
     { id: 'r90', name: 'Neon-66',     level: 'lv4', type: 'runner'   },
     { id: 'r91', name: 'Quicksilver-67', level: 'lv4', type: 'runner' },
+
+    // ── boss ──
+    { id: 'r99', name: 'BOSS', level: 'boss', type: 'fighter' },
 ];
 
 // ── Stats persistence ──
@@ -256,6 +259,7 @@ export function getRosterLeaderboardEntries() {
             totalExtractions: s.extractions,
             totalKills: s.kills,
             isAI: true,
+            isBoss: entry.level === 'boss',
         };
     });
 }

@@ -607,7 +607,7 @@ function _renderLeaderboardTable(profile, elo, data) {
                     ${leaderboard.map((entry) => {
                         const isYou = playerEntry && entry.rank === playerEntry.rank && entry.username === playerEntry.username;
                         const rankBadge = entry.rank <= 3 ? ` lb-rank-${entry.rank}` : '';
-                        const aiTag = entry.isAI ? ' <span class="lb-ai-tag">AI</span>' : '';
+                        const aiTag = entry.isBoss ? ' <span class="lb-ai-tag lb-boss-tag">BOSS</span>' : entry.isAI ? ' <span class="lb-ai-tag">AI</span>' : '';
                         return `
                         <tr class="lb-row${isYou ? ' lb-row-you' : ''}${rankBadge}${entry.isAI ? ' lb-row-ai' : ''}">
                             <td class="lb-col-rank">${entry.rank}</td>
@@ -1053,7 +1053,7 @@ function renderAccountPage(profile) {
                     ${pfpHtml}
                     <div class="account-pfp-overlay">CHANGE</div>
                 </div>
-                <input type="file" id="accountPfpInput" accept="image/*" style="display:none">
+                <input type="file" id="accountPfpInput" accept="image/*" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none">
                 <div class="account-username-display">${escapeHtml(profile.username)}</div>
                 <div class="account-elo-display">ELO ${profile.elo || 1000}</div>
             </div>
@@ -1074,7 +1074,8 @@ function renderAccountPage(profile) {
                     </div>
                 </div>
                 <div class="account-section">
-                    <h3>Security</h3>
+                    <h3 class="account-section-toggle" data-toggle="security" style="cursor:pointer;user-select:none">Security <span class="toggle-arrow" id="securityArrow">▸</span></h3>
+                    <div id="securityContent" style="display:none">
                     <div class="account-field">
                         <label>Current Password</label>
                         <input type="password" id="accountCurrentPw" placeholder="Enter current password">
@@ -1089,6 +1090,7 @@ function renderAccountPage(profile) {
                     </div>
                     <button class="account-btn" id="accountChangePwBtn">Change Password</button>
                     <div id="accountPwMsg" class="account-msg"></div>
+                    </div>
                 </div>
                 <div class="account-section">
                     <h3>Achievements</h3>
@@ -1118,6 +1120,17 @@ function renderAccountPage(profile) {
             renderAccountPage(store.getCurrentProfile());
         } catch (err) {
             console.error('PFP upload failed:', err);
+        }
+    });
+
+    // Security section toggle
+    document.querySelector('[data-toggle="security"]')?.addEventListener('click', () => {
+        const content = document.getElementById('securityContent');
+        const arrow = document.getElementById('securityArrow');
+        if (content) {
+            const hidden = content.style.display === 'none';
+            content.style.display = hidden ? '' : 'none';
+            if (arrow) arrow.textContent = hidden ? '▾' : '▸';
         }
     });
 
