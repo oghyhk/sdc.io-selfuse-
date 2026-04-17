@@ -1064,7 +1064,10 @@ function renderAuthButton() {
     `;
     authDropdown.innerHTML = TOPBAR_PAGE_OPTIONS.map((entry) => `
         <button class="auth-dropdown-button ${currentView === 'placeholder' && currentPlaceholderPage === entry.id ? 'active' : ''}" data-topbar-page="${entry.id}">${entry.label}</button>
-    `).join('');
+    `).join('') + `
+        <div class="auth-dropdown-separator"></div>
+        <button class="auth-dropdown-button auth-dropdown-logout" id="dropdownLogoutButton">Logout</button>
+    `;
     authDropdown.classList.toggle('hidden', !authDropdownOpen);
 }
 
@@ -2264,6 +2267,13 @@ authDropdown.addEventListener('click', (event) => {
     const button = event.target.closest('[data-topbar-page]');
     if (!button) return;
     openPlaceholderPage(button.dataset.topbarPage);
+});
+authDropdown.addEventListener('click', async (event) => {
+    if (!event.target.closest('#dropdownLogoutButton')) return;
+    await store.logout();
+    currentView = 'menu';
+    closeAuthDropdown();
+    renderAll();
 });
 document.addEventListener('click', (event) => {
     if (!authDropdownOpen) return;
