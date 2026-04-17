@@ -29,6 +29,42 @@ def read_store() -> dict:
 
 def write_store(store: dict) -> None:
     DATA_FILE.write_text(json.dumps(store, indent=2), encoding='utf-8')
+    _auto_git_commit_push()
+
+
+def _auto_git_commit_push() -> None:
+    """Auto-commit + push users.json to GitHub so local clones stay in sync."""
+    import subprocess
+    try:
+        root = Path(__file__).resolve().parent
+        git_dir = root / '.git'
+        # Stage only users.json (never commit other per-instance state)
+        data_path = DATA_FILE.relative_to(root)
+        subprocess.run(
+            ['git', '-C', str(git_dir.parent), 'add', str(data_path)],
+            capture_output=True, timeout=10
+        )
+        # Check if there is anything to commit
+        status = subprocess.run(
+            ['git', '-C', str(git_dir.parent), 'status', '--porcelain', str(data_path)],
+            capture_output=True, text=True, timeout=10
+        )
+        if not status.stdout.strip():
+            return  # nothing to commit
+        subprocess.run(
+            [
+                'git', '-C', str(git_dir.parent), 'commit',
+                '-m', 'chore: auto-commit user data'
+            ],
+            capture_output=True, timeout=10
+        )
+        subprocess.run(
+            ['git', '-C', str(git_dir.parent), 'push', 'origin', 'HEAD'],
+            capture_output=True, timeout=30
+        )
+    except Exception:
+        # Never let git errors crash the game server
+        pass
 
 
 def normalize_username_key(username: str) -> str:

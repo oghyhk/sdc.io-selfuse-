@@ -1,6 +1,5 @@
 __pycache__/
-data/users.json
 data/dev-config.json
-cron-state/state.json
+cron-state/
 *.log
 nohup.out

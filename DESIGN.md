@@ -767,7 +767,61 @@ Item image editing now uses a file upload button instead of text path entry. Sel
 
 ## 21. Equipment Descriptions Update
 All item descriptions in dev-config.json have been updated to include stat summaries appended after the original description text. Format examples:
-- Gun: `... | DMG:45 | SPD:0.18s | CLIP:30 | RNG:400 | RLD:2.1s`
-- Armor: `... | DEF:+25 | SHIELD:50`
-- Consumable: `... | HEAL:3HP | SPEED:0.5s`
-- Ammo: `... | DMG:x1.5`
+## 22. Data Persistence Strategy
+
+### Dual-Location Storage
+User data is stored in two places simultaneously:
+
+1. **Local VPS file** (`data/users.json`) — the primary store used by the live game server running on this VPS.
+2. **GitHub-tracked file** (`data/users.json` in the repo) — a mirrored copy committed automatically on every save.
+
+This ensures:
+- The localhost game client always has a recent copy of user data synced via `git pull`.
+- The VPS server is the authoritative source of truth during development.
+- Any device running the game locally can `git pull` to receive the latest user data.
+
+### Auto-Sync Mechanism
+On every profile save (`write_store`), the server:
+1. Writes the updated JSON to `data/users.json` on the VPS.
+2. Runs `git add data/users.json && git commit -m "chore: auto-commit user data" && git push origin HEAD`.
+3. Errors are silently swallowed — git failures never crash the game server.
+
+### .gitignore Policy
+- `data/users.json` is **tracked** in git — it MUST be committed.
+- `data/dev-config.json` is **ignored** — per-instance configuration.
+- `cron-state/` is **ignored** — per-instance development state.
+- `__pycache__/`, `*.log`, `nohup.out` are **ignored** — generated artifacts.
+
+### Running the Game on Localhost
+```bash
+# Clone the repo
+git clone https://github.com/oghyhk/sdc.io-selfuse-.git
+cd sdc.io-selfuse-
+
+# Pull latest user data before starting
+git pull origin main
+
+# Run the game (serves on localhost:8765)
+python3 server.py
+```
+
+### Flow of Data During Development
+```
+[VPS Server saves profile]
+  → writes data/users.json (local)
+  → git add + commit + push to GitHub
+
+[Localhost client pulls before session]
+  → git pull origin main
+  → data/users.json updated locally
+  → localhost server reads from its own data/users.json
+  → game plays with synced user data
+
+[Localhost client saves profile]
+  → writes to its own data/users.json
+  → (optionally push to GitHub manually or via a post-save hook)
+  → VPS server will pick up changes on next git push (if ever)
+```
+
+**Note**: During active development, the VPS is the live server and localhost is a read-only mirror. Once the game is deployed to production, the data flow will be reversed — localhost clients push changes and the production server pulls.
+
