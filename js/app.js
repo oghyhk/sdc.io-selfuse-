@@ -180,11 +180,10 @@ let lastRuntimeConfigRefreshAt = 0;
 const MARKET_CATEGORY_ORDER = ['goods', 'ammo', 'consumable', 'gun', 'armor', 'helmet', 'shoes', 'backpack'];
 const TOPBAR_PAGE_OPTIONS = [
     { id: 'raid-history', label: 'Raid History' },
-    { id: 'stats', label: 'Stats' },
+    { id: 'stats', label: 'Profile' },
     { id: 'player-level', label: 'Player Level' },
     { id: 'leaderboard', label: 'Leaderboard' },
     { id: 'safebox', label: 'Safebox' },
-    { id: 'account', label: 'Account' },
     { id: 'operation-pass', label: 'Operation Pass' },
 ];
 const DIFFICULTY_BUTTON_THEME = {
@@ -356,49 +355,157 @@ function getKdMetricClass(difficulty, kdValue) {
     return ` kd-tier-${getKdDisplayTier(kdValue, difficulty)}`;
 }
 
-function renderStatsPage(profile) {
+function renderProfilePage(profile) {
     const overall = getRaidHistorySummary(profile);
     const difficultyStats = getDifficultyStats(profile);
     const overallDeaths = (Array.isArray(profile?.raidHistory) ? profile.raidHistory : []).filter((entry) => !entry.extractedSuccess).length;
     const overallKd = formatKdValue(overall.operatorKills, overallDeaths);
 
-    placeholderTitle.textContent = 'Stats';
-    placeholderSubtitle.textContent = 'Lifetime operator combat and extraction performance by difficulty. AI operator kills count as operator kills.';
-    placeholderSummary.innerHTML = `
-        <div class="summary-tile"><span class="summary-label">Operator</span><strong>${profile.username}</strong></div>
-        <div class="summary-tile"><span class="summary-label">Total Raids</span><strong>${overall.raids}</strong></div>
-        <div class="summary-tile"><span class="summary-label">Overall Success Rate</span><strong>${formatPercent(overall.raids > 0 ? (overall.extractions / overall.raids) * 100 : 0)}</strong></div>
-        <div class="summary-tile"><span class="summary-label">Overall Operator KD</span><strong>${overallKd}</strong></div>
-        <div class="summary-wide stats-shell">
-            <div class="stats-grid">
-                ${difficultyStats.map((entry) => `
-                    <article class="stats-card">
-                        <div class="stats-card-header">
-                            ${formatDifficultyLabel(entry.difficulty)}
-                        </div>
-                        <div class="stats-card-metrics">
-                            <div class="stats-card-metric">
-                                <span>Raids Played</span>
-                                <strong>${entry.raidsPlayed}</strong>
-                            </div>
-                            <div class="stats-card-metric">
-                                <span>Success Rate</span>
-                                <strong>${formatPercent(entry.successRate)}</strong>
-                            </div>
-                            <div class="stats-card-metric">
-                                <span>Operators Killed</span>
-                                <strong>${entry.operatorKills}</strong>
-                            </div>
-                            <div class="stats-card-metric${getKdMetricClass(entry.difficulty, entry.kd)}">
-                                <span>Operator KD</span>
-                                <strong>${entry.kd}</strong>
-                            </div>
-                        </div>
-                    </article>
-                `).join('')}
+    placeholderTitle.textContent = 'Profile';
+    placeholderSubtitle.textContent = 'Your operator profile, combat stats, and account settings.';
+    placeholderSummary.innerHTML = '';
+
+    const avatarDataUrl = profile.avatarDataUrl || '';
+    const pfpHtml = avatarDataUrl
+        ? `<img src="${avatarDataUrl}" alt="Avatar">`
+        : `<div class="account-pfp-placeholder">?</div>`;
+
+    placeholderContent.innerHTML = `
+        <div class="account-layout">
+            <div class="account-sidebar">
+                <div class="account-pfp-wrap" id="accountPfpWrap" title="Change avatar">
+                    ${pfpHtml}
+                    <div class="account-pfp-overlay">CHANGE</div>
+                </div>
+                <input type="file" id="accountPfpInput" accept="image/*" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none">
+                <div class="account-username-display">${escapeHtml(profile.username)}</div>
+                <div class="account-elo-display">ELO ${profile.elo || 1000}</div>
+            </div>
+            <div class="account-main">
+                <div class="account-section">
+                    <h3>Combat Stats</h3>
+                    <div class="summary-tiles-inline">
+                        <div class="summary-tile"><span class="summary-label">Total Raids</span><strong>${overall.raids}</strong></div>
+                        <div class="summary-tile"><span class="summary-label">Success Rate</span><strong>${formatPercent(overall.raids > 0 ? (overall.extractions / overall.raids) * 100 : 0)}</strong></div>
+                        <div class="summary-tile"><span class="summary-label">Operator KD</span><strong>${overallKd}</strong></div>
+                        <div class="summary-tile"><span class="summary-label">Player Level</span><strong>${getPlayerLevelProgress(profile.playerExp || 0).level}</strong></div>
+                    </div>
+                    <div class="stats-grid" style="margin-top: 14px;">
+                        ${difficultyStats.map((entry) => `
+                            <article class="stats-card">
+                                <div class="stats-card-header">
+                                    ${formatDifficultyLabel(entry.difficulty)}
+                                </div>
+                                <div class="stats-card-metrics">
+                                    <div class="stats-card-metric">
+                                        <span>Raids Played</span>
+                                        <strong>${entry.raidsPlayed}</strong>
+                                    </div>
+                                    <div class="stats-card-metric">
+                                        <span>Success Rate</span>
+                                        <strong>${formatPercent(entry.successRate)}</strong>
+                                    </div>
+                                    <div class="stats-card-metric">
+                                        <span>Operators Killed</span>
+                                        <strong>${entry.operatorKills}</strong>
+                                    </div>
+                                    <div class="stats-card-metric${getKdMetricClass(entry.difficulty, entry.kd)}">
+                                        <span>Operator KD</span>
+                                        <strong>${entry.kd}</strong>
+                                    </div>
+                                </div>
+                            </article>
+                        `).join('')}
+                    </div>
+                </div>
+                <div class="account-section">
+                    <h3 class="account-section-toggle" data-toggle="security" style="cursor:pointer;user-select:none">Security <span class="toggle-arrow" id="securityArrow">▸</span></h3>
+                    <div id="securityContent" style="display:none">
+                    <div class="account-field">
+                        <label>Current Password</label>
+                        <input type="password" id="accountCurrentPw" placeholder="Enter current password">
+                    </div>
+                    <div class="account-field">
+                        <label>New Password</label>
+                        <input type="password" id="accountNewPw" placeholder="Enter new password">
+                    </div>
+                    <div class="account-field">
+                        <label>Confirm Password</label>
+                        <input type="password" id="accountConfirmPw" placeholder="Confirm new password">
+                    </div>
+                    <button class="account-btn" id="accountChangePwBtn">Change Password</button>
+                    <div id="accountPwMsg" class="account-msg"></div>
+                    </div>
+                </div>
+                <div class="account-section">
+                    <h3>Achievements</h3>
+                    <div class="achievements-grid">
+                        ${renderAchievementBadges()}
+                    </div>
+                </div>
             </div>
         </div>
     `;
+
+    // Hide the generic "coming soon" actions
+    const actionsEl = placeholderContent.parentElement?.querySelector('.placeholder-actions');
+    if (actionsEl) actionsEl.style.display = 'none';
+
+    // PFP upload
+    const pfpWrap = document.getElementById('accountPfpWrap');
+    const pfpInput = document.getElementById('accountPfpInput');
+    pfpWrap?.addEventListener('click', () => pfpInput?.click());
+    pfpInput?.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const dataUrl = await compressImageTo512(file);
+            profile.avatarDataUrl = dataUrl;
+            await store.saveCurrentProfile();
+            renderProfilePage(store.getCurrentProfile());
+        } catch (err) {
+            console.error('PFP upload failed:', err);
+        }
+    });
+
+    // Security section toggle
+    document.querySelector('[data-toggle="security"]')?.addEventListener('click', () => {
+        const content = document.getElementById('securityContent');
+        const arrow = document.getElementById('securityArrow');
+        if (content) {
+            const hidden = content.style.display === 'none';
+            content.style.display = hidden ? '' : 'none';
+            if (arrow) arrow.textContent = hidden ? '▾' : '▸';
+        }
+    });
+
+    // Password change
+    document.getElementById('accountChangePwBtn')?.addEventListener('click', async () => {
+        const msgEl = document.getElementById('accountPwMsg');
+        const currentPw = document.getElementById('accountCurrentPw')?.value || '';
+        const newPw = document.getElementById('accountNewPw')?.value || '';
+        const confirmPw = document.getElementById('accountConfirmPw')?.value || '';
+        if (!currentPw) { msgEl.className = 'account-msg error'; msgEl.textContent = 'Enter current password.'; return; }
+        if (newPw.length < 3) { msgEl.className = 'account-msg error'; msgEl.textContent = 'New password must be at least 3 characters.'; return; }
+        if (newPw !== confirmPw) { msgEl.className = 'account-msg error'; msgEl.textContent = 'Passwords do not match.'; return; }
+        try {
+            const res = await apiFetch('/change-password', {
+                method: 'POST',
+                body: JSON.stringify({ username: profile.username, currentPassword: currentPw, newPassword: newPw })
+            });
+            if (res.ok) {
+                msgEl.className = 'account-msg success'; msgEl.textContent = 'Password changed!';
+                store.currentProfile.password = newPw;
+                document.getElementById('accountCurrentPw').value = '';
+                document.getElementById('accountNewPw').value = '';
+                document.getElementById('accountConfirmPw').value = '';
+            } else {
+                msgEl.className = 'account-msg error'; msgEl.textContent = res.message || 'Failed to change password.';
+            }
+        } catch (err) {
+            msgEl.className = 'account-msg error'; msgEl.textContent = 'Network error.';
+        }
+    });
 }
 
 function renderPlayerLevelPage(profile) {
@@ -1035,133 +1142,7 @@ function renderAchievementBadges() {
     }).join('');
 }
 
-function renderAccountPage(profile) {
-    const summary = summarizeProfile(profile);
-    placeholderTitle.textContent = 'Account';
-    placeholderSubtitle.textContent = 'Manage your profile, avatar, and account settings.';
-    placeholderSummary.innerHTML = '';
 
-    const avatarDataUrl = profile.avatarDataUrl || '';
-    const pfpHtml = avatarDataUrl
-        ? `<img src="${avatarDataUrl}" alt="Avatar">`
-        : `<div class="account-pfp-placeholder">?</div>`;
-
-    placeholderContent.innerHTML = `
-        <div class="account-layout">
-            <div class="account-sidebar">
-                <div class="account-pfp-wrap" id="accountPfpWrap" title="Change avatar">
-                    ${pfpHtml}
-                    <div class="account-pfp-overlay">CHANGE</div>
-                </div>
-                <input type="file" id="accountPfpInput" accept="image/*" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none">
-                <div class="account-username-display">${escapeHtml(profile.username)}</div>
-                <div class="account-elo-display">ELO ${profile.elo || 1000}</div>
-            </div>
-            <div class="account-main">
-                <div class="account-section">
-                    <h3>Profile</h3>
-                    <div class="account-field">
-                        <label>Username</label>
-                        <span class="account-field-value">${escapeHtml(profile.username)}</span>
-                    </div>
-                    <div class="account-field">
-                        <label>ELO Rating</label>
-                        <span class="account-field-value">${profile.elo || 1000}</span>
-                    </div>
-                    <div class="account-field">
-                        <label>Player Level</label>
-                        <span class="account-field-value">${getPlayerLevelProgress(profile.playerExp || 0).level}</span>
-                    </div>
-                </div>
-                <div class="account-section">
-                    <h3 class="account-section-toggle" data-toggle="security" style="cursor:pointer;user-select:none">Security <span class="toggle-arrow" id="securityArrow">▸</span></h3>
-                    <div id="securityContent" style="display:none">
-                    <div class="account-field">
-                        <label>Current Password</label>
-                        <input type="password" id="accountCurrentPw" placeholder="Enter current password">
-                    </div>
-                    <div class="account-field">
-                        <label>New Password</label>
-                        <input type="password" id="accountNewPw" placeholder="Enter new password">
-                    </div>
-                    <div class="account-field">
-                        <label>Confirm Password</label>
-                        <input type="password" id="accountConfirmPw" placeholder="Confirm new password">
-                    </div>
-                    <button class="account-btn" id="accountChangePwBtn">Change Password</button>
-                    <div id="accountPwMsg" class="account-msg"></div>
-                    </div>
-                </div>
-                <div class="account-section">
-                    <h3>Achievements</h3>
-                    <div class="achievements-grid">
-                        ${renderAchievementBadges()}
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // Hide the generic "coming soon" actions
-    const actionsEl = placeholderContent.parentElement?.querySelector('.placeholder-actions');
-    if (actionsEl) actionsEl.style.display = 'none';
-
-    // PFP upload
-    const pfpWrap = document.getElementById('accountPfpWrap');
-    const pfpInput = document.getElementById('accountPfpInput');
-    pfpWrap?.addEventListener('click', () => pfpInput?.click());
-    pfpInput?.addEventListener('change', async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        try {
-            const dataUrl = await compressImageTo512(file);
-            profile.avatarDataUrl = dataUrl;
-            await store.saveCurrentProfile();
-            renderAccountPage(store.getCurrentProfile());
-        } catch (err) {
-            console.error('PFP upload failed:', err);
-        }
-    });
-
-    // Security section toggle
-    document.querySelector('[data-toggle="security"]')?.addEventListener('click', () => {
-        const content = document.getElementById('securityContent');
-        const arrow = document.getElementById('securityArrow');
-        if (content) {
-            const hidden = content.style.display === 'none';
-            content.style.display = hidden ? '' : 'none';
-            if (arrow) arrow.textContent = hidden ? '▾' : '▸';
-        }
-    });
-
-    // Password change
-    document.getElementById('accountChangePwBtn')?.addEventListener('click', async () => {
-        const msgEl = document.getElementById('accountPwMsg');
-        const currentPw = document.getElementById('accountCurrentPw')?.value || '';
-        const newPw = document.getElementById('accountNewPw')?.value || '';
-        const confirmPw = document.getElementById('accountConfirmPw')?.value || '';
-        if (!currentPw) { msgEl.className = 'account-msg error'; msgEl.textContent = 'Enter current password.'; return; }
-        if (newPw.length < 3) { msgEl.className = 'account-msg error'; msgEl.textContent = 'New password must be at least 3 characters.'; return; }
-        if (newPw !== confirmPw) { msgEl.className = 'account-msg error'; msgEl.textContent = 'Passwords do not match.'; return; }
-        try {
-            const res = await apiFetch('/change-password', {
-                method: 'POST',
-                body: JSON.stringify({ username: profile.username, currentPassword: currentPw, newPassword: newPw })
-            });
-            if (res.ok) {
-                msgEl.className = 'account-msg success'; msgEl.textContent = 'Password changed!';
-                store.currentProfile.password = newPw;
-                document.getElementById('accountCurrentPw').value = '';
-                document.getElementById('accountNewPw').value = '';
-                document.getElementById('accountConfirmPw').value = '';
-            } else {
-                msgEl.className = 'account-msg error'; msgEl.textContent = res.message || 'Failed to change password.';
-            }
-        } catch (err) {
-            msgEl.className = 'account-msg error'; msgEl.textContent = 'Network error.';
-        }
-    });
-}
 
 function compressImageTo512(file) {
     return new Promise((resolve, reject) => {
@@ -1206,18 +1187,14 @@ function renderPlaceholderScreen() {
         return;
     }
     if (page.id === 'stats') {
-        renderStatsPage(profile);
+        renderProfilePage(profile);
         return;
     }
     if (page.id === 'leaderboard') {
         renderLeaderboardPage(profile);
         return;
     }
-    if (page.id === 'account') {
-        renderAccountPage(profile);
-        return;
-    }
-    // Restore generic actions visibility for non-account pages
+    // Restore generic actions visibility for non-profile pages
     const actionsEl = placeholderContent?.parentElement?.querySelector('.placeholder-actions');
     if (actionsEl) actionsEl.style.display = '';
     if (placeholderContent) placeholderContent.innerHTML = '';
