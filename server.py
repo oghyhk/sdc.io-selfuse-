@@ -70,6 +70,9 @@ def build_profile(username: str, password: str, source_profile: dict | None = No
         'savedLoadouts': source_profile.get('savedLoadouts', []),
         'extractedRuns': source_profile.get('extractedRuns', []),
         'raidHistory': source_profile.get('raidHistory', []),
+        'avatarDataUrl': source_profile.get('avatarDataUrl', ''),
+        'pinnedAchievements': source_profile.get('pinnedAchievements', []),
+        'unlockedAchievements': source_profile.get('unlockedAchievements', ['welcome']),
         'stats': {
             'totalRuns': source_stats.get('totalRuns', 0),
             'totalExtractions': source_stats.get('totalExtractions', 0),
@@ -237,7 +240,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 self._send_json({'ok': False, 'message': 'Username and password are required.'}, HTTPStatus.BAD_REQUEST)
                 return
             if not is_valid_username(username):
-                self._send_json({'ok': False, 'message': 'Username may contain only English letters and the red heart emoji.'}, HTTPStatus.BAD_REQUEST)
+                self._send_json({'ok': False, 'message': 'Username may contain only English letters, numbers, and the red heart emoji.'}, HTTPStatus.BAD_REQUEST)
                 return
             store = read_store()
             users = store.setdefault('users', {})
@@ -265,7 +268,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 self._send_json({'ok': False, 'message': 'Username and password are required.'}, HTTPStatus.BAD_REQUEST)
                 return
             if not is_valid_username(username):
-                self._send_json({'ok': False, 'message': 'Username may contain only English letters and the red heart emoji.'}, HTTPStatus.BAD_REQUEST)
+                self._send_json({'ok': False, 'message': 'Username may contain only English letters, numbers, and the red heart emoji.'}, HTTPStatus.BAD_REQUEST)
                 return
             store = read_store()
             users = store.setdefault('users', {})

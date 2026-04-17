@@ -1306,7 +1306,8 @@ export function createDefaultProfile(username = 'Guest Operative', isGuest = fal
         raidHistory: [],
         stats: { totalRuns: 0, totalExtractions: 0, totalKills: 0, totalCoinsEarned: 0, totalMarketTrades: 0 },
         pinnedAchievements: [],
-        unlockedAchievements: ['welcome']
+        unlockedAchievements: ['welcome'],
+        avatarDataUrl: ''
     };
 }
 

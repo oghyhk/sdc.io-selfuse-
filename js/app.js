@@ -1757,7 +1757,7 @@ function renderAuthModal() {
     signupModeButton.classList.toggle('active', authMode === 'signup');
     authTitle.textContent = authMode === 'signup' ? 'Create Account' : 'Login';
     authMessage.textContent = authMode === 'signup'
-        ? 'Create an account with a username and password. Usernames may contain only English letters and the red heart emoji.'
+        ? 'Create an account with a username and password. Usernames may contain English letters, numbers, and the red heart emoji.'
         : 'Login with your existing username and password. Matching is not case-sensitive, but the registered casing is preserved.';
     authSubmit.textContent = authMode === 'signup' ? 'Create Account' : 'Continue';
     authForm.classList.remove('hidden');
