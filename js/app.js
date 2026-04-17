@@ -370,6 +370,8 @@ function renderProfilePage(profile) {
         ? `<img src="${avatarDataUrl}" alt="Avatar">`
         : `<div class="account-pfp-placeholder">?</div>`;
 
+    const pinnedIds = Array.isArray(profile.pinnedAchievements) ? profile.pinnedAchievements : [];
+
     placeholderContent.innerHTML = `
         <div class="account-layout">
             <div class="account-sidebar">
@@ -380,6 +382,12 @@ function renderProfilePage(profile) {
                 <input type="file" id="accountPfpInput" accept="image/*" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none">
                 <div class="account-username-display">${escapeHtml(profile.username)}</div>
                 <div class="account-elo-display">ELO ${profile.elo || 1000}</div>
+                <div class="pinned-achievements-section">
+                    <div class="pinned-achievements-label">Pinned Achievements</div>
+                    <div class="pinned-achievements-list" id="pinnedAchievementsList">
+                        ${renderPinnedAchievementsSidebar(pinnedIds)}
+                    </div>
+                </div>
             </div>
             <div class="account-main">
                 <div class="account-section">
@@ -439,8 +447,9 @@ function renderProfilePage(profile) {
                 </div>
                 <div class="account-section">
                     <h3>Achievements</h3>
-                    <div class="achievements-grid">
-                        ${renderAchievementBadges()}
+                    <div style="font-size:12px;color:rgba(255,255,255,0.35);margin-bottom:10px">Click an achievement to pin or unpin it (max 3).</div>
+                    <div class="achievements-grid" id="achievementsGrid">
+                        ${renderAchievementBadges(pinnedIds)}
                     </div>
                 </div>
             </div>
@@ -477,6 +486,25 @@ function renderProfilePage(profile) {
             content.style.display = hidden ? '' : 'none';
             if (arrow) arrow.textContent = hidden ? '▾' : '▸';
         }
+    });
+
+    // Achievement pinning
+    document.getElementById('achievementsGrid')?.addEventListener('click', async (e) => {
+        const badge = e.target.closest('.achievement-badge');
+        if (!badge) return;
+        const achId = badge.dataset.achievementId;
+        if (!achId) return;
+        if (!Array.isArray(profile.pinnedAchievements)) profile.pinnedAchievements = [];
+        const idx = profile.pinnedAchievements.indexOf(achId);
+        if (idx >= 0) {
+            profile.pinnedAchievements.splice(idx, 1);
+        } else if (profile.pinnedAchievements.length < 3) {
+            profile.pinnedAchievements.push(achId);
+        } else {
+            return; // max 3 pinned
+        }
+        await store.saveCurrentProfile();
+        renderProfilePage(store.getCurrentProfile());
     });
 
     // Password change
@@ -1120,23 +1148,47 @@ function syncAiRosterToServer() {
     store.pushAiRoster(entries).catch(() => {});
 }
 
-function renderAchievementBadges() {
+function renderAchievementBadges(pinnedIds) {
+    const pinned = Array.isArray(pinnedIds) ? pinnedIds : [];
     const achievements = runtimeAchievements || {};
     const entries = Object.entries(achievements).filter(([, a]) => a.enabled !== false);
     if (!entries.length) return '<div style="color:rgba(255,255,255,0.4);font-size:13px">No achievements available.</div>';
     return entries.map(([id, ach]) => {
         const imgSrc = ach.image || '';
+        const isPinned = pinned.includes(id);
         return `
-            <div class="achievement-badge" title="${escapeHtml(ach.name || id)}">
+            <div class="achievement-badge${isPinned ? ' achievement-pinned' : ''}" data-achievement-id="${escapeHtml(id)}" title="${isPinned ? 'Click to unpin' : 'Click to pin'} — ${escapeHtml(ach.name || id)}">
                 ${imgSrc
                     ? `<img src="${imgSrc}" alt="${escapeHtml(ach.name || '')}">`
                     : `<div class="achievement-badge-placeholder">?</div>`
                 }
+                ${isPinned ? '<div class="achievement-pin-icon">📌</div>' : ''}
                 <div class="achievement-tooltip">
                     ${imgSrc ? `<img src="${imgSrc}" alt="">` : ''}
                     <div class="achievement-tooltip-name">${escapeHtml(ach.name || id)}</div>
                     <div class="achievement-tooltip-desc">${escapeHtml(ach.description || 'No description.')}</div>
+                    <div class="achievement-tooltip-pin-hint">${isPinned ? 'Click to unpin' : 'Click to pin (max 3)'}</div>
                 </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderPinnedAchievementsSidebar(pinnedIds) {
+    const pinned = Array.isArray(pinnedIds) ? pinnedIds : [];
+    if (!pinned.length) return '<div class="pinned-achievements-empty">Pin up to 3 achievements</div>';
+    const achievements = runtimeAchievements || {};
+    return pinned.map((id) => {
+        const ach = achievements[id];
+        if (!ach) return '';
+        const imgSrc = ach.image || '';
+        return `
+            <div class="pinned-achievement-item" data-achievement-id="${escapeHtml(id)}" title="${escapeHtml(ach.name || id)}">
+                ${imgSrc
+                    ? `<img src="${imgSrc}" alt="${escapeHtml(ach.name || '')}">`
+                    : `<div class="pinned-achievement-placeholder">?</div>`
+                }
+                <div class="pinned-achievement-name">${escapeHtml(ach.name || id)}</div>
             </div>
         `;
     }).join('');

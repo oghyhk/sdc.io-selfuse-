@@ -352,7 +352,7 @@
         /* Achievements */
         .achievements-grid { display: flex; flex-wrap: wrap; gap: 14px; }
         .achievement-badge {
-            position: relative; width: 72px; height: 72px; cursor: default;
+            position: relative; width: 72px; height: 72px; cursor: pointer;
             border-radius: 50%; overflow: visible;
         }
         .achievement-badge img {
@@ -387,6 +387,56 @@
         }
         .achievement-tooltip-desc {
             font-size: 12px; color: rgba(255,255,255,0.65); line-height: 1.5;
+        }
+        .achievement-tooltip-pin-hint {
+            font-size: 11px; color: rgba(255,215,0,0.55); margin-top: 8px;
+            letter-spacing: 0.03em;
+        }
+        .achievement-pinned img {
+            border-color: rgba(255,215,0,0.6) !important;
+            box-shadow: 0 0 10px rgba(255,215,0,0.2);
+        }
+        .achievement-pin-icon {
+            position: absolute; top: -4px; right: -4px;
+            font-size: 16px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+            pointer-events: none;
+        }
+        .pinned-achievements-section {
+            margin-top: 18px; padding-top: 14px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        .pinned-achievements-label {
+            font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+            text-transform: uppercase; color: rgba(255,255,255,0.4);
+            margin-bottom: 10px; text-align: center;
+        }
+        .pinned-achievements-list {
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+        }
+        .pinned-achievement-item {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            cursor: default;
+        }
+        .pinned-achievement-item img {
+            width: 52px; height: 52px; border-radius: 50%;
+            border: 2px solid rgba(255,215,0,0.45); object-fit: cover;
+            background: rgba(255,255,255,0.04);
+            box-shadow: 0 0 8px rgba(255,215,0,0.15);
+        }
+        .pinned-achievement-placeholder {
+            width: 52px; height: 52px; border-radius: 50%;
+            background: rgba(255,255,255,0.06); border: 2px solid rgba(255,215,0,0.3);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; color: rgba(255,255,255,0.2);
+        }
+        .pinned-achievement-name {
+            font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.55);
+            text-align: center; max-width: 120px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .pinned-achievements-empty {
+            font-size: 11px; color: rgba(255,255,255,0.25); text-align: center;
+            padding: 6px 0;
         }
         .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; text-align: left; }
         .summary-tile {
