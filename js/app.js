@@ -45,6 +45,7 @@ import {
     getMinimumTradeQuantity,
     MIN_TRADE_TOTAL,
     apiFetch,
+    normalizeProfile,
     runtimeAchievements
 } from './profile.js';
 import { getRosterLeaderboardEntries } from './ai_roster.js';
@@ -471,7 +472,7 @@ function renderProfilePage(profile) {
         if (!file) return;
         try {
             const dataUrl = await compressImageTo512(file);
-            profile.avatarDataUrl = dataUrl;
+            store.currentProfile.avatarDataUrl = dataUrl;
             await store.saveCurrentProfile();
             renderProfilePage(store.getCurrentProfile());
         } catch (err) {
@@ -493,12 +494,12 @@ function renderProfilePage(profile) {
     // Achievement pinning (via global function for inline onclick)
     window.__togglePin = async function(achId) {
         if (!achId) return;
-        if (!Array.isArray(profile.pinnedAchievements)) profile.pinnedAchievements = [];
-        const idx = profile.pinnedAchievements.indexOf(achId);
+        if (!Array.isArray(store.currentProfile.pinnedAchievements)) store.currentProfile.pinnedAchievements = [];
+        const idx = store.currentProfile.pinnedAchievements.indexOf(achId);
         if (idx >= 0) {
-            profile.pinnedAchievements.splice(idx, 1);
-        } else if (profile.pinnedAchievements.length < 3) {
-            profile.pinnedAchievements.push(achId);
+            store.currentProfile.pinnedAchievements.splice(idx, 1);
+        } else if (store.currentProfile.pinnedAchievements.length < 3) {
+            store.currentProfile.pinnedAchievements.push(achId);
         } else {
             return; // max 3 pinned
         }
@@ -2780,6 +2781,25 @@ window.addEventListener('focus', () => {
     if (game.state === GAME_STATE.MENU) {
         scheduleRuntimeConfigRefresh(true);
     }
+});
+
+// Re-sync profile from server when tab regains focus (prevents stale localStorage)
+let _profileSyncInFlight = false;
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (game.state !== GAME_STATE.MENU) return;
+    if (!store.activeUsername || _profileSyncInFlight) return;
+    _profileSyncInFlight = true;
+    apiFetch(`/profile?username=${encodeURIComponent(store.activeUsername)}`)
+        .then((result) => {
+            store.currentProfile = normalizeProfile(result.profile, store.activeUsername, false);
+            // Re-render current page if it's the profile screen
+            if (!placeholderScreen.classList.contains('hidden')) {
+                renderPlaceholderScreen();
+            }
+        })
+        .catch(() => {})
+        .finally(() => { _profileSyncInFlight = false; });
 });
 
 setInterval(() => {
