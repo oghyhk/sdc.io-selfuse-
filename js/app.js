@@ -94,6 +94,7 @@ const marketSections = document.getElementById('marketSections');
 const marketMessage = document.getElementById('marketMessage');
 const difficultySelect = document.getElementById('difficultySelect');
 const startButton = document.getElementById('startButton');
+const raidLoadingOverlay = document.getElementById('raidLoadingOverlay');
 const menuLoadoutButtons = document.getElementById('menuLoadoutButtons');
 const menuLoadoutPreview = document.getElementById('menuLoadoutPreview');
 const inventoryButton = document.getElementById('inventoryButton');
@@ -827,6 +828,13 @@ function getEquippedLoadoutSlot(profile, definitionId) {
     return LOADOUT_SLOTS.find((slot) => profile.loadout?.[slot] === definitionId) || null;
 }
 
+function showRaidLoadingOverlay() {
+    raidLoadingOverlay.classList.add('visible');
+}
+function hideRaidLoadingOverlay() {
+    raidLoadingOverlay.classList.remove('visible');
+}
+
 function updateStartButtonDifficultyTheme() {
     const difficulty = DIFFICULTY_BUTTON_THEME[difficultySelect.value] || 'easy';
     startButton.dataset.difficulty = difficulty;
@@ -987,6 +995,7 @@ function resolveChaosStart(shouldContinue) {
     const resolver = pendingChaosStartResolver;
     pendingChaosStartResolver = null;
     closeChaosStartModal();
+    if (shouldContinue) showRaidLoadingOverlay();
     if (resolver) resolver(Boolean(shouldContinue));
 }
 
@@ -1922,8 +1931,10 @@ async function startRaidWithSelectedLoadout() {
     }
 
     await store.applyRaidLoadoutSelection(selectedSlot, { autoBuyMissing: preview.totalCost > 0 });
+    showRaidLoadingOverlay();
     game.startGame(store.getCurrentProfile(), { difficulty: difficultySelect.value });
     renderVisibility();
+    requestAnimationFrame(() => requestAnimationFrame(hideRaidLoadingOverlay));
 }
 
 // ─── Mail System ──────────────────────────
@@ -2190,6 +2201,7 @@ function renderMailDetail(mail) {
 
 startButton.addEventListener('click', () => {
     startRaidWithSelectedLoadout().catch((error) => {
+        hideRaidLoadingOverlay();
         window.alert(error.message || 'Failed to start raid.');
     });
 });

@@ -14,7 +14,7 @@ DATA_FILE = ROOT / 'data' / 'users.json'
 DEV_CONFIG_FILE = ROOT / 'data' / 'dev-config.json'
 HOST = '0.0.0.0'
 PORT = 8765
-USERNAME_PATTERN = re.compile(r'^(?:[A-Za-z]|❤(?:️)?)+$')
+USERNAME_PATTERN = re.compile(r'^(?:[A-Za-z0-9]|❤(?:️)?)+$')
 
 
 def read_store() -> dict:
@@ -332,6 +332,52 @@ class ApiHandler(SimpleHTTPRequestHandler):
             user['password'] = new_pw
             users[existing_key] = user
             write_store(store)
+            safe_user = {k: v for k, v in user.items() if k != 'password'}
+            self._send_json({'ok': True, 'profile': safe_user})
+            return
+
+        if parsed.path == '/api/unlock-achievement':
+            username = str(body.get('username', '')).strip()
+            achievement_id = str(body.get('achievementId', '')).strip()
+            if not username or not achievement_id:
+                self._send_json({'ok': False, 'message': 'username and achievementId required.'}, HTTPStatus.BAD_REQUEST)
+                return
+            store = read_store()
+            users = store.setdefault('users', {})
+            existing_key, user = get_user_record(users, username)
+            if not user or not existing_key:
+                self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
+                return
+            unlocked = user.get('unlockedAchievements', [])
+            if not isinstance(unlocked, list):
+                unlocked = []
+            if achievement_id not in unlocked:
+                unlocked.append(achievement_id)
+                user['unlockedAchievements'] = unlocked
+                users[existing_key] = user
+                write_store(store)
+            safe_user = {k: v for k, v in user.items() if k != 'password'}
+            self._send_json({'ok': True, 'profile': safe_user})
+            return
+
+        if parsed.path == '/api/lock-achievement':
+            username = str(body.get('username', '')).strip()
+            achievement_id = str(body.get('achievementId', '')).strip()
+            if not username or not achievement_id:
+                self._send_json({'ok': False, 'message': 'username and achievementId required.'}, HTTPStatus.BAD_REQUEST)
+                return
+            store = read_store()
+            users = store.setdefault('users', {})
+            existing_key, user = get_user_record(users, username)
+            if not user or not existing_key:
+                self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
+                return
+            unlocked = user.get('unlockedAchievements', [])
+            if achievement_id in unlocked:
+                unlocked.remove(achievement_id)
+                user['unlockedAchievements'] = unlocked
+                users[existing_key] = user
+                write_store(store)
             safe_user = {k: v for k, v in user.items() if k != 'password'}
             self._send_json({'ok': True, 'profile': safe_user})
             return

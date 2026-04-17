@@ -237,6 +237,28 @@
         .auth-dropdown-logout:hover {
             background: rgba(255,107,107,0.15); border-color: rgba(255,107,107,0.4);
         }
+        #raidLoadingOverlay {
+            position: fixed; inset: 0; z-index: 9999;
+            background: rgba(0,0,0,0.7);
+            display: flex; align-items: center; justify-content: center;
+            flex-direction: column; gap: 16px; pointer-events: none; opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+        #raidLoadingOverlay.visible {
+            pointer-events: auto; opacity: 1;
+        }
+        .raid-loading-spinner {
+            width: 48px; height: 48px;
+            border: 4px solid rgba(255,255,255,0.15);
+            border-top-color: #00e676;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .raid-loading-text {
+            color: rgba(255,255,255,0.7); font-size: 14px; font-weight: 600;
+            letter-spacing: 0.5px;
+        }
         .coin-inline {
             display: inline-flex; align-items: center; gap: 0.35em; white-space: nowrap;
         }
@@ -1431,7 +1453,11 @@
             </div>
         </div>
 
-        <div id="chaosStartModal" class="modal hidden">
+        <div id="raidLoadingOverlay">
+        <div class="raid-loading-spinner"></div>
+        <div class="raid-loading-text">Loading raid…</div>
+    </div>
+    <div id="chaosStartModal" class="modal hidden">
             <div class="panel modal-panel">
                 <div class="inventory-header">
                     <div>
