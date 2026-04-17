@@ -371,6 +371,7 @@ function renderProfilePage(profile) {
         : `<div class="account-pfp-placeholder">?</div>`;
 
     const pinnedIds = Array.isArray(profile.pinnedAchievements) ? profile.pinnedAchievements : [];
+    const unlockedIds = Array.isArray(profile.unlockedAchievements) ? profile.unlockedAchievements : [];
 
     placeholderContent.innerHTML = `
         <div class="account-layout">
@@ -385,7 +386,7 @@ function renderProfilePage(profile) {
                 <div class="pinned-achievements-section">
                     <div class="pinned-achievements-label">Pinned Achievements</div>
                     <div class="pinned-achievements-list" id="pinnedAchievementsList">
-                        ${renderPinnedAchievementsSidebar(pinnedIds)}
+                        ${renderPinnedAchievementsSidebar(pinnedIds, unlockedIds)}
                     </div>
                 </div>
             </div>
@@ -449,7 +450,7 @@ function renderProfilePage(profile) {
                     <h3>Achievements</h3>
                     <div style="font-size:12px;color:rgba(255,255,255,0.35);margin-bottom:10px">Click an achievement to pin or unpin it (max 3).</div>
                     <div class="achievements-grid" id="achievementsGrid">
-                        ${renderAchievementBadges(pinnedIds)}
+                        ${renderAchievementBadges(pinnedIds, unlockedIds)}
                     </div>
                 </div>
             </div>
@@ -488,11 +489,8 @@ function renderProfilePage(profile) {
         }
     });
 
-    // Achievement pinning
-    document.getElementById('achievementsGrid')?.addEventListener('click', async (e) => {
-        const badge = e.target.closest('.achievement-badge');
-        if (!badge) return;
-        const achId = badge.dataset.achievementId;
+    // Achievement pinning (via global function for inline onclick)
+    window.__togglePin = async function(achId) {
         if (!achId) return;
         if (!Array.isArray(profile.pinnedAchievements)) profile.pinnedAchievements = [];
         const idx = profile.pinnedAchievements.indexOf(achId);
@@ -505,7 +503,7 @@ function renderProfilePage(profile) {
         }
         await store.saveCurrentProfile();
         renderProfilePage(store.getCurrentProfile());
-    });
+    };
 
     // Password change
     document.getElementById('accountChangePwBtn')?.addEventListener('click', async () => {
@@ -560,7 +558,6 @@ function renderPlayerLevelPage(profile) {
     placeholderTitle.textContent = 'Player Level';
     placeholderSubtitle.textContent = 'Earn EXP by killing players, AI operators, and enemies. EXP follows the game compact value format.';
     placeholderSummary.innerHTML = `
-        <div class="summary-tile"><span class="summary-label">Operator</span><strong>${profile.username}</strong></div>
         <div class="summary-tile"><span class="summary-label">Current Level</span><strong>Lv. ${progress.level}</strong></div>
         <div class="summary-tile"><span class="summary-label">Total EXP</span><strong>${formatCompactValue(progress.totalExp)}</strong></div>
         <div class="summary-tile"><span class="summary-label">Pending Rewards</span><strong>${pendingRewardCount}</strong></div>
@@ -619,7 +616,6 @@ function renderRaidHistoryPage(profile) {
     placeholderTitle.textContent = 'Raid History';
     placeholderSubtitle.textContent = 'Recent 100 raids with extraction outcome and net gain. AI operator kills count as operator kills.';
     placeholderSummary.innerHTML = `
-        <div class="summary-tile"><span class="summary-label">Operator</span><strong>${profile.username}</strong></div>
         <div class="summary-tile"><span class="summary-label">Raids Stored</span><strong>${historySummary.raids}/100</strong></div>
         <div class="summary-tile"><span class="summary-label">Successful Extractions</span><strong>${historySummary.extractions}</strong></div>
         <div class="summary-tile"><span class="summary-label">Total Net Value</span><strong>${formatCoinAmountMarkup(historySummary.netValue)}</strong></div>
@@ -676,7 +672,6 @@ async function renderLeaderboardPage(profile) {
     // Show loading only on first render (no cache)
     if (!_leaderboardCache) {
         placeholderSummary.innerHTML = `
-            <div class="summary-tile"><span class="summary-label">Operator</span><strong>${profile.username}</strong></div>
             <div class="summary-tile"><span class="summary-label">Your ELO</span><strong>${elo}</strong></div>
             <div class="summary-tile"><span class="summary-label">Loading…</span><strong>—</strong></div>
         `;
@@ -721,7 +716,6 @@ function _renderLeaderboardTable(profile, elo, data) {
     const prevScreenScroll = placeholderScreen.scrollTop;
 
     placeholderSummary.innerHTML = `
-        <div class="summary-tile"><span class="summary-label">Operator</span><strong>${profile.username}</strong></div>
         <div class="summary-tile"><span class="summary-label">Your ELO</span><strong>${elo}</strong></div>
         <div class="summary-tile"><span class="summary-label">Your Rank</span><strong>${yourRank}</strong></div>
         <div class="summary-tile"><span class="summary-label">Total Players</span><strong>${total}</strong></div>
@@ -784,7 +778,6 @@ function renderGenericPlaceholderPage(profile, page) {
     placeholderTitle.textContent = page.label;
     placeholderSubtitle.textContent = `${page.label} will be implemented later.`;
     placeholderSummary.innerHTML = `
-        <div class="summary-tile"><span class="summary-label">Operator</span><strong>${profile.username}</strong></div>
         <div class="summary-tile"><span class="summary-label">Coins</span><strong>${formatCoinAmountMarkup(summary.coins)}</strong></div>
         <div class="summary-tile"><span class="summary-label">Inventory Value</span><strong>${formatCoinAmountMarkup(getProfileInventoryValue(profile))}</strong></div>
         <div class="summary-tile"><span class="summary-label">Status</span><strong>Coming Soon</strong></div>
@@ -1148,16 +1141,17 @@ function syncAiRosterToServer() {
     store.pushAiRoster(entries).catch(() => {});
 }
 
-function renderAchievementBadges(pinnedIds) {
+function renderAchievementBadges(pinnedIds, unlockedIds) {
     const pinned = Array.isArray(pinnedIds) ? pinnedIds : [];
+    const unlocked = Array.isArray(unlockedIds) ? unlockedIds : [];
     const achievements = runtimeAchievements || {};
-    const entries = Object.entries(achievements).filter(([, a]) => a.enabled !== false);
-    if (!entries.length) return '<div style="color:rgba(255,255,255,0.4);font-size:13px">No achievements available.</div>';
+    const entries = Object.entries(achievements).filter(([id, a]) => a.enabled !== false && unlocked.includes(id));
+    if (!entries.length) return '<div style="color:rgba(255,255,255,0.4);font-size:13px">No achievements unlocked yet.</div>';
     return entries.map(([id, ach]) => {
         const imgSrc = ach.image || '';
         const isPinned = pinned.includes(id);
         return `
-            <div class="achievement-badge${isPinned ? ' achievement-pinned' : ''}" data-achievement-id="${escapeHtml(id)}" title="${isPinned ? 'Click to unpin' : 'Click to pin'} — ${escapeHtml(ach.name || id)}">
+            <div class="achievement-badge${isPinned ? ' achievement-pinned' : ''}" data-achievement-id="${escapeHtml(id)}" onclick="window.__togglePin('${escapeHtml(id)}')" style="cursor:pointer;pointer-events:auto" title="${isPinned ? 'Click to unpin' : 'Click to pin'} — ${escapeHtml(ach.name || id)}">
                 ${imgSrc
                     ? `<img src="${imgSrc}" alt="${escapeHtml(ach.name || '')}">`
                     : `<div class="achievement-badge-placeholder">?</div>`
@@ -1174,13 +1168,13 @@ function renderAchievementBadges(pinnedIds) {
     }).join('');
 }
 
-function renderPinnedAchievementsSidebar(pinnedIds) {
+function renderPinnedAchievementsSidebar(pinnedIds, unlockedIds) {
     const pinned = Array.isArray(pinnedIds) ? pinnedIds : [];
+    const unlocked = Array.isArray(unlockedIds) ? unlockedIds : [];
     if (!pinned.length) return '<div class="pinned-achievements-empty">Pin up to 3 achievements</div>';
     const achievements = runtimeAchievements || {};
-    return pinned.map((id) => {
+    return pinned.filter(id => unlocked.includes(id) && achievements[id]).map((id) => {
         const ach = achievements[id];
-        if (!ach) return '';
         const imgSrc = ach.image || '';
         return `
             <div class="pinned-achievement-item" data-achievement-id="${escapeHtml(id)}" title="${escapeHtml(ach.name || id)}">
@@ -1191,7 +1185,7 @@ function renderPinnedAchievementsSidebar(pinnedIds) {
                 <div class="pinned-achievement-name">${escapeHtml(ach.name || id)}</div>
             </div>
         `;
-    }).join('');
+    }).join('') || '<div class="pinned-achievements-empty">Pin up to 3 achievements</div>';
 }
 
 
