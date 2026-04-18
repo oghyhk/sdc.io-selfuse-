@@ -75,6 +75,15 @@ def is_valid_username(username: str) -> bool:
     return bool(USERNAME_PATTERN.fullmatch(username))
 
 
+def normalize_ai_username(display_name: str) -> str:
+    base = display_name.lower().replace('-', '').replace('_', '').replace(' ', '')
+    return f'ai_{base}'
+
+
+def get_ai_users(users: dict) -> dict:
+    return {k: v for k, v in users.items() if v.get('isAI', False)}
+
+
 def get_user_record(users: dict, username: str) -> tuple[str | None, dict | None]:
     normalized = normalize_username_key(username)
     if normalized in users:
@@ -88,12 +97,13 @@ def get_user_record(users: dict, username: str) -> tuple[str | None, dict | None
     return None, None
 
 
-def build_profile(username: str, password: str, source_profile: dict | None = None) -> dict:
+def build_profile(username: str, password: str, source_profile: dict | None = None, *, is_ai: bool = False) -> dict:
     source_profile = source_profile or {}
     source_stats = source_profile.get('stats') or {}
     return {
         'username': username,
         'isGuest': source_profile.get('isGuest', False),
+        'isAI': is_ai,
         'coins': source_profile.get('coins', 0),
         'playerExp': source_profile.get('playerExp', 0),
         'elo': source_profile.get('elo', 1000),
@@ -186,7 +196,6 @@ class ApiHandler(SimpleHTTPRequestHandler):
         if parsed.path == '/api/leaderboard':
             store = read_store()
             users = store.get('users', {})
-            ai_roster = store.get('aiRoster', {})
             entries = []
             for _key, user in users.items():
                 username = user.get('username', _key)
@@ -198,17 +207,8 @@ class ApiHandler(SimpleHTTPRequestHandler):
                     'totalRuns': stats.get('totalRuns', 0),
                     'totalExtractions': stats.get('totalExtractions', 0),
                     'totalKills': stats.get('totalKills', 0),
-                    'isAI': False,
-                })
-            for _key, ai in ai_roster.items():
-                entries.append({
-                    'username': ai.get('username', _key),
-                    'elo': int(ai.get('elo', 1000)),
-                    'totalRuns': int(ai.get('totalRuns', 0)),
-                    'totalExtractions': int(ai.get('totalExtractions', 0)),
-                    'totalKills': int(ai.get('totalKills', 0)),
-                    'isAI': True,
-                    'isBoss': bool(ai.get('isBoss', False)),
+                    'isAI': user.get('isAI', False),
+                    'isBoss': bool(user.get('isBoss', False)),
                 })
             entries.sort(key=lambda e: -e['elo'])
             for i, entry in enumerate(entries):
@@ -244,41 +244,82 @@ class ApiHandler(SimpleHTTPRequestHandler):
         if parsed.path == '/api/ai-roster':
             if self.command == 'GET':
                 store = read_store()
-                ai_roster = store.get('aiRoster', {})
-                self._send_json({'ok': True, 'roster': ai_roster})
+                users = store.get('users', {})
+                old_ai_roster = store.get('aiRoster', {})
+                migrated = 0
+                if old_ai_roster and not get_ai_users(users):
+                    for key, ai_data in old_ai_roster.items():
+                        display_name = ai_data.get('username', key)
+                        user_key = normalize_username_key(normalize_ai_username(display_name))
+                        users[user_key] = build_profile(
+                            display_name,
+                            f'ai_{user_key}',
+                            {
+                                'elo': ai_data.get('elo', 1000),
+                                'stats': {
+                                    'totalRuns': ai_data.get('totalRuns', 0),
+                                    'totalExtractions': ai_data.get('totalExtractions', 0),
+                                    'totalKills': ai_data.get('totalKills', 0),
+                                },
+                                'totalDeaths': ai_data.get('totalDeaths', 0),
+                            },
+                            is_ai=True,
+                        )
+                        users[user_key]['isBoss'] = ai_data.get('isBoss', False)
+                        migrated += 1
+                    store['users'] = users
+                    store['aiRoster'] = {}
+                    write_store(store)
+                ai_users = get_ai_users(users)
+                self._send_json({'ok': True, 'roster': ai_users, 'migrated': migrated})
                 return
             if body.get('clear'):
                 store = read_store()
-                store['aiRoster'] = {}
+                users = store.get('users', {})
+                ai_keys = [k for k, v in users.items() if v.get('isAI', False)]
+                for k in ai_keys:
+                    del users[k]
+                store['users'] = users
                 write_store(store)
-                self._send_json({'ok': True, 'cleared': True})
+                self._send_json({'ok': True, 'cleared': len(ai_keys)})
                 return
             roster_entries = body.get('entries')
             if not isinstance(roster_entries, list):
                 self._send_json({'ok': False, 'message': 'Invalid entries.'}, HTTPStatus.BAD_REQUEST)
                 return
             store = read_store()
-            ai_roster = store.get('aiRoster', {})
+            users = store.get('users', {})
+            saved = 0
             for entry in roster_entries:
                 if not isinstance(entry, dict):
                     continue
-                name = str(entry.get('username', '')).strip()
-                if not name:
+                display_name = str(entry.get('username', '')).strip()
+                if not display_name:
                     continue
-                key = normalize_username_key(name)
-                ai_roster[key] = {
-                    'username': name,
-                    'elo': int(entry.get('elo', 1000)),
-                    'totalRuns': int(entry.get('totalRuns', 0)),
-                    'totalExtractions': int(entry.get('totalExtractions', 0)),
-                    'totalKills': int(entry.get('totalKills', 0)),
-                    'totalDeaths': int(entry.get('totalDeaths', 0)),
-                    'isAI': True,
-                    'isBoss': bool(entry.get('isBoss', False)),
-                }
-            store['aiRoster'] = ai_roster
+                user_key = normalize_username_key(normalize_ai_username(display_name))
+                existing = users.get(user_key, {})
+                current_stats = existing.get('stats', {})
+                users[user_key] = build_profile(
+                    display_name,
+                    f'ai_{user_key}',
+                    {
+                        'elo': entry.get('elo', existing.get('elo', 1000)),
+                        'coins': entry.get('coins', existing.get('coins', 10000)),
+                        'stats': {
+                            'totalRuns': entry.get('totalRuns', current_stats.get('totalRuns', 0)),
+                            'totalExtractions': entry.get('totalExtractions', current_stats.get('totalExtractions', 0)),
+                            'totalKills': entry.get('totalKills', current_stats.get('totalKills', 0)),
+                            'totalCoinsEarned': entry.get('totalCoinsEarned', current_stats.get('totalCoinsEarned', 0)),
+                            'totalMarketTrades': entry.get('totalMarketTrades', current_stats.get('totalMarketTrades', 0)),
+                        },
+                    },
+                    is_ai=True,
+                )
+                users[user_key]['isBoss'] = bool(entry.get('isBoss', False))
+                saved += 1
+            store['users'] = users
             write_store(store)
-            self._send_json({'ok': True, 'saved': len(roster_entries)})
+            self._send_json({'ok': True, 'saved': saved})
             return
 
         if parsed.path == '/api/ai-roster/batch':
@@ -287,38 +328,36 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 self._send_json({'ok': False, 'message': 'Invalid updates list.'}, HTTPStatus.BAD_REQUEST)
                 return
             store = read_store()
-            ai_roster = store.get('aiRoster', {})
+            users = store.get('users', {})
             saved = 0
             for upd in updates:
                 if not isinstance(upd, dict):
                     continue
-                name = str(upd.get('username', '')).strip()
-                if not name:
+                display_name = str(upd.get('username', '')).strip()
+                if not display_name:
                     continue
-                key = normalize_username_key(name)
-                if key not in ai_roster:
-                    ai_roster[key] = {
-                        'username': name,
-                        'elo': 1000,
-                        'totalRuns': 0,
-                        'totalExtractions': 0,
-                        'totalKills': 0,
-                        'totalDeaths': 0,
-                        'isAI': True,
-                        'isBoss': bool(upd.get('isBoss', False)),
-                    }
-                entry = ai_roster[key]
+                user_key = normalize_username_key(normalize_ai_username(display_name))
+                if user_key not in users or not users[user_key].get('isAI', False):
+                    continue
+                entry = users[user_key]
                 if 'elo' in upd:
                     entry['elo'] = max(0, int(upd['elo']))
                 if 'totalRuns' in upd:
-                    entry['totalRuns'] = max(0, int(entry['totalRuns'] + upd['totalRuns']))
+                    entry['stats']['totalRuns'] = max(0, int(entry['stats'].get('totalRuns', 0) + upd['totalRuns']))
                 if 'totalExtractions' in upd:
-                    entry['totalExtractions'] = max(0, int(entry['totalExtractions'] + upd['totalExtractions']))
+                    entry['stats']['totalExtractions'] = max(0, int(entry['stats'].get('totalExtractions', 0) + upd['totalExtractions']))
                 if 'totalKills' in upd:
-                    entry['totalKills'] = max(0, int(entry['totalKills'] + upd['totalKills']))
+                    entry['stats']['totalKills'] = max(0, int(entry['stats'].get('totalKills', 0) + upd['totalKills']))
                 if 'totalDeaths' in upd:
-                    entry['totalDeaths'] = max(0, int(entry['totalDeaths'] + upd['totalDeaths']))
+                    entry['totalDeaths'] = max(0, int(entry.get('totalDeaths', 0) + upd['totalDeaths']))
+                if 'coins' in upd:
+                    entry['coins'] = max(0, int(entry.get('coins', 0) + upd['coins']))
+                users[user_key] = entry
                 saved += 1
+            store['users'] = users
+            write_store(store)
+            self._send_json({'ok': True, 'saved': saved})
+            return
             store['aiRoster'] = ai_roster
             write_store(store)
             self._send_json({'ok': True, 'saved': saved})

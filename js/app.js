@@ -48,7 +48,7 @@ import {
     normalizeProfile,
     runtimeAchievements
 } from './profile.js';
-import { getRosterLeaderboardEntries, prefetchRoster } from './ai_roster.js';
+import { prefetchRoster, invalidateRosterCache } from './ai_roster.js';
 
 const store = new ProfileStore();
 
@@ -200,7 +200,7 @@ const game = new Game(canvas, {
     onStateChange: handleGameState,
     onRunComplete: async (result) => {
         await store.applyRaidOutcome(result);
-        syncAiRosterToServer();
+        invalidateRosterCache();
         _leaderboardCache = null; // invalidate so next view fetches fresh
         renderAll();
         refreshLeaderboardRank();
@@ -1146,12 +1146,6 @@ function refreshLeaderboardRank() {
         cachedLeaderboardPlayer = data?.player || null;
         renderTopbarLeaderboardBox();
     }).catch(() => {});
-}
-
-function syncAiRosterToServer() {
-    const entries = getRosterLeaderboardEntries();
-    if (!entries.length) return;
-    store.pushAiRoster(entries).catch(() => {});
 }
 
 function renderAchievementBadges(pinnedIds, unlockedIds) {

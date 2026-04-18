@@ -1,6 +1,7 @@
 // ============================================================
 // ai_roster.js — 91 persistent AI operator accounts
-// Server-driven: stats fetched from server, cached in memory
+// Stored as full user profiles in server's users table (isAI: true)
+// Equipment is generated per-game, not persisted
 // ============================================================
 
 import { apiFetch } from './profile.js';
@@ -107,6 +108,10 @@ function defaultStats() {
     return { raids: 0, kills: 0, deaths: 0, extractions: 0, elo: 1000 };
 }
 
+function _toKey(displayName) {
+    return 'ai_' + displayName.toLowerCase().replace(/-/g, '').replace(/_/g, '').replace(/ /g, '');
+}
+
 async function _fetchFromServer() {
     if (_fetchPromise) return _fetchPromise;
     _fetchPromise = (async () => {
@@ -131,14 +136,15 @@ export function getRoster() {
     return ROSTER.map((entry) => {
         const key = _toKey(entry.name);
         const s = statsMap[key] || {};
+        const userStats = s.stats || {};
         return {
             ...entry,
             stats: {
                 ...defaultStats(),
-                raids: s.totalRuns || 0,
-                kills: s.totalKills || 0,
+                raids: userStats.totalRuns || 0,
+                kills: userStats.totalKills || 0,
                 deaths: s.totalDeaths || 0,
-                extractions: s.totalExtractions || 0,
+                extractions: userStats.totalExtractions || 0,
                 elo: s.elo || 1000,
             },
         };
@@ -169,10 +175,6 @@ export function pickRosterForRaid(difficulty, count) {
 }
 
 const _STAT_KEY_MAP = { raids: 'totalRuns', kills: 'totalKills', deaths: 'totalDeaths', extractions: 'totalExtractions' };
-
-function _toKey(name) {
-    return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
 
 function _pushBatchToServer(updates) {
     if (!updates || !updates.length) return;
@@ -222,12 +224,13 @@ export function getRosterLeaderboardEntries() {
     return ROSTER.map((entry) => {
         const key = _toKey(entry.name);
         const s = statsMap[key] || {};
+        const userStats = s.stats || {};
         return {
             username: entry.name,
             elo: s.elo ?? 1000,
-            totalRuns: s.totalRuns ?? 0,
-            totalExtractions: s.totalExtractions ?? 0,
-            totalKills: s.totalKills ?? 0,
+            totalRuns: userStats.totalRuns ?? 0,
+            totalExtractions: userStats.totalExtractions ?? 0,
+            totalKills: userStats.totalKills ?? 0,
             isAI: true,
             isBoss: entry.level === 'boss',
         };

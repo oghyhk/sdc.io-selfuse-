@@ -213,6 +213,9 @@ def stats_map_to_leaderboard_format(stats_map):
         })
     return entries
 
+def stats_map_to_server_format(stats_map):
+    return [dict(entry, coins=10000) for entry in stats_map_to_leaderboard_format(stats_map)]
+
 if __name__ == "__main__":
     random.seed(42)
     stats_map = run_simulations(100)
@@ -220,6 +223,7 @@ if __name__ == "__main__":
     output = {
         "ai_roster_stats_v1": stats_map,
         "leaderboard": stats_map_to_leaderboard_format(stats_map),
+        "server_entries": stats_map_to_server_format(stats_map),
     }
 
     out_path = Path(__file__).parent / "data" / "simulated_ai_stats.json"

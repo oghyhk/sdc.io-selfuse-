@@ -71,7 +71,7 @@ async function applyStats() {
     const data = await loadSimulatedStats();
     if (!data) return;
 
-    const entries = data.leaderboard || [];
+    const entries = data.server_entries || data.leaderboard || [];
     log(`Pushing ${entries.length} AI operators to server...`, 'info');
 
     try {
