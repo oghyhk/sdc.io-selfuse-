@@ -231,6 +231,38 @@ class ApiHandler(SimpleHTTPRequestHandler):
             })
             return
 
+        if parsed.path == '/api/ai-roster':
+            store = read_store()
+            users = store.get('users', {})
+            old_ai_roster = store.get('aiRoster', {})
+            migrated = 0
+            if old_ai_roster and not get_ai_users(users):
+                for key, ai_data in old_ai_roster.items():
+                    display_name = ai_data.get('username', key)
+                    user_key = normalize_username_key(normalize_ai_username(display_name))
+                    users[user_key] = build_profile(
+                        display_name,
+                        f'ai_{user_key}',
+                        {
+                            'elo': ai_data.get('elo', 1000),
+                            'stats': {
+                                'totalRuns': ai_data.get('totalRuns', 0),
+                                'totalExtractions': ai_data.get('totalExtractions', 0),
+                                'totalKills': ai_data.get('totalKills', 0),
+                            },
+                            'totalDeaths': ai_data.get('totalDeaths', 0),
+                        },
+                        is_ai=True,
+                    )
+                    users[user_key]['isBoss'] = ai_data.get('isBoss', False)
+                    migrated += 1
+                store['users'] = users
+                store['aiRoster'] = {}
+                write_store(store)
+            ai_users = get_ai_users(users)
+            self._send_json({'ok': True, 'roster': ai_users, 'migrated': migrated})
+            return
+
         return super().do_GET()
 
     def do_POST(self):
