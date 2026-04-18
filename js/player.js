@@ -1249,6 +1249,21 @@ export class Player {
             return true;
         }
 
+        if (isAmmoDefinition(item.definitionId)) {
+            const quantity = getAmmoAmountForEntry(item) || 1;
+            const existingFreeSlots = this.inventoryItems
+                .filter((entry) => entry.definitionId === item.definitionId && isAmmoDefinition(entry.definitionId))
+                .reduce((sum, entry) => sum + Math.max(0, 999 - getAmmoAmountForEntry(entry)), 0);
+            const extraSlotsNeeded = Math.ceil(Math.max(0, quantity - existingFreeSlots) / 999);
+            const extraSpaceNeeded = extraSlotsNeeded * this._getItemSpace(item);
+            if (this.getCarriedSpaceUsed() + extraSpaceNeeded > this.carryCapacity) {
+                return false;
+            }
+            this._pushAmmoPackToBackpack(item.definitionId, quantity);
+            this._recalculateLootValue();
+            return true;
+        }
+
         // Auto-equip gun to free hand slot if available
         if (getItemDefinition(item.definitionId)?.category === 'gun') {
             const freeSlot = GUN_LOADOUT_SLOTS.find((slot) => !this.loadout[slot]);
