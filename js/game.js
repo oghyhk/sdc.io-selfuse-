@@ -1519,12 +1519,12 @@ export class Game {
         ctx.fillText(this.activeDifficulty === 'chaos' ? 'Backpack loot was lost. Safebox contents may also have been lost.' : 'Backpack loot was lost. Safebox contents were retained.', w / 2, h / 2 + 110);
 
         const lostSummary = this.lastExtractSummary || this._buildRunSummary();
-        ctx.fillStyle = '#ffb74d';
-        ctx.font = 'bold 20px monospace';
+        ctx.fillStyle = '#666';
+        ctx.font = 'bold 16px monospace';
         this.renderer.drawCoinValueText('LOST VALUE: ', lostSummary.lostValue, w / 2, h / 2 + 145, {
             align: 'center',
-            iconSize: 18,
-            iconOffsetY: -9,
+            iconSize: 14,
+            iconOffsetY: -7,
         });
 
         const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 400);
@@ -1572,20 +1572,20 @@ export class Game {
         ctx.fillText(`AI Enemies Killed: ${this.stats.aiEnemyKills}`, w / 2, h / 2 + 75);
         ctx.fillText(`Time: ${this._formatTime(this.stats.timeSurvived)}`, w / 2, h / 2 + 105);
 
-        ctx.fillStyle = '#aaa';
-        ctx.font = 'bold 20px monospace';
-        this.renderer.drawCoinValueText('EST. EXTRACTED VALUE: ', summary.estimatedValue, w / 2, h / 2 + 150, {
+        ctx.fillStyle = '#ffb74d';
+        ctx.font = 'bold 26px monospace';
+        this.renderer.drawCoinValueText('EST. EXTRACTED VALUE: ', summary.estimatedValue, w / 2, h / 2 + 145, {
             align: 'center',
-            iconSize: 18,
-            iconOffsetY: -9,
+            iconSize: 20,
+            iconOffsetY: -10,
         });
 
-        ctx.fillStyle = '#ffb74d';
-        ctx.font = 'bold 20px monospace';
-        this.renderer.drawCoinValueText('LOST VALUE: ', summary.lostValue || 0, w / 2, h / 2 + 185, {
+        ctx.fillStyle = '#666';
+        ctx.font = 'bold 16px monospace';
+        this.renderer.drawCoinValueText('LOST VALUE: ', summary.lostValue || 0, w / 2, h / 2 + 180, {
             align: 'center',
-            iconSize: 18,
-            iconOffsetY: -9,
+            iconSize: 14,
+            iconOffsetY: -7,
         });
 
         const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 400);
