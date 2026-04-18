@@ -767,7 +767,28 @@ Item image editing now uses a file upload button instead of text path entry. Sel
 
 ## 21. Equipment Descriptions Update
 All item descriptions in dev-config.json have been updated to include stat summaries appended after the original description text. Format examples:
-## 22. Data Persistence Strategy
+## 23. Item Definitions: Single Source of Truth
+
+`js/profile.js` previously contained hardcoded item definitions for ~14 guns AND ~50+ pieces of ammunition, equipment, and consumables — alongside `data/dev-config.json` which served the same purpose. This duplication created sync hazards: a new item added to `dev-config.json` would not work unless its definition was also manually added to `profile.js`.
+
+**The fix:** `ITEM_DEFS` in `profile.js` is now an **empty object**. It is populated **exclusively** at runtime by `loadRuntimeDevConfig()`, which fetches from `GET /api/dev-config`. This makes `dev-config.json` the **sole source of truth** for all item definitions.
+
+```
+data/dev-config.json  →  server.py  →  GET /api/dev-config  →  loadRuntimeDevConfig()  →  ITEM_DEFS
+```
+
+**Implications:**
+- If `loadRuntimeDevConfig()` fails, `ITEM_DEFS` remains empty — no items are purchasable, which is correct server-authoritative behavior.
+- All items (guns, ammo, armor, helmets, shoes, backpacks, consumables) **must** be defined in `dev-config.json`.
+- `STARTER_LOADOUT` references (`g17`, `cloth_vest`, `scout_cap`, `trail_shoes`, `sling_pack`) must all exist in `dev-config.json`.
+- Server-side validation (`buyItem`, `sellItem`, `computeEloChange`) all reference `ITEM_DEFS`, so they automatically use whatever the server provides.
+
+### .gitignore Policy (Updated)
+- `data/users.json` is **tracked** — it MUST be committed (player data).
+- `data/dev-config.json` is **tracked** — it MUST be committed (game content definitions).
+- Previously `dev-config.json` was gitignored — this was the root cause of the missing-item bug.
+
+## 24. Running the Game on Localhost
 
 ### Dual-Location Storage
 User data is stored in two places simultaneously:
