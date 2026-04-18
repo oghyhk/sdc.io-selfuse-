@@ -62,7 +62,11 @@ def read_store() -> dict:
                     return _load_store_file(DATA_FILE_BACKUP)
                 except (json.JSONDecodeError, OSError, ValueError):
                     pass
-            return _default_store()
+            raise RuntimeError(
+                f'Both primary store ({DATA_FILE}) and backup ({DATA_FILE_BACKUP}) are unreadable. '
+                'Cannot safely load or write user data without risking total data loss. '
+                'Restore from git history or a known-good backup before resuming.'
+            )
 
 
 def write_store(store: dict) -> None:
