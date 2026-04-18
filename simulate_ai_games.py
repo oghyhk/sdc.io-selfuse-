@@ -159,6 +159,16 @@ def simulate_game(difficulty, stats_map):
     eligible = [e for e in ROSTER if e["level"] in levels]
     participants = random.sample(eligible, min(count, len(eligible)))
 
+    # Boss spawns with probability on top of regular count (chaos: 30%, hell: 5%)
+    if difficulty == "chaos" and random.random() < 0.30:
+        boss_entry = next((e for e in ROSTER if e["level"] == "boss"), None)
+        if boss_entry and boss_entry not in participants:
+            participants = participants + [boss_entry]
+    elif difficulty == "hell" and random.random() < 0.05:
+        boss_entry = next((e for e in ROSTER if e["level"] == "boss"), None)
+        if boss_entry and boss_entry not in participants:
+            participants = participants + [boss_entry]
+
     for op in participants:
         op_id = op["id"]
         if op_id not in stats_map:

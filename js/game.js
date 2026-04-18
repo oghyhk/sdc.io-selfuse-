@@ -304,6 +304,7 @@ export class Game {
             squadId: 'boss-squad',
             squadIndex: 0,
             squadSize: 1,
+            rosterId: 'r99',
         });
         bot.onDamageTaken = (entity, amount) => this._spawnFloatingDamageNumber(entity.x, entity.y, amount);
         bot.elo = 1500; // bosses have high ELO

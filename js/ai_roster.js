@@ -160,8 +160,8 @@ export function pickRosterForRaid(difficulty, count) {
     const allowedLevels = {
         easy:     ['lv1'],
         advanced: ['lv1', 'lv2'],
-        hell:     ['lv1', 'lv2', 'lv3', 'lv4'],
-        chaos:    ['lv2', 'lv3', 'lv4'],
+        hell:     ['lv1', 'lv2', 'lv3', 'lv4', 'boss'],
+        chaos:    ['lv2', 'lv3', 'lv4', 'boss'],
     };
     const levels = allowedLevels[difficulty] || allowedLevels.advanced;
     const eligible = getRoster().filter((e) => levels.includes(e.level));
