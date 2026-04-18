@@ -32,6 +32,9 @@ def write_store(store: dict) -> None:
         raise ValueError('store must be a dict')
     if 'users' not in store:
         raise ValueError('store must have users key')
+    # Prevent wiping users with empty dict
+    if not isinstance(store.get('users'), dict):
+        raise ValueError('store.users must be a dict')
     DATA_FILE.write_text(json.dumps(store, indent=2), encoding='utf-8')
     _auto_git_commit_push()
 
