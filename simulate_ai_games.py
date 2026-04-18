@@ -227,7 +227,6 @@ def stats_map_to_server_format(stats_map):
     return [dict(entry, coins=10000) for entry in stats_map_to_leaderboard_format(stats_map)]
 
 if __name__ == "__main__":
-    random.seed(42)
     stats_map = run_simulations(100)
 
     output = {
