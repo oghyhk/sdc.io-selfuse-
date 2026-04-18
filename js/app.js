@@ -199,9 +199,13 @@ const COIN_ICON_PATH = '/assets/items/coin.png';
 const game = new Game(canvas, {
     onStateChange: handleGameState,
     onRunComplete: async (result) => {
-        await store.applyRaidOutcome(result);
+        try {
+            await store.applyRaidOutcome(result);
+        } catch (e) {
+            console.warn('applyRaidOutcome failed:', e);
+        }
         invalidateRosterCache();
-        _leaderboardCache = null; // invalidate so next view fetches fresh
+        _leaderboardCache = null;
         renderAll();
         refreshLeaderboardRank();
     }
@@ -708,7 +712,7 @@ function _renderLeaderboardTable(profile, elo, data) {
     const playerEntry = data?.player || null;
     const total = data?.total || 0;
 
-    const yourRank = playerEntry ? `#${playerEntry.rank}` : 'Unranked';
+    const yourRank = playerEntry && playerEntry.rank ? `#${playerEntry.rank}` : 'Unranked';
     cachedLeaderboardPlayer = playerEntry;
     renderTopbarLeaderboardBox();
 
@@ -736,17 +740,18 @@ function _renderLeaderboardTable(profile, elo, data) {
                 </thead>
                 <tbody>
                     ${leaderboard.map((entry) => {
-                        const isYou = playerEntry && entry.rank === playerEntry.rank && entry.username === playerEntry.username;
-                        const rankBadge = entry.rank <= 3 ? ` lb-rank-${entry.rank}` : '';
+                        const rank = entry.rank ?? 0;
+                        const isYou = playerEntry && rank === (playerEntry.rank ?? 0) && entry.username === playerEntry.username;
+                        const rankBadge = rank > 0 && rank <= 3 ? ` lb-rank-${rank}` : '';
                         const aiTag = entry.isBoss ? ' <span class="lb-ai-tag lb-boss-tag">BOSS</span>' : entry.isAI ? ' <span class="lb-ai-tag">AI</span>' : '';
                         return `
                         <tr class="lb-row${isYou ? ' lb-row-you' : ''}${rankBadge}${entry.isAI ? ' lb-row-ai' : ''}">
-                            <td class="lb-col-rank">${entry.rank}</td>
-                            <td class="lb-col-name">${entry.username}${aiTag}${isYou ? ' <span class="lb-you-tag">(You)</span>' : ''}</td>
-                            <td class="lb-col-elo">${entry.elo}</td>
-                            <td class="lb-col-stat">${entry.totalRuns}</td>
-                            <td class="lb-col-stat">${entry.totalExtractions}</td>
-                            <td class="lb-col-stat">${entry.totalKills}</td>
+                            <td class="lb-col-rank">${rank || '?'}</td>
+                            <td class="lb-col-name">${entry.username || '?'}${aiTag}${isYou ? ' <span class="lb-you-tag">(You)</span>' : ''}</td>
+                            <td class="lb-col-elo">${entry.elo ?? '?'}</td>
+                            <td class="lb-col-stat">${entry.totalRuns ?? 0}</td>
+                            <td class="lb-col-stat">${entry.totalExtractions ?? 0}</td>
+                            <td class="lb-col-stat">${entry.totalKills ?? 0}</td>
                         </tr>`;
                     }).join('')}
                 </tbody>
@@ -756,12 +761,12 @@ function _renderLeaderboardTable(profile, elo, data) {
                 <table class="leaderboard-table lb-footer-table">
                     <tbody>
                         <tr class="lb-row lb-row-you">
-                            <td class="lb-col-rank">${playerEntry.rank}</td>
-                            <td class="lb-col-name">${playerEntry.username} <span class="lb-you-tag">(You)</span></td>
-                            <td class="lb-col-elo">${playerEntry.elo}</td>
-                            <td class="lb-col-stat">${playerEntry.totalRuns}</td>
-                            <td class="lb-col-stat">${playerEntry.totalExtractions}</td>
-                            <td class="lb-col-stat">${playerEntry.totalKills}</td>
+                            <td class="lb-col-rank">${playerEntry.rank ?? '?'}</td>
+                            <td class="lb-col-name">${playerEntry.username || '?'} <span class="lb-you-tag">(You)</span></td>
+                            <td class="lb-col-elo">${playerEntry.elo ?? '?'}</td>
+                            <td class="lb-col-stat">${playerEntry.totalRuns ?? 0}</td>
+                            <td class="lb-col-stat">${playerEntry.totalExtractions ?? 0}</td>
+                            <td class="lb-col-stat">${playerEntry.totalKills ?? 0}</td>
                         </tr>
                     </tbody>
                 </table>
