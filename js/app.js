@@ -1929,6 +1929,8 @@ async function startRaidWithSelectedLoadout() {
     if (difficultySelect.value === 'chaos') {
         const shouldContinue = await confirmChaosStart();
         if (!shouldContinue) return;
+    } else {
+        showRaidLoadingOverlay();
     }
 
     await store.applyRaidLoadoutSelection(selectedSlot, { autoBuyMissing: preview.totalCost > 0 });
