@@ -1,0 +1,1563 @@
+{
+  "ai_roster_stats_v1": {
+    "r01": {
+      "raids": 161,
+      "kills": 142,
+      "deaths": 81,
+      "extractions": 80,
+      "elo": 1358
+    },
+    "r09": {
+      "raids": 165,
+      "kills": 175,
+      "deaths": 72,
+      "extractions": 93,
+      "elo": 1337
+    },
+    "r04": {
+      "raids": 164,
+      "kills": 160,
+      "deaths": 80,
+      "extractions": 84,
+      "elo": 1253
+    },
+    "r15": {
+      "raids": 174,
+      "kills": 168,
+      "deaths": 89,
+      "extractions": 85,
+      "elo": 1321
+    },
+    "r03": {
+      "raids": 175,
+      "kills": 165,
+      "deaths": 86,
+      "extractions": 89,
+      "elo": 1355
+    },
+    "r12": {
+      "raids": 162,
+      "kills": 164,
+      "deaths": 80,
+      "extractions": 82,
+      "elo": 1273
+    },
+    "r02": {
+      "raids": 159,
+      "kills": 174,
+      "deaths": 79,
+      "extractions": 80,
+      "elo": 1272
+    },
+    "r16": {
+      "raids": 177,
+      "kills": 205,
+      "deaths": 87,
+      "extractions": 90,
+      "elo": 1354
+    },
+    "r11": {
+      "raids": 170,
+      "kills": 147,
+      "deaths": 95,
+      "extractions": 75,
+      "elo": 1218
+    },
+    "r07": {
+      "raids": 155,
+      "kills": 175,
+      "deaths": 80,
+      "extractions": 75,
+      "elo": 1334
+    },
+    "r17": {
+      "raids": 165,
+      "kills": 179,
+      "deaths": 70,
+      "extractions": 95,
+      "elo": 1381
+    },
+    "r08": {
+      "raids": 159,
+      "kills": 180,
+      "deaths": 70,
+      "extractions": 89,
+      "elo": 1330
+    },
+    "r06": {
+      "raids": 169,
+      "kills": 167,
+      "deaths": 85,
+      "extractions": 84,
+      "elo": 1256
+    },
+    "r10": {
+      "raids": 170,
+      "kills": 165,
+      "deaths": 83,
+      "extractions": 87,
+      "elo": 1251
+    },
+    "r05": {
+      "raids": 161,
+      "kills": 156,
+      "deaths": 83,
+      "extractions": 78,
+      "elo": 1293
+    },
+    "r13": {
+      "raids": 161,
+      "kills": 141,
+      "deaths": 88,
+      "extractions": 73,
+      "elo": 1247
+    },
+    "r14": {
+      "raids": 166,
+      "kills": 167,
+      "deaths": 82,
+      "extractions": 84,
+      "elo": 1291
+    },
+    "r19": {
+      "raids": 126,
+      "kills": 125,
+      "deaths": 64,
+      "extractions": 62,
+      "elo": 1259
+    },
+    "r25": {
+      "raids": 123,
+      "kills": 123,
+      "deaths": 52,
+      "extractions": 71,
+      "elo": 1572
+    },
+    "r34": {
+      "raids": 116,
+      "kills": 131,
+      "deaths": 61,
+      "extractions": 55,
+      "elo": 1276
+    },
+    "r23": {
+      "raids": 116,
+      "kills": 127,
+      "deaths": 54,
+      "extractions": 62,
+      "elo": 1565
+    },
+    "r20": {
+      "raids": 130,
+      "kills": 129,
+      "deaths": 66,
+      "extractions": 64,
+      "elo": 1351
+    },
+    "r18": {
+      "raids": 115,
+      "kills": 107,
+      "deaths": 60,
+      "extractions": 55,
+      "elo": 1486
+    },
+    "r31": {
+      "raids": 123,
+      "kills": 138,
+      "deaths": 52,
+      "extractions": 71,
+      "elo": 1660
+    },
+    "r29": {
+      "raids": 126,
+      "kills": 126,
+      "deaths": 58,
+      "extractions": 68,
+      "elo": 1705
+    },
+    "r35": {
+      "raids": 99,
+      "kills": 109,
+      "deaths": 46,
+      "extractions": 53,
+      "elo": 1566
+    },
+    "r22": {
+      "raids": 133,
+      "kills": 151,
+      "deaths": 55,
+      "extractions": 78,
+      "elo": 1582
+    },
+    "r26": {
+      "raids": 123,
+      "kills": 121,
+      "deaths": 58,
+      "extractions": 65,
+      "elo": 1476
+    },
+    "r24": {
+      "raids": 111,
+      "kills": 107,
+      "deaths": 49,
+      "extractions": 62,
+      "elo": 1696
+    },
+    "r28": {
+      "raids": 110,
+      "kills": 99,
+      "deaths": 64,
+      "extractions": 46,
+      "elo": 1180
+    },
+    "r33": {
+      "raids": 123,
+      "kills": 103,
+      "deaths": 68,
+      "extractions": 55,
+      "elo": 1335
+    },
+    "r21": {
+      "raids": 123,
+      "kills": 125,
+      "deaths": 67,
+      "extractions": 56,
+      "elo": 1243
+    },
+    "r27": {
+      "raids": 119,
+      "kills": 124,
+      "deaths": 63,
+      "extractions": 56,
+      "elo": 1357
+    },
+    "r30": {
+      "raids": 117,
+      "kills": 126,
+      "deaths": 64,
+      "extractions": 53,
+      "elo": 1200
+    },
+    "r36": {
+      "raids": 110,
+      "kills": 104,
+      "deaths": 60,
+      "extractions": 50,
+      "elo": 1247
+    },
+    "r32": {
+      "raids": 137,
+      "kills": 139,
+      "deaths": 66,
+      "extractions": 71,
+      "elo": 1469
+    },
+    "r77": {
+      "raids": 85,
+      "kills": 91,
+      "deaths": 34,
+      "extractions": 51,
+      "elo": 1719
+    },
+    "r54": {
+      "raids": 66,
+      "kills": 65,
+      "deaths": 31,
+      "extractions": 35,
+      "elo": 1512
+    },
+    "r49": {
+      "raids": 70,
+      "kills": 74,
+      "deaths": 31,
+      "extractions": 39,
+      "elo": 1538
+    },
+    "r75": {
+      "raids": 69,
+      "kills": 66,
+      "deaths": 35,
+      "extractions": 34,
+      "elo": 1434
+    },
+    "r63": {
+      "raids": 71,
+      "kills": 66,
+      "deaths": 40,
+      "extractions": 31,
+      "elo": 1319
+    },
+    "r73": {
+      "raids": 72,
+      "kills": 76,
+      "deaths": 35,
+      "extractions": 37,
+      "elo": 1594
+    },
+    "r88": {
+      "raids": 75,
+      "kills": 74,
+      "deaths": 38,
+      "extractions": 37,
+      "elo": 1370
+    },
+    "r38": {
+      "raids": 74,
+      "kills": 73,
+      "deaths": 34,
+      "extractions": 40,
+      "elo": 1708
+    },
+    "r68": {
+      "raids": 72,
+      "kills": 70,
+      "deaths": 39,
+      "extractions": 33,
+      "elo": 1290
+    },
+    "r65": {
+      "raids": 67,
+      "kills": 70,
+      "deaths": 38,
+      "extractions": 29,
+      "elo": 1378
+    },
+    "r81": {
+      "raids": 71,
+      "kills": 65,
+      "deaths": 35,
+      "extractions": 36,
+      "elo": 1605
+    },
+    "r87": {
+      "raids": 68,
+      "kills": 67,
+      "deaths": 34,
+      "extractions": 34,
+      "elo": 1288
+    },
+    "r70": {
+      "raids": 69,
+      "kills": 70,
+      "deaths": 36,
+      "extractions": 33,
+      "elo": 1273
+    },
+    "r46": {
+      "raids": 68,
+      "kills": 83,
+      "deaths": 31,
+      "extractions": 37,
+      "elo": 1337
+    },
+    "r53": {
+      "raids": 76,
+      "kills": 77,
+      "deaths": 44,
+      "extractions": 32,
+      "elo": 1420
+    },
+    "r51": {
+      "raids": 71,
+      "kills": 61,
+      "deaths": 27,
+      "extractions": 44,
+      "elo": 1651
+    },
+    "r44": {
+      "raids": 75,
+      "kills": 88,
+      "deaths": 30,
+      "extractions": 45,
+      "elo": 1806
+    },
+    "r76": {
+      "raids": 71,
+      "kills": 58,
+      "deaths": 45,
+      "extractions": 26,
+      "elo": 1170
+    },
+    "r59": {
+      "raids": 73,
+      "kills": 89,
+      "deaths": 28,
+      "extractions": 45,
+      "elo": 1649
+    },
+    "r40": {
+      "raids": 62,
+      "kills": 61,
+      "deaths": 29,
+      "extractions": 33,
+      "elo": 1542
+    },
+    "r37": {
+      "raids": 55,
+      "kills": 55,
+      "deaths": 21,
+      "extractions": 34,
+      "elo": 1632
+    },
+    "r86": {
+      "raids": 69,
+      "kills": 74,
+      "deaths": 39,
+      "extractions": 30,
+      "elo": 1465
+    },
+    "r72": {
+      "raids": 65,
+      "kills": 66,
+      "deaths": 32,
+      "extractions": 33,
+      "elo": 1407
+    },
+    "r61": {
+      "raids": 68,
+      "kills": 69,
+      "deaths": 37,
+      "extractions": 31,
+      "elo": 1294
+    },
+    "r48": {
+      "raids": 60,
+      "kills": 56,
+      "deaths": 27,
+      "extractions": 33,
+      "elo": 1427
+    },
+    "r60": {
+      "raids": 80,
+      "kills": 78,
+      "deaths": 40,
+      "extractions": 40,
+      "elo": 1358
+    },
+    "r58": {
+      "raids": 72,
+      "kills": 64,
+      "deaths": 39,
+      "extractions": 33,
+      "elo": 1296
+    },
+    "r79": {
+      "raids": 75,
+      "kills": 91,
+      "deaths": 33,
+      "extractions": 42,
+      "elo": 1663
+    },
+    "r39": {
+      "raids": 58,
+      "kills": 53,
+      "deaths": 28,
+      "extractions": 30,
+      "elo": 1383
+    },
+    "r66": {
+      "raids": 75,
+      "kills": 74,
+      "deaths": 42,
+      "extractions": 33,
+      "elo": 1314
+    },
+    "r56": {
+      "raids": 70,
+      "kills": 70,
+      "deaths": 38,
+      "extractions": 32,
+      "elo": 1344
+    },
+    "r45": {
+      "raids": 69,
+      "kills": 60,
+      "deaths": 42,
+      "extractions": 27,
+      "elo": 1270
+    },
+    "r57": {
+      "raids": 71,
+      "kills": 73,
+      "deaths": 31,
+      "extractions": 40,
+      "elo": 1514
+    },
+    "r62": {
+      "raids": 75,
+      "kills": 83,
+      "deaths": 36,
+      "extractions": 39,
+      "elo": 1403
+    },
+    "r47": {
+      "raids": 74,
+      "kills": 78,
+      "deaths": 40,
+      "extractions": 34,
+      "elo": 1253
+    },
+    "r91": {
+      "raids": 58,
+      "kills": 44,
+      "deaths": 33,
+      "extractions": 25,
+      "elo": 1412
+    },
+    "r43": {
+      "raids": 68,
+      "kills": 66,
+      "deaths": 34,
+      "extractions": 34,
+      "elo": 1222
+    },
+    "r84": {
+      "raids": 54,
+      "kills": 54,
+      "deaths": 21,
+      "extractions": 33,
+      "elo": 1647
+    },
+    "r78": {
+      "raids": 79,
+      "kills": 81,
+      "deaths": 41,
+      "extractions": 38,
+      "elo": 1448
+    },
+    "r50": {
+      "raids": 89,
+      "kills": 112,
+      "deaths": 43,
+      "extractions": 46,
+      "elo": 1723
+    },
+    "r42": {
+      "raids": 56,
+      "kills": 55,
+      "deaths": 28,
+      "extractions": 28,
+      "elo": 1311
+    },
+    "r67": {
+      "raids": 72,
+      "kills": 66,
+      "deaths": 42,
+      "extractions": 30,
+      "elo": 1237
+    },
+    "r64": {
+      "raids": 75,
+      "kills": 59,
+      "deaths": 36,
+      "extractions": 39,
+      "elo": 1392
+    },
+    "r90": {
+      "raids": 56,
+      "kills": 66,
+      "deaths": 21,
+      "extractions": 35,
+      "elo": 1578
+    },
+    "r71": {
+      "raids": 66,
+      "kills": 73,
+      "deaths": 33,
+      "extractions": 33,
+      "elo": 1436
+    },
+    "r69": {
+      "raids": 70,
+      "kills": 70,
+      "deaths": 31,
+      "extractions": 39,
+      "elo": 1556
+    },
+    "r41": {
+      "raids": 64,
+      "kills": 78,
+      "deaths": 21,
+      "extractions": 43,
+      "elo": 1783
+    },
+    "r85": {
+      "raids": 76,
+      "kills": 63,
+      "deaths": 41,
+      "extractions": 35,
+      "elo": 1375
+    },
+    "r74": {
+      "raids": 68,
+      "kills": 66,
+      "deaths": 35,
+      "extractions": 33,
+      "elo": 1338
+    },
+    "r55": {
+      "raids": 74,
+      "kills": 84,
+      "deaths": 33,
+      "extractions": 41,
+      "elo": 1603
+    },
+    "r83": {
+      "raids": 62,
+      "kills": 51,
+      "deaths": 31,
+      "extractions": 31,
+      "elo": 1397
+    },
+    "r89": {
+      "raids": 62,
+      "kills": 58,
+      "deaths": 35,
+      "extractions": 27,
+      "elo": 1217
+    },
+    "r52": {
+      "raids": 58,
+      "kills": 56,
+      "deaths": 33,
+      "extractions": 25,
+      "elo": 1349
+    },
+    "r82": {
+      "raids": 74,
+      "kills": 76,
+      "deaths": 36,
+      "extractions": 38,
+      "elo": 1392
+    },
+    "r80": {
+      "raids": 69,
+      "kills": 85,
+      "deaths": 28,
+      "extractions": 41,
+      "elo": 1732
+    }
+  },
+  "leaderboard": [
+    {
+      "username": "Ghost-11",
+      "elo": 1358,
+      "totalRuns": 161,
+      "totalExtractions": 80,
+      "totalKills": 142,
+      "totalDeaths": 81,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Brick-4",
+      "elo": 1272,
+      "totalRuns": 159,
+      "totalExtractions": 80,
+      "totalKills": 174,
+      "totalDeaths": 79,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Anvil-9",
+      "elo": 1355,
+      "totalRuns": 175,
+      "totalExtractions": 89,
+      "totalKills": 165,
+      "totalDeaths": 86,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Badger-6",
+      "elo": 1253,
+      "totalRuns": 164,
+      "totalExtractions": 84,
+      "totalKills": 160,
+      "totalDeaths": 80,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Hound-12",
+      "elo": 1293,
+      "totalRuns": 161,
+      "totalExtractions": 78,
+      "totalKills": 156,
+      "totalDeaths": 83,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Ember-3",
+      "elo": 1256,
+      "totalRuns": 169,
+      "totalExtractions": 84,
+      "totalKills": 167,
+      "totalDeaths": 85,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Magpie-5",
+      "elo": 1334,
+      "totalRuns": 155,
+      "totalExtractions": 75,
+      "totalKills": 175,
+      "totalDeaths": 80,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Rook-14",
+      "elo": 1330,
+      "totalRuns": 159,
+      "totalExtractions": 89,
+      "totalKills": 180,
+      "totalDeaths": 70,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Ferret-2",
+      "elo": 1337,
+      "totalRuns": 165,
+      "totalExtractions": 93,
+      "totalKills": 175,
+      "totalDeaths": 72,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Cricket-8",
+      "elo": 1251,
+      "totalRuns": 170,
+      "totalExtractions": 87,
+      "totalKills": 165,
+      "totalDeaths": 83,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Pebble-17",
+      "elo": 1218,
+      "totalRuns": 170,
+      "totalExtractions": 75,
+      "totalKills": 147,
+      "totalDeaths": 95,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Sprout-10",
+      "elo": 1273,
+      "totalRuns": 162,
+      "totalExtractions": 82,
+      "totalKills": 164,
+      "totalDeaths": 80,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Rabbit-7",
+      "elo": 1247,
+      "totalRuns": 161,
+      "totalExtractions": 73,
+      "totalKills": 141,
+      "totalDeaths": 88,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Flicker-16",
+      "elo": 1291,
+      "totalRuns": 166,
+      "totalExtractions": 84,
+      "totalKills": 167,
+      "totalDeaths": 82,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Wisp-1",
+      "elo": 1321,
+      "totalRuns": 174,
+      "totalExtractions": 85,
+      "totalKills": 168,
+      "totalDeaths": 89,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Dart-13",
+      "elo": 1354,
+      "totalRuns": 177,
+      "totalExtractions": 90,
+      "totalKills": 205,
+      "totalDeaths": 87,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Swift-20",
+      "elo": 1381,
+      "totalRuns": 165,
+      "totalExtractions": 95,
+      "totalKills": 179,
+      "totalDeaths": 70,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Viper-9",
+      "elo": 1486,
+      "totalRuns": 115,
+      "totalExtractions": 55,
+      "totalKills": 107,
+      "totalDeaths": 60,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Raven-2",
+      "elo": 1259,
+      "totalRuns": 126,
+      "totalExtractions": 62,
+      "totalKills": 125,
+      "totalDeaths": 64,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Mako-7",
+      "elo": 1351,
+      "totalRuns": 130,
+      "totalExtractions": 64,
+      "totalKills": 129,
+      "totalDeaths": 66,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Warden-1",
+      "elo": 1243,
+      "totalRuns": 123,
+      "totalExtractions": 56,
+      "totalKills": 125,
+      "totalDeaths": 67,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Titan-15",
+      "elo": 1582,
+      "totalRuns": 133,
+      "totalExtractions": 78,
+      "totalKills": 151,
+      "totalDeaths": 55,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Storm-22",
+      "elo": 1565,
+      "totalRuns": 116,
+      "totalExtractions": 62,
+      "totalKills": 127,
+      "totalDeaths": 54,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Blitz-12",
+      "elo": 1696,
+      "totalRuns": 111,
+      "totalExtractions": 62,
+      "totalKills": 107,
+      "totalDeaths": 49,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Atlas-4",
+      "elo": 1572,
+      "totalRuns": 123,
+      "totalExtractions": 71,
+      "totalKills": 123,
+      "totalDeaths": 52,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Cipher-8",
+      "elo": 1476,
+      "totalRuns": 123,
+      "totalExtractions": 65,
+      "totalKills": 121,
+      "totalDeaths": 58,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Echo-6",
+      "elo": 1357,
+      "totalRuns": 119,
+      "totalExtractions": 56,
+      "totalKills": 124,
+      "totalDeaths": 63,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Nomad-18",
+      "elo": 1180,
+      "totalRuns": 110,
+      "totalExtractions": 46,
+      "totalKills": 99,
+      "totalDeaths": 64,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Lynx-25",
+      "elo": 1705,
+      "totalRuns": 126,
+      "totalExtractions": 68,
+      "totalKills": 126,
+      "totalDeaths": 58,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Pilgrim-21",
+      "elo": 1200,
+      "totalRuns": 117,
+      "totalExtractions": 53,
+      "totalKills": 126,
+      "totalDeaths": 64,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Falcon-5",
+      "elo": 1660,
+      "totalRuns": 123,
+      "totalExtractions": 71,
+      "totalKills": 138,
+      "totalDeaths": 52,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Nova-3",
+      "elo": 1469,
+      "totalRuns": 137,
+      "totalExtractions": 71,
+      "totalKills": 139,
+      "totalDeaths": 66,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Drift-17",
+      "elo": 1335,
+      "totalRuns": 123,
+      "totalExtractions": 55,
+      "totalKills": 103,
+      "totalDeaths": 68,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Zephyr-11",
+      "elo": 1276,
+      "totalRuns": 116,
+      "totalExtractions": 55,
+      "totalKills": 131,
+      "totalDeaths": 61,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Shade-28",
+      "elo": 1566,
+      "totalRuns": 99,
+      "totalExtractions": 53,
+      "totalKills": 109,
+      "totalDeaths": 46,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Breeze-19",
+      "elo": 1247,
+      "totalRuns": 110,
+      "totalExtractions": 50,
+      "totalKills": 104,
+      "totalDeaths": 60,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Reaper-10",
+      "elo": 1632,
+      "totalRuns": 55,
+      "totalExtractions": 34,
+      "totalKills": 55,
+      "totalDeaths": 21,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Phantom-13",
+      "elo": 1708,
+      "totalRuns": 74,
+      "totalExtractions": 40,
+      "totalKills": 73,
+      "totalDeaths": 34,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Mantis-14",
+      "elo": 1383,
+      "totalRuns": 58,
+      "totalExtractions": 30,
+      "totalKills": 53,
+      "totalDeaths": 28,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Cerberus-30",
+      "elo": 1542,
+      "totalRuns": 62,
+      "totalExtractions": 33,
+      "totalKills": 61,
+      "totalDeaths": 29,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Apex-26",
+      "elo": 1783,
+      "totalRuns": 64,
+      "totalExtractions": 43,
+      "totalKills": 78,
+      "totalDeaths": 21,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Hydra-31",
+      "elo": 1723,
+      "totalRuns": 89,
+      "totalExtractions": 46,
+      "totalKills": 112,
+      "totalDeaths": 43,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Vulcan-32",
+      "elo": 1651,
+      "totalRuns": 71,
+      "totalExtractions": 44,
+      "totalKills": 61,
+      "totalDeaths": 27,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Onslaught-33",
+      "elo": 1349,
+      "totalRuns": 58,
+      "totalExtractions": 25,
+      "totalKills": 56,
+      "totalDeaths": 33,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Havoc-34",
+      "elo": 1420,
+      "totalRuns": 76,
+      "totalExtractions": 32,
+      "totalKills": 77,
+      "totalDeaths": 44,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Fury-35",
+      "elo": 1512,
+      "totalRuns": 66,
+      "totalExtractions": 35,
+      "totalKills": 65,
+      "totalDeaths": 31,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Titan-X",
+      "elo": 1603,
+      "totalRuns": 74,
+      "totalExtractions": 41,
+      "totalKills": 84,
+      "totalDeaths": 33,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Warpath-36",
+      "elo": 1344,
+      "totalRuns": 70,
+      "totalExtractions": 32,
+      "totalKills": 70,
+      "totalDeaths": 38,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Specter-18",
+      "elo": 1311,
+      "totalRuns": 56,
+      "totalExtractions": 28,
+      "totalKills": 55,
+      "totalDeaths": 28,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Orion-15",
+      "elo": 1222,
+      "totalRuns": 68,
+      "totalExtractions": 34,
+      "totalKills": 66,
+      "totalDeaths": 34,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Jackal-29",
+      "elo": 1806,
+      "totalRuns": 75,
+      "totalExtractions": 45,
+      "totalKills": 88,
+      "totalDeaths": 30,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Sable-37",
+      "elo": 1514,
+      "totalRuns": 71,
+      "totalExtractions": 40,
+      "totalKills": 73,
+      "totalDeaths": 31,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Mirage-38",
+      "elo": 1296,
+      "totalRuns": 72,
+      "totalExtractions": 33,
+      "totalKills": 64,
+      "totalDeaths": 39,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Crypt-39",
+      "elo": 1649,
+      "totalRuns": 73,
+      "totalExtractions": 45,
+      "totalKills": 89,
+      "totalDeaths": 28,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Argus-40",
+      "elo": 1358,
+      "totalRuns": 80,
+      "totalExtractions": 40,
+      "totalKills": 78,
+      "totalDeaths": 40,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Nexus-41",
+      "elo": 1294,
+      "totalRuns": 68,
+      "totalExtractions": 31,
+      "totalKills": 69,
+      "totalDeaths": 37,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Valkyrie-19",
+      "elo": 1270,
+      "totalRuns": 69,
+      "totalExtractions": 27,
+      "totalKills": 60,
+      "totalDeaths": 42,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Ion-20",
+      "elo": 1337,
+      "totalRuns": 68,
+      "totalExtractions": 37,
+      "totalKills": 83,
+      "totalDeaths": 31,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Aegis-16",
+      "elo": 1253,
+      "totalRuns": 74,
+      "totalExtractions": 34,
+      "totalKills": 78,
+      "totalDeaths": 40,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Wraith-27",
+      "elo": 1427,
+      "totalRuns": 60,
+      "totalExtractions": 33,
+      "totalKills": 56,
+      "totalDeaths": 27,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Comet-24",
+      "elo": 1538,
+      "totalRuns": 70,
+      "totalExtractions": 39,
+      "totalKills": 74,
+      "totalDeaths": 31,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Mercury-42",
+      "elo": 1403,
+      "totalRuns": 75,
+      "totalExtractions": 39,
+      "totalKills": 83,
+      "totalDeaths": 36,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Bolt-43",
+      "elo": 1319,
+      "totalRuns": 71,
+      "totalExtractions": 31,
+      "totalKills": 66,
+      "totalDeaths": 40,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Pulse-44",
+      "elo": 1392,
+      "totalRuns": 75,
+      "totalExtractions": 39,
+      "totalKills": 59,
+      "totalDeaths": 36,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Streak-45",
+      "elo": 1378,
+      "totalRuns": 67,
+      "totalExtractions": 29,
+      "totalKills": 70,
+      "totalDeaths": 38,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Glint-46",
+      "elo": 1314,
+      "totalRuns": 75,
+      "totalExtractions": 33,
+      "totalKills": 74,
+      "totalDeaths": 42,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Oblivion-47",
+      "elo": 1237,
+      "totalRuns": 72,
+      "totalExtractions": 30,
+      "totalKills": 66,
+      "totalDeaths": 42,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Ragnarok-48",
+      "elo": 1290,
+      "totalRuns": 72,
+      "totalExtractions": 33,
+      "totalKills": 70,
+      "totalDeaths": 39,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Desolator-49",
+      "elo": 1556,
+      "totalRuns": 70,
+      "totalExtractions": 39,
+      "totalKills": 70,
+      "totalDeaths": 31,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Inferno-50",
+      "elo": 1273,
+      "totalRuns": 69,
+      "totalExtractions": 33,
+      "totalKills": 70,
+      "totalDeaths": 36,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Tyrant-51",
+      "elo": 1436,
+      "totalRuns": 66,
+      "totalExtractions": 33,
+      "totalKills": 73,
+      "totalDeaths": 33,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Dreadnought-52",
+      "elo": 1407,
+      "totalRuns": 65,
+      "totalExtractions": 33,
+      "totalKills": 66,
+      "totalDeaths": 32,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Warlord-53",
+      "elo": 1594,
+      "totalRuns": 72,
+      "totalExtractions": 37,
+      "totalKills": 76,
+      "totalDeaths": 35,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Juggernaut-54",
+      "elo": 1338,
+      "totalRuns": 68,
+      "totalExtractions": 33,
+      "totalKills": 66,
+      "totalDeaths": 35,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Overlord-55",
+      "elo": 1434,
+      "totalRuns": 69,
+      "totalExtractions": 34,
+      "totalKills": 66,
+      "totalDeaths": 35,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Executioner-56",
+      "elo": 1170,
+      "totalRuns": 71,
+      "totalExtractions": 26,
+      "totalKills": 58,
+      "totalDeaths": 45,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Annihilator-57",
+      "elo": 1719,
+      "totalRuns": 85,
+      "totalExtractions": 51,
+      "totalKills": 91,
+      "totalDeaths": 34,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Colossus-58",
+      "elo": 1448,
+      "totalRuns": 79,
+      "totalExtractions": 38,
+      "totalKills": 81,
+      "totalDeaths": 41,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Spectre-59",
+      "elo": 1663,
+      "totalRuns": 75,
+      "totalExtractions": 42,
+      "totalKills": 91,
+      "totalDeaths": 33,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Revenant-60",
+      "elo": 1732,
+      "totalRuns": 69,
+      "totalExtractions": 41,
+      "totalKills": 85,
+      "totalDeaths": 28,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Enigma-61",
+      "elo": 1605,
+      "totalRuns": 71,
+      "totalExtractions": 36,
+      "totalKills": 65,
+      "totalDeaths": 35,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Phantom-X",
+      "elo": 1392,
+      "totalRuns": 74,
+      "totalExtractions": 38,
+      "totalKills": 76,
+      "totalDeaths": 36,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Oracle-62",
+      "elo": 1397,
+      "totalRuns": 62,
+      "totalExtractions": 31,
+      "totalKills": 51,
+      "totalDeaths": 31,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Wraith-X",
+      "elo": 1647,
+      "totalRuns": 54,
+      "totalExtractions": 33,
+      "totalKills": 54,
+      "totalDeaths": 21,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Eclipse-63",
+      "elo": 1375,
+      "totalRuns": 76,
+      "totalExtractions": 35,
+      "totalKills": 63,
+      "totalDeaths": 41,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Tempest-64",
+      "elo": 1465,
+      "totalRuns": 69,
+      "totalExtractions": 30,
+      "totalKills": 74,
+      "totalDeaths": 39,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Mirage-X",
+      "elo": 1288,
+      "totalRuns": 68,
+      "totalExtractions": 34,
+      "totalKills": 67,
+      "totalDeaths": 34,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Blitz-X",
+      "elo": 1370,
+      "totalRuns": 75,
+      "totalExtractions": 37,
+      "totalKills": 74,
+      "totalDeaths": 38,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Strider-65",
+      "elo": 1217,
+      "totalRuns": 62,
+      "totalExtractions": 27,
+      "totalKills": 58,
+      "totalDeaths": 35,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Neon-66",
+      "elo": 1578,
+      "totalRuns": 56,
+      "totalExtractions": 35,
+      "totalKills": 66,
+      "totalDeaths": 21,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "Quicksilver-67",
+      "elo": 1412,
+      "totalRuns": 58,
+      "totalExtractions": 25,
+      "totalKills": 44,
+      "totalDeaths": 33,
+      "isAI": true,
+      "isBoss": false
+    },
+    {
+      "username": "BOSS",
+      "elo": 1000,
+      "totalRuns": 0,
+      "totalExtractions": 0,
+      "totalKills": 0,
+      "totalDeaths": 0,
+      "isAI": true,
+      "isBoss": true
+    }
+  ]
+}

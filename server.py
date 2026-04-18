@@ -242,6 +242,17 @@ class ApiHandler(SimpleHTTPRequestHandler):
             return
 
         if parsed.path == '/api/ai-roster':
+            if self.command == 'GET':
+                store = read_store()
+                ai_roster = store.get('aiRoster', {})
+                self._send_json({'ok': True, 'roster': ai_roster})
+                return
+            if body.get('clear'):
+                store = read_store()
+                store['aiRoster'] = {}
+                write_store(store)
+                self._send_json({'ok': True, 'cleared': True})
+                return
             roster_entries = body.get('entries')
             if not isinstance(roster_entries, list):
                 self._send_json({'ok': False, 'message': 'Invalid entries.'}, HTTPStatus.BAD_REQUEST)
@@ -261,12 +272,56 @@ class ApiHandler(SimpleHTTPRequestHandler):
                     'totalRuns': int(entry.get('totalRuns', 0)),
                     'totalExtractions': int(entry.get('totalExtractions', 0)),
                     'totalKills': int(entry.get('totalKills', 0)),
+                    'totalDeaths': int(entry.get('totalDeaths', 0)),
                     'isAI': True,
                     'isBoss': bool(entry.get('isBoss', False)),
                 }
             store['aiRoster'] = ai_roster
             write_store(store)
             self._send_json({'ok': True, 'saved': len(roster_entries)})
+            return
+
+        if parsed.path == '/api/ai-roster/batch':
+            updates = body.get('updates')
+            if not isinstance(updates, list):
+                self._send_json({'ok': False, 'message': 'Invalid updates list.'}, HTTPStatus.BAD_REQUEST)
+                return
+            store = read_store()
+            ai_roster = store.get('aiRoster', {})
+            saved = 0
+            for upd in updates:
+                if not isinstance(upd, dict):
+                    continue
+                name = str(upd.get('username', '')).strip()
+                if not name:
+                    continue
+                key = normalize_username_key(name)
+                if key not in ai_roster:
+                    ai_roster[key] = {
+                        'username': name,
+                        'elo': 1000,
+                        'totalRuns': 0,
+                        'totalExtractions': 0,
+                        'totalKills': 0,
+                        'totalDeaths': 0,
+                        'isAI': True,
+                        'isBoss': bool(upd.get('isBoss', False)),
+                    }
+                entry = ai_roster[key]
+                if 'elo' in upd:
+                    entry['elo'] = max(0, int(upd['elo']))
+                if 'totalRuns' in upd:
+                    entry['totalRuns'] = max(0, int(entry['totalRuns'] + upd['totalRuns']))
+                if 'totalExtractions' in upd:
+                    entry['totalExtractions'] = max(0, int(entry['totalExtractions'] + upd['totalExtractions']))
+                if 'totalKills' in upd:
+                    entry['totalKills'] = max(0, int(entry['totalKills'] + upd['totalKills']))
+                if 'totalDeaths' in upd:
+                    entry['totalDeaths'] = max(0, int(entry['totalDeaths'] + upd['totalDeaths']))
+                saved += 1
+            store['aiRoster'] = ai_roster
+            write_store(store)
+            self._send_json({'ok': True, 'saved': saved})
             return
 
         if parsed.path == '/api/auth':

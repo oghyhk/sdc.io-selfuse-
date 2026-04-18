@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Apply Simulated AI Stats</title>
+<style>
+    body { font-family: monospace; background: #0a0a0f; color: #e0e0e0; padding: 40px; }
+    h1 { color: #44aaff; }
+    .result { margin: 12px 0; padding: 12px; background: #1a1a2e; border-radius: 8px; }
+    .ok { color: #4cff4c; }
+    .fail { color: #ff4c4c; }
+    .info { color: #ffaa44; }
+    button { background: #44aaff; color: #000; border: none; padding: 12px 24px; font-size: 16px; cursor: pointer; border-radius: 6px; margin: 10px 4px; }
+    button:hover { background: #66ccff; }
+    .progress { margin: 20px 0; }
+    .progress-bar { height: 8px; background: #333; border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; background: #44aaff; transition: width 0.3s; }
+</style>
+</head>
+<body>
+<h1>Apply Simulated AI Stats to Server</h1>
+<p>Loads <code>data/simulated_ai_stats.json</code> and pushes to the game server via <code>/api/ai-roster</code>.</p>
+<button onclick="applyStats()">Apply Stats to Server</button>
+<button onclick="resetStats()">Reset Server AI Stats</button>
+<div id="output"></div>
+<div class="progress" id="progress" style="display:none">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+
+function log(msg, type='info') {
+    const el = document.createElement('div');
+    el.className = 'result ' + type;
+    el.textContent = msg;
+    document.getElementById('output').appendChild(el);
+}
+
+function setProgress(pct) {
+    const bar = document.getElementById('progressFill');
+    if (bar) bar.style.width = pct + '%';
+}
+
+async function apiFetch(path, options = {}) {
+    const res = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.message || 'Request failed');
+    return data;
+}
+
+async function loadSimulatedStats() {
+    try {
+        const res = await fetch('./data/simulated_ai_stats.json');
+        if (!res.ok) throw new Error('File not found - run simulate_ai_games.py first');
+        return await res.json();
+    } catch(e) {
+        log('Failed to load simulated_ai_stats.json: ' + e.message, 'fail');
+        return null;
+    }
+}
+
+async function applyStats() {
+    document.getElementById('output').innerHTML = '';
+    document.getElementById('progress').style.display = 'block';
+    setProgress(0);
+
+    const data = await loadSimulatedStats();
+    if (!data) return;
+
+    const entries = data.leaderboard || [];
+    log(`Pushing ${entries.length} AI operators to server...`, 'info');
+
+    try {
+        const result = await apiFetch('/api/ai-roster', {
+            method: 'POST',
+            body: JSON.stringify({ entries }),
+        });
+        setProgress(100);
+        log(`Server updated successfully! ${result.saved} entries saved.`, 'ok');
+    } catch(e) {
+        setProgress(0);
+        log(`Server push failed: ${e.message}`, 'fail');
+        log('Make sure the game server is running on port 8765', 'info');
+        return;
+    }
+
+    const top10 = entries.sort((a, b) => b.elo - a.elo).slice(0, 10);
+    log('Top 10 ELO leaders:', 'info');
+    top10.forEach((op, i) => {
+        log(`  ${i+1}. ${op.username} — ELO: ${op.elo}, Raids: ${op.totalRuns}, Ext: ${op.totalExtractions}, Kills: ${op.totalKills}`, 'info');
+    });
+
+    log('\nRefresh the game to see updated AI operator stats.', 'ok');
+}
+
+async function resetStats() {
+    if (!confirm('Reset ALL AI operator stats on the server? This cannot be undone.')) return;
+    document.getElementById('output').innerHTML = '';
+    try {
+        await apiFetch('/api/ai-roster', {
+            method: 'POST',
+            body: JSON.stringify({ clear: true }),
+        });
+        log('Server AI roster stats cleared.', 'ok');
+    } catch(e) {
+        log(`Reset failed: ${e.message}`, 'fail');
+    }
+}
+</script>
+</body>
+</html>

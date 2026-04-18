@@ -48,7 +48,7 @@ import {
     normalizeProfile,
     runtimeAchievements
 } from './profile.js';
-import { getRosterLeaderboardEntries } from './ai_roster.js';
+import { getRosterLeaderboardEntries, prefetchRoster } from './ai_roster.js';
 
 const store = new ProfileStore();
 
@@ -2327,6 +2327,7 @@ authForm.addEventListener('submit', async (event) => {
             await store.login(username, password);
         }
         closeAuthModal();
+        prefetchRoster();
         renderAll();
     } catch (error) {
         authMessage.textContent = error.message;
