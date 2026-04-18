@@ -1,0 +1,1777 @@
+{
+  "version": 1,
+  "player_level_rewards": {
+    "1": {
+      "level": 1,
+      "type": "coins",
+      "coins": 1000000,
+      "itemId": "",
+      "quantity": 0,
+      "label": "Enjoy",
+      "description": "",
+      "enabled": true
+    },
+    "10": {
+      "level": 10,
+      "type": "item",
+      "coins": 0,
+      "itemId": "ammo_green",
+      "quantity": 10000,
+      "label": "Lv. 10 reward",
+      "description": "",
+      "enabled": true
+    },
+    "20": {
+      "level": 20,
+      "type": "item",
+      "coins": 0,
+      "itemId": "med_kit",
+      "quantity": 5000,
+      "label": "Lv. 20 reward",
+      "description": "",
+      "enabled": true
+    },
+    "50": {
+      "level": 50,
+      "type": "item",
+      "coins": 0,
+      "itemId": "ammo_green",
+      "quantity": 25000,
+      "label": "Lv. 50 reward",
+      "description": "",
+      "enabled": true
+    },
+    "60": {
+      "level": 60,
+      "type": "item",
+      "coins": 0,
+      "itemId": "combat_medic_pack",
+      "quantity": 500,
+      "label": "Lv. 60 reward",
+      "description": "",
+      "enabled": true
+    },
+    "90": {
+      "level": 90,
+      "type": "item",
+      "coins": 0,
+      "itemId": "marlin",
+      "quantity": 5,
+      "label": "Lv. 90 reward",
+      "description": "most affordable snipper",
+      "enabled": true
+    },
+    "100": {
+      "level": 100,
+      "type": "item",
+      "coins": 0,
+      "itemId": "ammo_red",
+      "quantity": 5,
+      "label": "Lv. 100 reward",
+      "description": "tryout this overpowered ammo!",
+      "enabled": true
+    },
+    "110": {
+      "level": 110,
+      "type": "item",
+      "coins": 0,
+      "itemId": "ammo_blue",
+      "quantity": 999,
+      "label": "Lv. 110 reward",
+      "description": "",
+      "enabled": true
+    },
+    "150": {
+      "level": 150,
+      "type": "item",
+      "coins": 0,
+      "itemId": "ammo_red",
+      "quantity": 20,
+      "label": "Lv. 150 reward",
+      "description": "You better save these powerful ammo for later use",
+      "enabled": true
+    },
+    "200": {
+      "level": 200,
+      "type": "item",
+      "coins": 0,
+      "itemId": "awm",
+      "quantity": 1,
+      "label": "Lv. 200 reward",
+      "description": "Tryout this gun, instakill most of you enemies!",
+      "enabled": true
+    },
+    "210": {
+      "level": 210,
+      "type": "item",
+      "coins": 0,
+      "itemId": "ammo_338_ap",
+      "quantity": 1,
+      "label": "Lv. 210 reward",
+      "description": "Most powerful ammo in the game, instakills everything",
+      "enabled": true
+    },
+    "250": {
+      "level": 250,
+      "type": "item",
+      "coins": 0,
+      "itemId": "ammo_gold",
+      "quantity": 45,
+      "label": "Lv. 250 reward",
+      "description": "",
+      "enabled": true
+    }
+  },
+  "items": {
+    "g17": {
+      "id": "g17",
+      "category": "gun",
+      "rarity": "white",
+      "name": "G17",
+      "description": "Sidearm with a steady rhythm, 17-round magazine, and light recoil drift. | DMG:11 | SPD:0.27s | CLIP:17 | RNG:340 | RLD:1s | SPR:0.075° | BSPD:500 | VAL:120",
+      "sellValue": 120,
+      "image": "/assets/items/g17.png",
+      "size": 2,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "stats": {
+        "damage": 11,
+        "cooldown": 0.27,
+        "bulletSpeed": 500,
+        "range": 340,
+        "clipSize": 17,
+        "reloadTime": 1,
+        "spread": 0.075,
+        "outrangeMulti": 0.3
+      }
+    },
+    "as_val": {
+      "id": "as_val",
+      "category": "gun",
+      "rarity": "red",
+      "name": "As Val",
+      "description": "Suppressed rifle with 900 RPM fire rate, 45-round magazine, and wider spray. | DMG:22 | SPD:0.062s | CLIP:45 | RNG:550 | RLD:1.2s | SPR:0.12° | BSPD:600 | VAL:2000000",
+      "sellValue": 1000000,
+      "size": 12,
+      "image": "/assets/items/asval.png",
+      "buyMarketTaxPercent": 20,
+      "sellMarketTaxPercent": 40,
+      "stats": {
+        "damage": 22,
+        "cooldown": 0.062,
+        "bulletSpeed": 450,
+        "range": 550,
+        "clipSize": 45,
+        "reloadTime": 1.2,
+        "spread": 0.12,
+        "outrangeMulti": 0.9
+      }
+    },
+    "awm": {
+      "id": "awm",
+      "category": "gun",
+      "rarity": "red",
+      "name": "AWM",
+      "description": "Heavy bolt-action magnum rifle with extreme range, high muzzle velocity, and a 5-round magazine. | DMG:133 | SPD:1.45s | CLIP:5 | RNG:1080 | RLD:3.4s | SPR:0.003° | BSPD:1080 | VAL:13500000",
+      "sellValue": 13500000,
+      "size": 8,
+      "image": "/assets/items/awm.png",
+      "buyMarketTaxPercent": 20,
+      "sellMarketTaxPercent": 50,
+      "stats": {
+        "damage": 133,
+        "cooldown": 1.45,
+        "bulletSpeed": 1080,
+        "range": 1080,
+        "clipSize": 5,
+        "reloadTime": 3.4,
+        "spread": 0.003,
+        "outrangeMulti": 0.9
+      }
+    },
+    "cloth_vest": {
+      "id": "cloth_vest",
+      "category": "armor",
+      "rarity": "white",
+      "name": "Cloth Vest",
+      "description": "Minimal torso protection. | HP:+10",
+      "sellValue": 100,
+      "modifiers": {
+        "maxHp": 10,
+        "speed": 0
+      },
+      "image": "/assets/dev/cloth_vest.jpg",
+      "size": 9
+    },
+    "kevlar_weave": {
+      "id": "kevlar_weave",
+      "category": "armor",
+      "rarity": "green",
+      "name": "Kevlar Weave",
+      "description": "Standard-issue ballistic protection. | HP:+18",
+      "sellValue": 500,
+      "modifiers": {
+        "maxHp": 18,
+        "speed": 0
+      },
+      "image": "/assets/dev/kevlar_weave.jpg",
+      "size": 9
+    },
+    "ranger_plate": {
+      "id": "ranger_plate",
+      "category": "armor",
+      "rarity": "blue",
+      "name": "Ranger Plate",
+      "description": "Balanced combat vest. | HP:+35",
+      "sellValue": 8000,
+      "image": "/assets/dev/ranger_plate.jpg",
+      "size": 9,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 35
+      }
+    },
+    "warden_vest": {
+      "id": "warden_vest",
+      "category": "armor",
+      "rarity": "purple",
+      "name": "Warden Vest",
+      "description": "Heavy-duty protection for high-threat zones. | HP:+72 | SPD:+-25%",
+      "sellValue": 128000,
+      "image": "/assets/dev/warden_vest.jpg",
+      "size": 12,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 72,
+        "speed": -25,
+        "shieldHp": 32,
+        "shieldRegen": 4
+      }
+    },
+    "titan_rig": {
+      "id": "titan_rig",
+      "category": "armor",
+      "rarity": "gold",
+      "name": "Titan Rig",
+      "description": "Heavy armor for frontline raids. | HP:+110 | SPD:+-45%",
+      "sellValue": 400000,
+      "image": "/assets/dev/titan_rig.jpg",
+      "size": 16,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 90,
+        "speed": -55,
+        "shieldHp": 50,
+        "shieldRegen": 3
+      }
+    },
+    "bastion_plate": {
+      "id": "bastion_plate",
+      "category": "armor",
+      "rarity": "red",
+      "name": "Bastion Plate",
+      "description": "Experimental exo-armor with maximum protection. | HP:+150 | SPD:+-25%",
+      "sellValue": 5800000,
+      "image": "/assets/dev/bastion_plate.jpg",
+      "size": 24,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 120,
+        "speed": -25,
+        "shieldHp": 80,
+        "shieldRegen": 3
+      }
+    },
+    "scout_cap": {
+      "id": "scout_cap",
+      "category": "helmet",
+      "rarity": "white",
+      "name": "Scout Cap",
+      "description": "Light head cover. | HP:+6",
+      "sellValue": 100,
+      "image": "/assets/dev/scout_cap.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 6,
+        "speed": 30
+      }
+    },
+    "recon_helmet": {
+      "id": "recon_helmet",
+      "category": "helmet",
+      "rarity": "green",
+      "name": "Recon Helmet",
+      "description": "Standard issue tactical helmet. | HP:+20",
+      "sellValue": 500,
+      "image": "/assets/dev/recon_helmet.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 20,
+        "speed": -10
+      }
+    },
+    "sentinel_helm": {
+      "id": "sentinel_helm",
+      "category": "helmet",
+      "rarity": "blue",
+      "name": "Sentinel Helm",
+      "description": "Reinforced helmet with side protection. | HP:+33",
+      "sellValue": 8000,
+      "image": "/assets/dev/sentinel_helm.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 33,
+        "speed": 10
+      }
+    },
+    "eclipse_visor": {
+      "id": "eclipse_visor",
+      "category": "helmet",
+      "rarity": "purple",
+      "name": "Eclipse Visor",
+      "description": "Enhanced visor with reinforced shell. | HP:+69",
+      "sellValue": 80000,
+      "image": "/assets/dev/eclipse_visor.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 69,
+        "speed": -10,
+        "shieldHp": 12,
+        "shieldRegen": 1
+      }
+    },
+    "fortress_mask": {
+      "id": "fortress_mask",
+      "category": "helmet",
+      "rarity": "gold",
+      "name": "Fortress Mask",
+      "description": "Full-face tactical helmet with blast shielding. | HP:+90",
+      "sellValue": 600000,
+      "image": "/assets/dev/fortress_mask.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 90,
+        "shieldHp": 20,
+        "shieldRegen": 1
+      }
+    },
+    "phantom_crown": {
+      "id": "phantom_crown",
+      "category": "helmet",
+      "rarity": "red",
+      "name": "Phantom Crown",
+      "description": "Prototype adaptive helmet with integrated HUD. | HP:+132",
+      "sellValue": 7000000,
+      "image": "/assets/dev/phantom_crown.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 70,
+        "speed": 5,
+        "shieldHp": 110,
+        "shieldRegen": 7
+      }
+    },
+    "trail_shoes": {
+      "id": "trail_shoes",
+      "category": "shoes",
+      "rarity": "white",
+      "name": "Trail Shoes",
+      "description": "Plain footwear for basic mobility. | SPD:+10%",
+      "sellValue": 100,
+      "modifiers": {
+        "maxHp": 0,
+        "speed": 10
+      },
+      "image": "/assets/dev/trail_shoes.jpg",
+      "size": 4
+    },
+    "runner_boots": {
+      "id": "runner_boots",
+      "category": "shoes",
+      "rarity": "green",
+      "name": "Runner Boots",
+      "description": "Reliable movement boost. | SPD:+16%",
+      "sellValue": 500,
+      "image": "/assets/dev/runner_boots.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "speed": 16
+      }
+    },
+    "phase_greaves": {
+      "id": "phase_greaves",
+      "category": "shoes",
+      "rarity": "blue",
+      "name": "Phase Greaves",
+      "description": "Fast boots for quick disengages. | SPD:+27% | HP:+-10",
+      "sellValue": 8000,
+      "image": "/assets/dev/phase_greaves.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": -10,
+        "speed": 27
+      }
+    },
+    "phantom_sprinters": {
+      "id": "phantom_sprinters",
+      "category": "shoes",
+      "rarity": "purple",
+      "name": "Phantom Sprinters",
+      "description": "Ultra-light boots for rapid extraction. | SPD:+44%",
+      "sellValue": 70000,
+      "image": "/assets/dev/phantom_sprinters.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "speed": 42
+      }
+    },
+    "blitz_treads": {
+      "id": "blitz_treads",
+      "category": "shoes",
+      "rarity": "gold",
+      "name": "Blitz Treads",
+      "description": "High-performance boots with shock absorption. | SPD:+56% | HP:+-5",
+      "sellValue": 300000,
+      "image": "/assets/dev/blitz_treads.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": -5,
+        "speed": 54
+      }
+    },
+    "warp_drivers": {
+      "id": "warp_drivers",
+      "category": "shoes",
+      "rarity": "red",
+      "name": "Warp Drivers",
+      "description": "Experimental exo-boots that defy physics. | SPD:+72% | HP:+5",
+      "sellValue": 3400000,
+      "image": "/assets/dev/warp_drivers.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 5,
+        "speed": 60
+      }
+    },
+    "scout_pack": {
+      "id": "scout_pack",
+      "category": "backpack",
+      "rarity": "green",
+      "name": "Scout Pack",
+      "description": "Compact backpack for efficient loot runs. | SLOTS:+4",
+      "sellValue": 800,
+      "image": "/assets/dev/scout_pack.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "carrySlots": 9
+      }
+    },
+    "mule_pack": {
+      "id": "mule_pack",
+      "category": "backpack",
+      "rarity": "blue",
+      "name": "Mule Pack",
+      "description": "Larger backpack for bigger hauls. | SLOTS:+4",
+      "sellValue": 8900,
+      "image": "/assets/dev/mule_pack.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "carrySlots": 12
+      }
+    },
+    "siege_rucksack": {
+      "id": "siege_rucksack",
+      "category": "backpack",
+      "rarity": "purple",
+      "name": "Siege Rucksack",
+      "description": "Tactical rucksack built for extended operations. | SLOTS:+4",
+      "sellValue": 56000,
+      "image": "/assets/dev/siege_rucksack.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "carrySlots": 20
+      }
+    },
+    "cargo_titan": {
+      "id": "cargo_titan",
+      "category": "backpack",
+      "rarity": "gold",
+      "name": "Cargo Titan",
+      "description": "Heavy-duty hauler with reinforced compartments. | SLOTS:+9",
+      "sellValue": 300000,
+      "image": "/assets/dev/cargo_titan.jpg",
+      "size": 9,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "carrySlots": 28
+      }
+    },
+    "void_satchel": {
+      "id": "void_satchel",
+      "category": "backpack",
+      "rarity": "red",
+      "name": "Void Satchel",
+      "description": "Prototype pack with huge haul capacity. | SLOTS:+9",
+      "sellValue": 1800000,
+      "image": "/assets/dev/void_satchel.jpg",
+      "size": 9,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "carrySlots": 45
+      }
+    },
+    "ammo_white": {
+      "id": "ammo_white",
+      "category": "loot",
+      "lootType": "ammo",
+      "rarity": "gray",
+      "name": "Gray Ammo",
+      "description": "infinite supply free ammo. Damage x0.4 | DMG:x0.4",
+      "sellValue": 1,
+      "ammoAmount": 1,
+      "damageMultiplier": 0.7,
+      "image": "/assets/dev/ammo_white.jpg",
+      "instantKill": false,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10
+    },
+    "ammo_green": {
+      "id": "ammo_green",
+      "category": "loot",
+      "lootType": "ammo",
+      "rarity": "green",
+      "name": "Green Ammo",
+      "description": "Standard green ammo. Damage x1.0. | DMG:x1",
+      "sellValue": 8,
+      "ammoAmount": 1,
+      "damageMultiplier": 1,
+      "image": "/assets/dev/ammo_green.jpg"
+    },
+    "ammo_blue": {
+      "id": "ammo_blue",
+      "category": "loot",
+      "lootType": "ammo",
+      "rarity": "blue",
+      "name": "Blue Ammo",
+      "description": "Improved blue ammo. Damage x1.05. | DMG:x1.2",
+      "sellValue": 250,
+      "ammoAmount": 1,
+      "damageMultiplier": 1.2,
+      "image": "/assets/dev/ammo_blue.jpg",
+      "instantKill": false,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10
+    },
+    "ammo_purple": {
+      "id": "ammo_purple",
+      "category": "loot",
+      "lootType": "ammo",
+      "rarity": "purple",
+      "name": "Purple Ammo",
+      "description": "High-end purple ammo. Damage x1.2. | DMG:x1.5",
+      "sellValue": 5000,
+      "ammoAmount": 1,
+      "damageMultiplier": 1.5,
+      "image": "/assets/dev/ammo_purple.jpg",
+      "instantKill": false,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10
+    },
+    "ammo_gold": {
+      "id": "ammo_gold",
+      "category": "loot",
+      "lootType": "ammo",
+      "rarity": "gold",
+      "name": "Gold Ammo",
+      "description": "Elite gold ammo. Damage x1.4. | DMG:x2",
+      "sellValue": 25000,
+      "ammoAmount": 1,
+      "damageMultiplier": 2,
+      "image": "/assets/goldammo.png",
+      "instantKill": false,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10
+    },
+    "ammo_338_ap": {
+      "id": "ammo_338_ap",
+      "category": "loot",
+      "lootType": "ammo",
+      "rarity": "legend",
+      "name": ".338 AP",
+      "description": "The most overpowered ammo that vaporizes targets and punches through a single wall tile. Instakills everything!! Extreme tax applied to prevent abusing. | DMG:x999 | INSTAKILL",
+      "sellValue": 5000000,
+      "ammoAmount": 1,
+      "damageMultiplier": 999,
+      "instantKill": true,
+      "wallPenetration": 1,
+      "projectileStyle": "ap",
+      "projectileColor": "#050505",
+      "projectileWidth": 4,
+      "projectileLength": 26,
+      "trailLength": 58,
+      "image": "/assets/items/ap.png",
+      "buyMarketTaxPercent": 900,
+      "sellMarketTaxPercent": 90
+    },
+    "ammo_red": {
+      "id": "ammo_red",
+      "category": "loot",
+      "lootType": "ammo",
+      "rarity": "red",
+      "name": "Red Ammo",
+      "description": "Experimental red ammo | DMG:x4",
+      "sellValue": 280000,
+      "ammoAmount": 1,
+      "damageMultiplier": 4,
+      "instantKill": false,
+      "image": "/assets/dev/ammo_red.jpg",
+      "buyMarketTaxPercent": 20,
+      "sellMarketTaxPercent": 50
+    },
+    "bent_watch": {
+      "id": "bent_watch",
+      "category": "loot",
+      "lootType": "goods",
+      "rarity": "white",
+      "name": "Bent Watch",
+      "description": "Damaged wristwatch scavenged from the ruins. Pure sellable goods. | VAL:60",
+      "sellValue": 60,
+      "image": "/assets/items/coin.png",
+      "size": 1
+    },
+    "signal_chip": {
+      "id": "signal_chip",
+      "category": "loot",
+      "lootType": "goods",
+      "rarity": "green",
+      "name": "Signal Chip",
+      "description": "Recovered communications chip with resale value but no direct use yet. | VAL:180",
+      "sellValue": 180,
+      "image": "/assets/items/coin.png",
+      "size": 1
+    },
+    "antique_coin": {
+      "id": "antique_coin",
+      "category": "loot",
+      "lootType": "goods",
+      "rarity": "blue",
+      "name": "Antique Coin",
+      "description": "Collector-grade old world coin. Valuable trade goods. | VAL:900",
+      "sellValue": 900,
+      "image": "/assets/items/coin.png",
+      "size": 1
+    },
+    "jade_idol": {
+      "id": "jade_idol",
+      "category": "loot",
+      "lootType": "goods",
+      "rarity": "purple",
+      "name": "Jade Idol",
+      "description": "A fragile ceremonial carving that currently serves only as loot to sell. | VAL:7000",
+      "sellValue": 7000,
+      "image": "/assets/items/coin.png",
+      "size": 1
+    },
+    "vault_keycard": {
+      "id": "vault_keycard",
+      "category": "loot",
+      "lootType": "goods",
+      "rarity": "gold",
+      "name": "Vault Keycard",
+      "description": "Rare secured access card. For now it is simply high-value goods. | VAL:45000",
+      "sellValue": 45000,
+      "image": "/assets/items/coin.png",
+      "size": 1
+    },
+    "quantum_core": {
+      "id": "quantum_core",
+      "category": "loot",
+      "lootType": "goods",
+      "rarity": "red",
+      "name": "Quantum Core",
+      "description": "Extremely valuable lab salvage with no implemented use beyond selling. | VAL:500000",
+      "sellValue": 500000,
+      "image": "/assets/items/coin.png",
+      "size": 1
+    },
+    "fort_armor": {
+      "id": "fort_armor",
+      "category": "armor",
+      "rarity": "blue",
+      "name": "Fort Defender",
+      "description": "Full coverage assault vest with ceramic plates and neck guard. | HP:+40 | SPD:+5%",
+      "sellValue": 12500,
+      "image": "/assets/dev/fort_armor.jpg",
+      "size": 9,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 40,
+        "speed": 5
+      }
+    },
+    "slick_armor": {
+      "id": "slick_armor",
+      "category": "armor",
+      "rarity": "purple",
+      "name": "Slick Plate",
+      "description": "Ultra-thin Level IV plate carrier. High protection, low profile. | HP:+66",
+      "sellValue": 96000,
+      "image": "/assets/dev/slick_armor.jpg",
+      "size": 12,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 66,
+        "shieldHp": 24,
+        "shieldRegen": 2
+      }
+    },
+    "altyn_vest": {
+      "id": "altyn_vest",
+      "category": "armor",
+      "rarity": "gold",
+      "name": "Altyn Vest",
+      "description": "Heavy assault armor rated for rifle threats. Built like a tank. | HP:+92 | SPD:+-10%",
+      "sellValue": 440000,
+      "image": "/assets/dev/altyn_vest.jpg",
+      "size": 16,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 80,
+        "speed": -10,
+        "shieldHp": 30,
+        "shieldRegen": 2
+      }
+    },
+    "exo_suit": {
+      "id": "exo_suit",
+      "category": "armor",
+      "rarity": "red",
+      "name": "Exo Combat Suit",
+      "description": "Powered exoskeleton with integrated ballistic protection. The future of warfare. | HP:+128 | SPD:+25%",
+      "sellValue": 9500000,
+      "image": "/assets/dev/exo_suit.jpg",
+      "size": 24,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 90,
+        "speed": 25,
+        "shieldHp": 100,
+        "shieldRegen": 6
+      }
+    },
+    "altyn_helmet": {
+      "id": "altyn_helmet",
+      "category": "helmet",
+      "rarity": "blue",
+      "name": "Altyn Helmet",
+      "description": "Heavy titanium helmet with face shield. Spetsnaz heritage. | HP:+40",
+      "sellValue": 11000,
+      "image": "/assets/dev/altyn_helmet.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 40,
+        "speed": -15
+      }
+    },
+    "exfil_helmet": {
+      "id": "exfil_helmet",
+      "category": "helmet",
+      "rarity": "purple",
+      "name": "EXFIL Ballistic",
+      "description": "Team Wendy EXFIL with SLAAP armor applique. Best in class. | HP:+37",
+      "sellValue": 282800,
+      "image": "/assets/dev/exfil_helmet.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 37,
+        "speed": 50,
+        "shieldHp": 20,
+        "shieldRegen": 2
+      }
+    },
+    "rys_t": {
+      "id": "rys_t",
+      "category": "helmet",
+      "rarity": "gold",
+      "name": "Rys-T Helmet",
+      "description": "Heavy combat helmet with full face shield. Stops rifle rounds. | HP:+110",
+      "sellValue": 400000,
+      "image": "/assets/dev/rys_t.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 85,
+        "speed": -50,
+        "shieldHp": 65,
+        "shieldRegen": 4
+      }
+    },
+    "cyber_helm": {
+      "id": "cyber_helm",
+      "category": "helmet",
+      "rarity": "red",
+      "name": "Cyber Operative Helm",
+      "description": "AI-assisted tactical helmet with threat detection HUD and reactive armor. | HP:+162",
+      "sellValue": 8800000,
+      "image": "/assets/dev/cyber_helm.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": 100,
+        "speed": -20,
+        "shieldHp": 100,
+        "shieldRegen": 7
+      }
+    },
+    "jump_boots": {
+      "id": "jump_boots",
+      "category": "shoes",
+      "rarity": "blue",
+      "name": "Jump Boots",
+      "description": "Airborne-rated boots with reinforced sole. Built for drops. | SPD:+35%",
+      "sellValue": 20000,
+      "image": "/assets/dev/jump_boots.jpg",
+      "size": 1,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "speed": 35
+      }
+    },
+    "fast_greaves": {
+      "id": "fast_greaves",
+      "category": "shoes",
+      "rarity": "purple",
+      "name": "FAST Greaves",
+      "description": "Lightweight carbon fiber leg armor. Speed and protection combined. | SPD:+48% | HP:+-20",
+      "sellValue": 55300,
+      "image": "/assets/dev/fast_greaves.jpg",
+      "size": 2,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "maxHp": -20,
+        "speed": 48
+      }
+    },
+    "evas_sprinters": {
+      "id": "evas_sprinters",
+      "category": "shoes",
+      "rarity": "gold",
+      "name": "EVA Sprinters",
+      "description": "Electric-assist running boots with hydraulic dampening. | SPD:+62%",
+      "sellValue": 540000,
+      "image": "/assets/dev/evas_sprinters.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "speed": 52
+      }
+    },
+    "gravity_boots": {
+      "id": "gravity_boots",
+      "category": "shoes",
+      "rarity": "legend",
+      "name": "Gravity Boots",
+      "description": "Anti-gravity assist boots. Walk on walls, sprint on air. | SPD:+80% | HP:+20",
+      "sellValue": 39600000,
+      "image": "/assets/dev/gravity_boots.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 300,
+      "sellMarketTaxPercent": 80,
+      "modifiers": {
+        "maxHp": 35,
+        "speed": 80,
+        "gravityBoots": true
+      }
+    },
+    "duffel_bag": {
+      "id": "duffel_bag",
+      "category": "backpack",
+      "rarity": "white",
+      "name": "Duffel Bag",
+      "description": "Canvas military duffel. Gets the job done. | SLOTS:+1",
+      "sellValue": 100,
+      "image": "/assets/dev/duffel_bag.jpg",
+      "size": 1,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "carrySlots": 4
+      }
+    },
+    "alice_pack": {
+      "id": "alice_pack",
+      "category": "backpack",
+      "rarity": "blue",
+      "name": "ALICE Pack",
+      "description": "All-purpose lightweight carrying equipment. Vietnam-proven design. | SLOTS:+1",
+      "sellValue": 12400,
+      "image": "/assets/dev/alice_pack.jpg",
+      "size": 1,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "carrySlots": 15
+      }
+    },
+    "parachute_pack": {
+      "id": "parachute_pack",
+      "category": "backpack",
+      "rarity": "gold",
+      "name": "Parachute Pack",
+      "description": "HALO-rated pack with integrated reserve chute. Carry more, jump further. | SLOTS:+4",
+      "sellValue": 420000,
+      "image": "/assets/dev/parachute_pack.jpg",
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "carrySlots": 32
+      }
+    },
+    "quantum_pack": {
+      "id": "quantum_pack",
+      "category": "backpack",
+      "rarity": "red",
+      "name": "Quantum Satchel",
+      "description": "Dimensional compression pack. Physics-defying storage capacity. | SLOTS:+9",
+      "sellValue": 9100000,
+      "image": "/assets/dev/quantum_pack.jpg",
+      "size": 9,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "modifiers": {
+        "carrySlots": 60
+      }
+    },
+    "field_bandage": {
+      "id": "field_bandage",
+      "category": "consumable",
+      "rarity": "white",
+      "name": "Field Bandage",
+      "description": "Basic 20-use gauze wrap. Restores 1 HP per use at 1 HP/sec. | HEAL:20 | SPD:1s",
+      "sellValue": 5,
+      "size": 1,
+      "healAmount": 20,
+      "healRate": 3,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10
+    },
+    "med_kit": {
+      "id": "med_kit",
+      "category": "consumable",
+      "rarity": "green",
+      "name": "Med Kit",
+      "description": "Standard 35-use first aid kit. Restores 1 HP per use at 1.5 HP/sec. | HEAL:35 | SPD:2s",
+      "sellValue": 30,
+      "size": 1,
+      "healAmount": 35,
+      "healRate": 9,
+      "healingMoveSpeed": 20,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10
+    },
+    "stim_syringe": {
+      "id": "stim_syringe",
+      "category": "consumable",
+      "rarity": "blue",
+      "name": "Stim Syringe",
+      "description": "Fast-acting 50-use combat stimulant. Restores 1 HP per use at 2 HP/sec. | HEAL:50 | SPD:4s",
+      "sellValue": 400,
+      "size": 1,
+      "healAmount": 50,
+      "healRate": 15,
+      "healingMoveSpeed": 40,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10
+    },
+    "combat_medic_pack": {
+      "id": "combat_medic_pack",
+      "category": "consumable",
+      "rarity": "purple",
+      "name": "Combat Medic Pack",
+      "description": "Advanced 70-use field surgical kit. Restores 1 HP per use at 3 HP/sec. | HEAL:70 | SPD:10s",
+      "sellValue": 900,
+      "size": 1,
+      "healAmount": 70,
+      "healRate": 25,
+      "healingMoveSpeed": 80,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10
+    },
+    "regen_injector": {
+      "id": "regen_injector",
+      "category": "consumable",
+      "rarity": "gold",
+      "name": "Regen Injector",
+      "description": "100-use nanobot injector. Restores 1 HP per use at 4 HP/sec. | HEAL:100 | SPD:25s",
+      "sellValue": 3000,
+      "size": 1,
+      "healAmount": 100,
+      "regenPerSecond": 2,
+      "regenDuration": 15,
+      "healRate": 60,
+      "healingMoveSpeed": 108,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10
+    },
+    "nano_serum": {
+      "id": "nano_serum",
+      "category": "consumable",
+      "rarity": "red",
+      "name": "Nano Serum",
+      "description": "Experimental nano-serum reserve. Restores 1 HP per use at 6 HP/sec. | HEAL:-1 | SPD:150s",
+      "sellValue": 50000,
+      "size": 1,
+      "healAmount": -1,
+      "restoreEnergy": true,
+      "healRate": 180,
+      "healingMoveSpeed": 200,
+      "buyMarketTaxPercent": 20,
+      "sellMarketTaxPercent": 50
+    },
+    "g18": {
+      "id": "g18",
+      "category": "gun",
+      "rarity": "green",
+      "name": "G18",
+      "description": "G18, 1120rpm!! | DMG:6 | SPD:0.051s | CLIP:33 | RNG:370 | RLD:0.7s | SPR:0.18° | BSPD:500 | VAL:1000",
+      "sellValue": 1000,
+      "size": 2,
+      "image": "/assets/g18.png",
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "stats": {
+        "damage": 6,
+        "cooldown": 0.051,
+        "bulletSpeed": 500,
+        "range": 370,
+        "clipSize": 33,
+        "reloadTime": 0.7,
+        "spread": 0.18,
+        "outrangeMulti": 0.3
+      }
+    },
+    "groza": {
+      "id": "groza",
+      "category": "gun",
+      "rarity": "purple",
+      "name": "GROZA",
+      "description": "DMG:16 | SPD:0.0857s | CLIP:45 | RNG:466 | RLD:1.8s | SPR:0.13° | BSPD:500 | VAL:90000",
+      "sellValue": 90000,
+      "size": 8,
+      "image": "/assets/groza.png",
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "stats": {
+        "damage": 16,
+        "cooldown": 0.0857,
+        "bulletSpeed": 500,
+        "range": 466,
+        "clipSize": 45,
+        "reloadTime": 1.8,
+        "spread": 0.13,
+        "outrangeMulti": 0.55
+      }
+    },
+    "m7_long": {
+      "id": "m7_long",
+      "category": "gun",
+      "rarity": "red",
+      "name": "M7",
+      "description": "DMG:29 | SPD:0.097s | CLIP:45 | RNG:766 | RLD:1.8s | SPR:0.07° | BSPD:720 | VAL:12000000",
+      "sellValue": 12000000,
+      "size": 12,
+      "image": "/assets/m7_long.png",
+      "buyMarketTaxPercent": 1,
+      "sellMarketTaxPercent": 1,
+      "stats": {
+        "damage": 29,
+        "cooldown": 0.097,
+        "bulletSpeed": 720,
+        "range": 766,
+        "clipSize": 45,
+        "reloadTime": 1.8,
+        "spread": 0.07,
+        "outrangeMulti": 0.7
+      }
+    },
+    "m14": {
+      "id": "m14",
+      "category": "gun",
+      "rarity": "red",
+      "name": "M14",
+      "description": "DMG:27 | SPD:0.07s | CLIP:50 | RNG:550 | RLD:2.7s | SPR:0.06° | BSPD:650 | VAL:2200000",
+      "sellValue": 2200000,
+      "size": 12,
+      "image": "/assets/m14.png",
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "stats": {
+        "damage": 27,
+        "cooldown": 0.07,
+        "bulletSpeed": 650,
+        "range": 550,
+        "clipSize": 50,
+        "reloadTime": 2,
+        "spread": 0.06,
+        "outrangeMulti": 0.77
+      }
+    },
+    "m250": {
+      "id": "m250",
+      "category": "gun",
+      "rarity": "gold",
+      "name": "M250",
+      "description": "DMG:30 | SPD:0.12s | CLIP:125 | RNG:680 | RLD:4.5s | SPR:0.11° | BSPD:770 | VAL:780000",
+      "sellValue": 780000,
+      "size": 14,
+      "image": "/assets/m250.png",
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "stats": {
+        "damage": 30,
+        "cooldown": 0.12,
+        "bulletSpeed": 770,
+        "range": 680,
+        "clipSize": 125,
+        "reloadTime": 4.5,
+        "spread": 0.11,
+        "outrangeMulti": 0.65
+      }
+    },
+    "marlin": {
+      "id": "marlin",
+      "category": "gun",
+      "rarity": "blue",
+      "name": "Marlin",
+      "description": "DMG:25 | SPD:0.4s | CLIP:10 | RNG:745 | RLD:5s | SPR:0.04° | BSPD:710 | VAL:10000",
+      "sellValue": 10000,
+      "size": 6,
+      "image": "/assets/marlin.png",
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "stats": {
+        "damage": 25,
+        "cooldown": 0.4,
+        "bulletSpeed": 710,
+        "range": 745,
+        "clipSize": 10,
+        "reloadTime": 5,
+        "spread": 0.04,
+        "outrangeMulti": 0.4
+      }
+    },
+    "awm250": {
+      "id": "awm250",
+      "category": "gun",
+      "rarity": "legend",
+      "name": "AWM250",
+      "description": "Strongest gun in the game. Nothing can compete with it. | DMG:39 | SPD:0.04s | CLIP:999 | RNG:999 | RLD:0.099s | SPR:0.099° | BSPD:999 | VAL:240000000",
+      "sellValue": 240000000,
+      "size": 24,
+      "image": "/assets/awm250.png",
+      "buyMarketTaxPercent": 900,
+      "sellMarketTaxPercent": 95,
+      "stats": {
+        "damage": 39,
+        "cooldown": 0.04,
+        "bulletSpeed": 999,
+        "range": 999,
+        "clipSize": 999,
+        "reloadTime": 0.099,
+        "spread": 0.099,
+        "outrangeMulti": 0.5
+      }
+    },
+    "sr25": {
+      "id": "sr25",
+      "category": "gun",
+      "rarity": "red",
+      "name": "SR-25",
+      "description": "DMG:38 | SPD:0.14s | CLIP:20 | RNG:820 | RLD:2.5s | SPR:0.05° | BSPD:800 | VAL:4000000",
+      "sellValue": 4000000,
+      "size": 16,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "image": "/assets/sr25.png",
+      "stats": {
+        "damage": 38,
+        "cooldown": 0.14,
+        "bulletSpeed": 800,
+        "range": 820,
+        "clipSize": 20,
+        "reloadTime": 2.5,
+        "spread": 0.05,
+        "outrangeMulti": 0.66
+      }
+    },
+    "uzi": {
+      "id": "uzi",
+      "category": "gun",
+      "rarity": "white",
+      "name": "UZI",
+      "description": "DMG:7 | SPD:0.065s | CLIP:45 | RNG:380 | RLD:1.8s | SPR:0.16° | BSPD:490 | VAL:780",
+      "sellValue": 780,
+      "size": 4,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "image": "/assets/uzi.png",
+      "stats": {
+        "damage": 7,
+        "cooldown": 0.065,
+        "bulletSpeed": 490,
+        "range": 380,
+        "clipSize": 45,
+        "reloadTime": 1.8,
+        "spread": 0.16,
+        "outrangeMulti": 0.4
+      }
+    },
+    "akm": {
+      "id": "akm",
+      "category": "gun",
+      "rarity": "blue",
+      "name": "AKM",
+      "description": "DMG:18 | SPD:0.09s | CLIP:30 | RNG:488 | RLD:2s | SPR:0.105° | BSPD:488 | VAL:25000",
+      "sellValue": 25000,
+      "size": 1,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "image": "/assets/akm.png",
+      "stats": {
+        "damage": 18,
+        "cooldown": 0.09,
+        "bulletSpeed": 488,
+        "range": 488,
+        "clipSize": 30,
+        "reloadTime": 2,
+        "spread": 0.105,
+        "outrangeMulti": 0.45
+      }
+    },
+    "vector": {
+      "id": "vector",
+      "category": "gun",
+      "rarity": "gold",
+      "name": "Vector",
+      "description": "DMG:13 | SPD:0.03s | CLIP:90 | RNG:340 | RLD:2.2s | SPR:0.15° | BSPD:560 | VAL:660000",
+      "sellValue": 660000,
+      "size": 8,
+      "buyMarketTaxPercent": 10,
+      "sellMarketTaxPercent": 10,
+      "image": "/assets/vector.png",
+      "stats": {
+        "damage": 13,
+        "cooldown": 0.03,
+        "bulletSpeed": 560,
+        "range": 340,
+        "clipSize": 90,
+        "reloadTime": 2.2,
+        "spread": 0.15,
+        "outrangeMulti": 0.66
+      }
+    },
+    "btc": {
+      "id": "btc",
+      "category": "loot",
+      "rarity": "legend",
+      "name": "Bitcoin",
+      "description": "Extremely rare item that cannot be purchased from market. Only dropped by boss in hell and chaos mode. | VAL:1314520025",
+      "sellValue": 1314520025,
+      "size": 1,
+      "buyMarketTaxPercent": 1,
+      "sellMarketTaxPercent": 50,
+      "image": "/assets/dev/btc.png",
+      "lootType": "goods"
+    },
+    "cure_spell": {
+      "id": "cure_spell",
+      "category": "consumable",
+      "rarity": "legend",
+      "name": "Cure Spell",
+      "description": "Instantly heal to max health + max sheild + max energy",
+      "sellValue": 3000000,
+      "size": 1,
+      "buyMarketTaxPercent": 25,
+      "sellMarketTaxPercent": 70,
+      "image": "/assets/dev/cure_spell.png",
+      "instantCure": true
+    }
+  },
+  "enemies": {
+    "drone": {
+      "id": "drone",
+      "name": "Drone",
+      "type": "melee",
+      "radius": 12,
+      "speed": 100,
+      "hp": 40,
+      "damage": 8,
+      "attackCooldown": 0.8,
+      "sightRange": 250,
+      "chaseRange": 350,
+      "patrolRange": 150,
+      "canShoot": false,
+      "color": "#ff5252",
+      "description": "Fast melee drone that charges the player."
+    },
+    "sentinel": {
+      "id": "sentinel",
+      "name": "Sentinel",
+      "type": "ranged",
+      "radius": 20,
+      "speed": 70,
+      "hp": 120,
+      "damage": 18,
+      "attackCooldown": 1.2,
+      "sightRange": 200,
+      "chaseRange": 300,
+      "shootRange": 180,
+      "bulletSpeed": 300,
+      "canShoot": true,
+      "color": "#ff6f00",
+      "description": "Ranged sentinel that shoots at the player."
+    },
+    "berserker": {
+      "id": "berserker",
+      "name": "Berserker",
+      "type": "melee",
+      "radius": 16,
+      "speed": 140,
+      "hp": 65,
+      "damage": 22,
+      "attackCooldown": 0.5,
+      "sightRange": 280,
+      "chaseRange": 400,
+      "patrolRange": 120,
+      "canShoot": false,
+      "color": "#e91e63",
+      "description": "Fast and aggressive melee unit. Charges the player relentlessly."
+    },
+    "sniper": {
+      "id": "sniper",
+      "name": "Sniper",
+      "type": "ranged",
+      "radius": 18,
+      "speed": 50,
+      "hp": 80,
+      "damage": 35,
+      "attackCooldown": 2.5,
+      "sightRange": 400,
+      "chaseRange": 250,
+      "patrolRange": 80,
+      "canShoot": true,
+      "shootRange": 350,
+      "bulletSpeed": 600,
+      "color": "#9c27b0",
+      "description": "Stationary ranged unit with high damage and long sight range. Slow fire rate."
+    },
+    "swarm_drone": {
+      "id": "swarm_drone",
+      "name": "Swarm Drone",
+      "type": "melee",
+      "radius": 8,
+      "speed": 160,
+      "hp": 20,
+      "damage": 5,
+      "attackCooldown": 0.6,
+      "sightRange": 200,
+      "chaseRange": 300,
+      "patrolRange": 200,
+      "canShoot": false,
+      "color": "#ff9800",
+      "description": "Tiny fast drone. Low HP but appears in swarms. Hard to hit."
+    },
+    "turret": {
+      "id": "turret",
+      "name": "Auto-Turret",
+      "type": "ranged",
+      "radius": 24,
+      "speed": 0,
+      "hp": 200,
+      "damage": 12,
+      "attackCooldown": 0.4,
+      "sightRange": 300,
+      "chaseRange": 0,
+      "patrolRange": 0,
+      "canShoot": true,
+      "shootRange": 280,
+      "bulletSpeed": 450,
+      "color": "#607d8b",
+      "description": "Stationary automated turret. High HP, fast fire rate, limited range. Defends high-value zones."
+    },
+    "heavy_gunner": {
+      "id": "heavy_gunner",
+      "name": "Heavy Gunner",
+      "type": "ranged",
+      "radius": 22,
+      "speed": 55,
+      "hp": 180,
+      "damage": 15,
+      "attackCooldown": 0.3,
+      "sightRange": 250,
+      "chaseRange": 350,
+      "patrolRange": 100,
+      "canShoot": true,
+      "shootRange": 220,
+      "bulletSpeed": 380,
+      "color": "#f44336",
+      "description": "Heavily armored ranged unit. Slow but extremely dangerous sustained fire."
+    }
+  },
+  "crate_tiers": {
+    "supply": {
+      "label": "Supply Crate",
+      "description": "Common field supplies - mostly white and green gear.",
+      "pool": [
+        "white",
+        "white",
+        "white",
+        "white",
+        "green",
+        "green",
+        "green",
+        "blue"
+      ],
+      "itemCount": {
+        "min": 2,
+        "max": 4
+      },
+      "color": "#8d6e63",
+      "itemPool": [
+        "trench_spike",
+        "soft_armor",
+        "ssh68",
+        "combat_boots",
+        "duffel_bag",
+        "field_knife",
+        "cloth_vest",
+        "scout_cap",
+        "trail_shoes",
+        "sling_pack",
+        "tomahawk",
+        "carrier_rig",
+        "ops_core",
+        "hiking_boots",
+        "day_pack",
+        "breach_hatchet",
+        "kevlar_weave",
+        "recon_helmet",
+        "runner_boots",
+        "scout_pack"
+      ]
+    },
+    "tactical": {
+      "label": "Tactical Crate",
+      "description": "Military-grade equipment - blue to purple quality.",
+      "pool": [
+        "green",
+        "blue",
+        "blue",
+        "blue",
+        "purple",
+        "purple",
+        "gold"
+      ],
+      "itemCount": {
+        "min": 2,
+        "max": 4
+      },
+      "color": "#5c6bc0",
+      "itemPool": [
+        "karambit",
+        "fort_armor",
+        "altyn_helmet",
+        "jump_boots",
+        "alice_pack",
+        "fire_axe",
+        "slick_armor",
+        "exfil_helmet",
+        "fast_greaves",
+        "mystery_ranch",
+        "ion_blade",
+        "ranger_plate",
+        "sentinel_helm",
+        "phase_greaves",
+        "mule_pack",
+        "revenant_machete",
+        "warden_vest",
+        "eclipse_visor",
+        "phantom_sprinters",
+        "siege_rucksack"
+      ]
+    },
+    "elite": {
+      "label": "Elite Crate",
+      "description": "High-value cache - purple, gold, and rare red items.",
+      "pool": [
+        "blue",
+        "purple",
+        "gold",
+        "gold",
+        "gold",
+        "red",
+        "red"
+      ],
+      "itemCount": {
+        "min": 1,
+        "max": 3
+      },
+      "color": "#c62828",
+      "itemPool": [
+        "cricket_bat",
+        "altyn_vest",
+        "rys_t",
+        "evas_sprinters",
+        "parachute_pack",
+        "thermal_blade",
+        "exo_suit",
+        "cyber_helm",
+        "gravity_boots",
+        "quantum_pack",
+        "wraith_katana",
+        "titan_rig",
+        "fortress_mask",
+        "blitz_treads",
+        "cargo_titan",
+        "doom_cleaver",
+        "bastion_plate",
+        "phantom_crown",
+        "warp_drivers",
+        "void_satchel"
+      ]
+    }
+  },
+  "ammo_tiers": {
+    "ammo_white": {
+      "damageMultiplier": 0.8,
+      "sellValue": 1,
+      "color": "#aaa",
+      "instantKill": false
+    },
+    "ammo_green": {
+      "damageMultiplier": 1,
+      "sellValue": 8,
+      "color": "#81c784",
+      "instantKill": false
+    },
+    "ammo_blue": {
+      "damageMultiplier": 1.05,
+      "sellValue": 250,
+      "color": "#64b5f6",
+      "instantKill": false
+    },
+    "ammo_purple": {
+      "damageMultiplier": 1.2,
+      "sellValue": 5000,
+      "color": "#b388ff",
+      "instantKill": false
+    },
+    "ammo_gold": {
+      "damageMultiplier": 1.4,
+      "sellValue": 25000,
+      "color": "#ffca28",
+      "instantKill": false
+    },
+    "ammo_red": {
+      "damageMultiplier": 999999,
+      "sellValue": 1000000,
+      "color": "#ff4d4d",
+      "instantKill": true
+    }
+  },
+  "achievements": {
+    "first_blood": {
+      "name": "First Blood",
+      "description": "Eliminate your first enemy operator in a raid.",
+      "image": "/assets/achievements/first_blood.png",
+      "enabled": true
+    },
+    "extract_king": {
+      "name": "Extraction King",
+      "description": "Successfully extract from 10 raids.",
+      "image": "/assets/achievements/extract_king.png",
+      "enabled": true
+    },
+    "sharpshooter": {
+      "name": "Sharpshooter",
+      "description": "Get 50 operator kills without dying.",
+      "image": "/assets/achievements/sharpshooter.png",
+      "enabled": true
+    },
+    "lucky_crate": {
+      "name": "Lucky Crate",
+      "description": "Open a High Value Crate dropped by an AI enemy.",
+      "image": "/assets/achievements/lucky_crate.png",
+      "enabled": true
+    },
+    "survivor": {
+      "name": "Survivor",
+      "description": "Extract from a Chaos difficulty raid.",
+      "image": "/assets/achievements/survivor.png",
+      "enabled": true
+    },
+    "welcome": {
+      "name": "Welcome, Operator",
+      "description": "Begin your journey as an operator. Unlocked automatically on first login.",
+      "image": "/assets/achievements/welcome.png",
+      "enabled": true
+    }
+  },
+  "ai_operators": {
+    "lv1": {
+      "maxRarity": "purple",
+      "rarityWeights": {
+        "gray": 16,
+        "white": 34,
+        "green": 28,
+        "blue": 16,
+        "purple": 6
+      },
+      "aimError": [
+        24,
+        52
+      ],
+      "predictionFactor": 0,
+      "aimDistanceScale": 1.15,
+      "aggroRange": [
+        360,
+        620
+      ],
+      "combatConfidence": 0.7,
+      "disengageBias": 1.25
+    },
+    "lv2": {
+      "maxRarity": "gold",
+      "rarityWeights": {
+        "gray": 8,
+        "white": 16,
+        "green": 25,
+        "blue": 24,
+        "purple": 18,
+        "gold": 9
+      },
+      "aimError": [
+        10,
+        22
+      ],
+      "predictionFactor": 0,
+      "aimDistanceScale": 0.85,
+      "aggroRange": [
+        440,
+        760
+      ],
+      "combatConfidence": 1,
+      "disengageBias": 1
+    },
+    "lv3": {
+      "maxRarity": "red",
+      "rarityWeights": {
+        "white": 7,
+        "green": 14,
+        "blue": 23,
+        "purple": 24,
+        "gold": 22,
+        "red": 10
+      },
+      "aimError": [
+        5,
+        10
+      ],
+      "predictionFactor": 1,
+      "aimDistanceScale": 0.55,
+      "aggroRange": [
+        520,
+        880
+      ],
+      "combatConfidence": 1.18,
+      "disengageBias": 0.92
+    },
+    "lv4": {
+      "maxRarity": "red",
+      "rarityWeights": {
+        "gold": 90,
+        "red": 10
+      },
+      "aimError": [
+        5,
+        10
+      ],
+      "predictionFactor": 1,
+      "aimDistanceScale": 0.55,
+      "aggroRange": [
+        520,
+        880
+      ],
+      "combatConfidence": 1.18,
+      "disengageBias": 0.92
+    },
+    "boss": {
+      "maxRarity": "red",
+      "rarityWeights": {
+        "red": 100
+      },
+      "aimError": [
+        2,
+        5
+      ],
+      "predictionFactor": 1.2,
+      "aimDistanceScale": 0.35,
+      "aggroRange": [
+        600,
+        1000
+      ],
+      "combatConfidence": 1.5,
+      "disengageBias": 0.6,
+      "isBoss": true,
+      "bossHealCooldown": 15
+    }
+  }
+}

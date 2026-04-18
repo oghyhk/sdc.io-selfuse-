@@ -100,7 +100,97 @@ export const ITEM_DEFS = {
         stats: { damage: 95, cooldown: 1.45, bulletSpeed: 960, range: 920, clipSize: 5, reloadTime: 3.4, spread: 0.012, outrangeMulti: 0.5 }
     },
 
-    // ─── LOOT / AMMO ───────────────────────────────────────
+    // ─── MISSING GUNS (from dev-config) ─────────────────────────
+    akm: {
+        id: 'akm', category: 'gun', rarity: 'blue',
+        name: 'AKM', description: 'DMG:18 | SPD:0.09s | CLIP:30 | RNG:488 | RLD:2s | SPR:0.105° | BSPD:488 | VAL:25000',
+        sellValue: 25000,
+        size: 1,
+        image: '/assets/akm.png',
+        stats: {"damage": 18, "cooldown": 0.09, "bulletSpeed": 488, "range": 488, "clipSize": 30, "reloadTime": 2, "spread": 0.105, "outrangeMulti": 0.45}
+    },
+    awm250: {
+        id: 'awm250', category: 'gun', rarity: 'legend',
+        name: 'AWM250', description: 'Strongest gun in the game. Nothing can compete with it. | DMG:39 | SPD:0.04s | CLIP:999 | RNG:999 | RLD:0.099s | SPR:0.099° | BSPD:999 | VAL:240000000',
+        sellValue: 240000000,
+        size: 24,
+        image: '/assets/awm250.png',
+        stats: {"damage": 39, "cooldown": 0.04, "bulletSpeed": 999, "range": 999, "clipSize": 999, "reloadTime": 0.099, "spread": 0.099, "outrangeMulti": 0.5}
+    },
+    g18: {
+        id: 'g18', category: 'gun', rarity: 'green',
+        name: 'G18', description: 'G18, 1120rpm!! | DMG:6 | SPD:0.051s | CLIP:33 | RNG:370 | RLD:0.7s | SPR:0.18° | BSPD:500 | VAL:1000',
+        sellValue: 1000,
+        size: 2,
+        image: '/assets/g18.png',
+        stats: {"damage": 6, "cooldown": 0.051, "bulletSpeed": 500, "range": 370, "clipSize": 33, "reloadTime": 0.7, "spread": 0.18, "outrangeMulti": 0.3}
+    },
+    groza: {
+        id: 'groza', category: 'gun', rarity: 'purple',
+        name: 'GROZA', description: 'DMG:16 | SPD:0.0857s | CLIP:45 | RNG:466 | RLD:1.8s | SPR:0.13° | BSPD:500 | VAL:90000',
+        sellValue: 90000,
+        size: 8,
+        image: '/assets/groza.png',
+        stats: {"damage": 16, "cooldown": 0.0857, "bulletSpeed": 500, "range": 466, "clipSize": 45, "reloadTime": 1.8, "spread": 0.13, "outrangeMulti": 0.55}
+    },
+    m14: {
+        id: 'm14', category: 'gun', rarity: 'red',
+        name: 'M14', description: 'DMG:27 | SPD:0.07s | CLIP:50 | RNG:550 | RLD:2.7s | SPR:0.06° | BSPD:650 | VAL:2200000',
+        sellValue: 2200000,
+        size: 12,
+        image: '/assets/m14.png',
+        stats: {"damage": 27, "cooldown": 0.07, "bulletSpeed": 650, "range": 550, "clipSize": 50, "reloadTime": 2, "spread": 0.06, "outrangeMulti": 0.77}
+    },
+    m250: {
+        id: 'm250', category: 'gun', rarity: 'gold',
+        name: 'M250', description: 'DMG:30 | SPD:0.12s | CLIP:125 | RNG:680 | RLD:4.5s | SPR:0.11° | BSPD:770 | VAL:780000',
+        sellValue: 780000,
+        size: 14,
+        image: '/assets/m250.png',
+        stats: {"damage": 30, "cooldown": 0.12, "bulletSpeed": 770, "range": 680, "clipSize": 125, "reloadTime": 4.5, "spread": 0.11, "outrangeMulti": 0.65}
+    },
+    m7_long: {
+        id: 'm7_long', category: 'gun', rarity: 'red',
+        name: 'M7', description: 'DMG:29 | SPD:0.097s | CLIP:45 | RNG:766 | RLD:1.8s | SPR:0.07° | BSPD:720 | VAL:12000000',
+        sellValue: 12000000,
+        size: 12,
+        image: '/assets/m7_long.png',
+        stats: {"damage": 29, "cooldown": 0.097, "bulletSpeed": 720, "range": 766, "clipSize": 45, "reloadTime": 1.8, "spread": 0.07, "outrangeMulti": 0.7}
+    },
+    marlin: {
+        id: 'marlin', category: 'gun', rarity: 'blue',
+        name: 'Marlin', description: 'DMG:25 | SPD:0.4s | CLIP:10 | RNG:745 | RLD:5s | SPR:0.04° | BSPD:710 | VAL:10000',
+        sellValue: 10000,
+        size: 6,
+        image: '/assets/marlin.png',
+        stats: {"damage": 25, "cooldown": 0.4, "bulletSpeed": 710, "range": 745, "clipSize": 10, "reloadTime": 5, "spread": 0.04, "outrangeMulti": 0.4}
+    },
+    sr25: {
+        id: 'sr25', category: 'gun', rarity: 'red',
+        name: 'SR-25', description: 'DMG:38 | SPD:0.14s | CLIP:20 | RNG:820 | RLD:2.5s | SPR:0.05° | BSPD:800 | VAL:4000000',
+        sellValue: 4000000,
+        size: 16,
+        image: '/assets/sr25.png',
+        stats: {"damage": 38, "cooldown": 0.14, "bulletSpeed": 800, "range": 820, "clipSize": 20, "reloadTime": 2.5, "spread": 0.05, "outrangeMulti": 0.66}
+    },
+    uzi: {
+        id: 'uzi', category: 'gun', rarity: 'white',
+        name: 'UZI', description: 'DMG:7 | SPD:0.065s | CLIP:45 | RNG:380 | RLD:1.8s | SPR:0.16° | BSPD:490 | VAL:780',
+        sellValue: 780,
+        size: 4,
+        image: '/assets/uzi.png',
+        stats: {"damage": 7, "cooldown": 0.065, "bulletSpeed": 490, "range": 380, "clipSize": 45, "reloadTime": 1.8, "spread": 0.16, "outrangeMulti": 0.4}
+    },
+    vector: {
+        id: 'vector', category: 'gun', rarity: 'gold',
+        name: 'Vector', description: 'DMG:13 | SPD:0.03s | CLIP:90 | RNG:340 | RLD:2.2s | SPR:0.15° | BSPD:560 | VAL:660000',
+        sellValue: 660000,
+        size: 8,
+        image: '/assets/vector.png',
+        stats: {"damage": 13, "cooldown": 0.03, "bulletSpeed": 560, "range": 340, "clipSize": 90, "reloadTime": 2.2, "spread": 0.15, "outrangeMulti": 0.66}
+    },
+
+    // ─── LOOT / AMMO ────────────────────────────────────────
     ammo_white: {
         id: 'ammo_white', category: 'loot', lootType: 'ammo', rarity: 'gray',
         name: 'Gray Ammo', description: 'Low-grade gray ammo. Damage x0.8.',
