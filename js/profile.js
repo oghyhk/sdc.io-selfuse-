@@ -720,27 +720,21 @@ export async function apiFetch(path, options = {}) {
 function mergeDefinitionOverride(baseDefinition, overrideDefinition) {
     if (!baseDefinition || !overrideDefinition) return;
 
-    const merged = {
-        ...baseDefinition,
-        ...clone(overrideDefinition),
-    };
+    Object.assign(baseDefinition, clone(overrideDefinition));
 
     if (baseDefinition.stats || overrideDefinition.stats) {
-        merged.stats = {
+        baseDefinition.stats = {
             ...(baseDefinition.stats || {}),
             ...(overrideDefinition.stats || {}),
         };
     }
 
     if (baseDefinition.modifiers || overrideDefinition.modifiers) {
-        merged.modifiers = {
+        baseDefinition.modifiers = {
             ...(baseDefinition.modifiers || {}),
             ...(overrideDefinition.modifiers || {}),
         };
     }
-
-    Object.keys(baseDefinition).forEach((key) => delete baseDefinition[key]);
-    Object.assign(baseDefinition, merged);
 }
 
 export async function loadRuntimeDevConfig() {
@@ -1246,33 +1240,81 @@ export const ELO_KILL_BONUS_MULT = { easy: 0, advanced: 1, hell: 2, chaos: 4 };
 const PER_KILL_K = 8;
 
 /**
- * Compute ELO gain for a single kill based on killer vs victim ELO difference.
- * Higher-ELO victims yield more; lower-ELO victims yield less. Minimum 1.
+ * Return the loss multiplier for a given ELO bracket (used on death/loss).
+ * Based solely on the player's own ELO — brackets:
+ *   0–900   → 0.33× loss  (i.e. 3× gain, 1× loss)
+ *   901–1200 → 0.5× loss  (i.e. 2× gain, 1× loss stays unchanged)
+ *   1201–1800 → 1.0× loss (unchanged)
+ *   1801–2100 → 2.0× loss
+ *   2101–2400 → 3.0× loss
+ *   2401+     → 5.0× loss
  */
-export function computePerKillElo(killerElo = 1000, victimElo = 1000) {
-    const expected = 1 / (1 + Math.pow(10, (victimElo - killerElo) / 400));
-    return Math.max(1, Math.round(PER_KILL_K * (1 - expected)));
+export function getLossMultiplier(elo) {
+    if (elo <= 900)    return 1 / 3;   // 3× gain, 1× loss
+    if (elo <= 1200)   return 1 / 2;   // 2× gain, 1× loss
+    if (elo <= 1800)   return 1.0;     // unchanged
+    if (elo <= 2100)   return 2.0;     // 2× loss
+    if (elo <= 2400)   return 3.0;     // 3× loss
+    return 5.0;                        // 5× loss
 }
 
 /**
- * Compute a death-penalty multiplier based on who killed you.
- * Dying to a lower-ELO opponent → scale > 1 (more loss).
- * Dying to a higher-ELO opponent → scale < 1 (less loss).
- * Returns 1.0 when no killer ELO is available.
+ * Return the gain multiplier for a given ELO bracket (used on kill/gain).
+ * Based solely on the player's own ELO — brackets:
+ *   0–900   → 3× gain
+ *   901–1200 → 2× gain
+ *   1201–1800 → 1× (unchanged)
+ *   1801+   → 1× (loss multipliers kick in for losses only)
  */
-export function computeDeathPenaltyScale(myElo = 1000, killerElo = null) {
-    if (killerElo == null) return 1.0;
-    const expected = 1 / (1 + Math.pow(10, (killerElo - myElo) / 400));
-    return Math.max(0.5, Math.min(1.5, 0.5 + expected));
+export function getGainMultiplier(elo) {
+    if (elo <= 900)    return 3.0;
+    if (elo <= 1200)   return 2.0;
+    return 1.0;
 }
 
-export function computeEloChange(difficulty = 'advanced', extracted = false, eloKillBonus = 0, deathPenaltyScale = 1.0) {
+/**
+ * Compute ELO gain for a single kill. Base is a flat constant regardless of
+ * killer or victim ELO. Minimum 1.
+ */
+export function computePerKillElo(killerElo = 1000, victimElo = 1000) {
+    return Math.max(1, PER_KILL_K);
+}
+
+/**
+ * Compute the death-penalty multiplier using bracket-based rules.
+ * The scale is applied to the loss side only and is based on the victim's own ELO.
+ * The killer's ELO is no longer used.
+ * Returns 1.0 when no killer ELO is available (no penalty context).
+ */
+export function computeDeathPenaltyScale(myElo = 1000, killerElo = null) {
+    // If we don't know who killed us, fall back to the loss multiplier at my ELO
+    if (killerElo == null) return getLossMultiplier(myElo);
+    return getLossMultiplier(myElo);
+}
+
+/**
+ * Compute ELO change for a single raid.
+ *
+ * Gain side (extracted):
+ *   (K + eloKillBonus) × gainMultiplier
+ *
+ * Loss side (death):
+ *   -(K - eloKillBonus) × lossMultiplier
+ *
+ * Both the base K and the kill bonus are scaled by the gain/loss multipliers
+ * based on the player's own ELO bracket.
+ */
+export function computeEloChange(difficulty = 'advanced', extracted = false, eloKillBonus = 0, deathPenaltyScale = 1.0, playerElo = 1000) {
     if (difficulty === 'easy') return 0;
     const K = ELO_DIFFICULTY_K[difficulty] || ELO_DIFFICULTY_K.advanced;
-    const mult = ELO_KILL_BONUS_MULT[difficulty] || 0;
-    const adjustedKillBonus = eloKillBonus * mult;
-    if (extracted) return K + adjustedKillBonus;
-    return -(K - Math.max(0, adjustedKillBonus));
+    const gainMult = getGainMultiplier(playerElo);
+    if (extracted) {
+        // K and kill bonus both scaled by gain multiplier
+        return Math.round((K + eloKillBonus) * gainMult);
+    }
+    // Death: kill bonus offsets the loss first; net loss then scaled by loss multiplier
+    const netLoss = Math.max(0, K - eloKillBonus); // kills offset the loss
+    return Math.round(-netLoss * deathPenaltyScale);
 }
 
 function applyEloChange(profile, change) {
@@ -2204,7 +2246,7 @@ export class ProfileStore {
         this.currentProfile.stats.totalExtractions += 1;
         this.currentProfile.stats.totalKills += runSummary.kills || 0;
         awardProfileExp(this.currentProfile, getExpRewardForRunSummary(runSummary));
-        applyEloChange(this.currentProfile, computeEloChange(runSummary.difficulty, true, runSummary.eloKillBonus || 0));
+        applyEloChange(this.currentProfile, computeEloChange(runSummary.difficulty, true, runSummary.eloKillBonus || 0, 1.0, this.currentProfile.elo || 1000));
         return this.saveCurrentProfile();
     }
 
@@ -2237,7 +2279,7 @@ export class ProfileStore {
             this.currentProfile.stats.totalRuns += 1;
             this.currentProfile.stats.totalKills += Number(result?.summary?.kills) || 0;
             awardProfileExp(this.currentProfile, getExpRewardForRunSummary(result?.summary));
-            applyEloChange(this.currentProfile, computeEloChange(difficulty, false, result?.summary?.eloKillBonus || 0, result?.summary?.deathPenaltyScale || 1.0));
+            applyEloChange(this.currentProfile, computeEloChange(difficulty, false, result?.summary?.eloKillBonus || 0, result?.summary?.deathPenaltyScale || 1.0, this.currentProfile.elo || 1000));
             this.currentProfile.backpackItems = [];
             applyDeathLosses(this.currentProfile, difficulty, result?.summary?.deathLosses);
             this._recordRaidHistory({

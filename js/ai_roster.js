@@ -228,17 +228,17 @@ export function pickRosterForRaid(difficulty, count) {
 
 /**
  * Apply ELO changes for AI operators that participated in a raid.
- * @param {Array<{rosterId, extracted, eloKillBonus, deathPenaltyScale}>} outcomes — one entry per bot
+ * @param {Array<{rosterId, extracted, eloKillBonus, deathPenaltyScale, botElo}>} outcomes — one entry per bot
  * @param {string} difficulty — raid difficulty
  * @param {function} computeEloChange — imported ELO compute function from profile.js
  */
 export function applyRosterEloChanges(outcomes, difficulty, computeEloChange) {
     if (!outcomes?.length || typeof computeEloChange !== 'function') return;
     const statsMap = loadStats();
-    for (const { rosterId, extracted, eloKillBonus, deathPenaltyScale } of outcomes) {
+    for (const { rosterId, extracted, eloKillBonus, deathPenaltyScale, botElo } of outcomes) {
         if (!rosterId) continue;
         if (!statsMap[rosterId]) statsMap[rosterId] = defaultStats();
-        const change = computeEloChange(difficulty, extracted, eloKillBonus || 0, deathPenaltyScale || 1.0);
+        const change = computeEloChange(difficulty, extracted, eloKillBonus || 0, deathPenaltyScale || 1.0, botElo ?? 1000);
         statsMap[rosterId].elo = Math.max(0, Math.round((statsMap[rosterId].elo ?? 1000) + change));
     }
     saveStats(statsMap);

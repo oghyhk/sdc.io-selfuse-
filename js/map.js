@@ -232,6 +232,9 @@ export function generateMap(options = {}) {
         }
     }
 
+    // ---------- Zone wall rings with fixed entrances ----------
+    buildZoneWalls(tiles, zones, MAP_ROWS, MAP_COLS, difficulty);
+
     // ---------- Find open floor positions ----------
     function isOpenFloor(r, c) {
         return r > 0 && r < MAP_ROWS - 1 && c > 0 && c < MAP_COLS - 1 &&
@@ -557,4 +560,213 @@ export function buildNavGrid(tiles, rows, cols) {
         }
     }
     return grid;
+}
+
+// ── Zone wall rings ──────────────────────────────────────────────────────────
+// Surrounds each zone ring with walls, leaving a fixed number of entrances.
+//  - COMBAT ring: 4 entrances (North/South/East/West)
+//  - HIGH_VALUE (normal): 3 entrances
+//  - HIGH_VALUE (chaos): 1 entrance (North only)
+//  - All extraction points remain in SAFE zones.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Determine the radius boundaries of each zone ring in tile units.
+ * Returns { combatInner, combatOuter, hvInner, hvOuter }.
+ * The COMBAT ring spans [combatInner, combatOuter].
+ * The HIGH_VALUE ring spans [hvInner, combatInner).
+ * The SAFE zone is everything outside combatOuter.
+ */
+export function getZoneRadii(rows, cols) {
+    // d = max(|dcx|, |dcy|) where dcx = (c - cols/2)/(cols/2), dcy = (r - rows/2)/(rows/2)
+    //   0 ≤ d < 0.25  → HIGH_VALUE
+    //   0.25 ≤ d < 0.6 → COMBAT
+    //   d ≥ 0.6        → SAFE
+    // Solve for tile units: d < threshold  →  max(|dcx|,|dcy|) < thr
+    //   |dcx| < thr  →  |c - cols/2| < thr * cols/2
+    //   |dcy| < thr  →  |r - rows/2| < thr * rows/2
+    // So in tile units:
+    //   hvInner  = cols/2 - 0.25 * cols/2  = cols * 0.375
+    //   combatOuter = cols/2 + 0.6 * cols/2  = cols * 0.8   (same for rows)
+    // Actually we want a single radius per ring, so let's use the tighter bound
+    // from the column dimension (MAP_WIDTH >= MAP_HEIGHT in base presets).
+    // To keep the rings concentric and symmetric, use the same formula for
+    // both axes and take max() — which is how the zone d is computed.
+    const halfCols = cols / 2;
+    const halfRows = rows / 2;
+
+    // Ring boundaries in tile units
+    // HV: d < 0.25  → tile dist < 0.25 * halfDim
+    // COMBAT: 0.25 ≤ d < 0.6  → tile dist ∈ [0.25*halfDim, 0.6*halfDim)
+    // SAFE: d ≥ 0.6
+
+    // Use the same halfDim for both axes (match zone assignment's max(dcx,dcy))
+    const halfDim = Math.min(halfCols, halfRows); // the tighter radius
+
+    const hvOuter  = Math.floor(0.25 * halfDim);       // HV ring outer edge
+    const combatInner = hvOuter;                         // COMBAT inner = HV outer
+    const combatOuter = Math.floor(0.6  * halfDim);     // COMBAT outer edge
+
+    return { hvInner: 0, hvOuter, combatInner, combatOuter };
+}
+
+/**
+ * Place a single corridor entrance through a wall ring.
+ * Wall positions are computed from the center using Chebyshev distance.
+ * For rectangular maps, the south wall is at halfRows + ringDist (not rows-1-ringDist)
+ * and the east wall is at halfCols + ringDist (not cols-1-ringDist), because the
+ * zone boundary is a Chebyshev circle centered on the map, not symmetric around edges.
+ *
+ * @param {number[][]} tiles         - tile grid (modified in place)
+ * @param {number} rows              - number of rows
+ * @param {number} cols              - number of columns
+ * @param {number} ringDist          - tile distance from center to the ring wall
+ * @param {string} direction         - 'N' | 'S' | 'E' | 'W'
+ * @param {number} entranceWidth      - how many tiles wide the opening is (1 or 2)
+ */
+function carveEntrance(tiles, rows, cols, ringDist, direction, entranceWidth) {
+    const halfRows = Math.floor(rows / 2);
+    const halfCols = Math.floor(cols / 2);
+    const half = Math.floor(entranceWidth / 2);
+
+    // All four wall positions (Chebyshev circle centered on map center)
+    const wallRowN = halfRows - ringDist;  // north wall row
+    const wallRowS = halfRows + ringDist;  // south wall row
+    const wallColW = halfCols - ringDist;  // west wall col
+    const wallColE = halfCols + ringDist;  // east wall col
+
+    if (direction === 'N') {
+        const colStart = halfCols - half;
+        for (let dc = 0; dc < entranceWidth; dc++) {
+            const c = colStart + dc;
+            const r = wallRowN;
+            if (r > 0 && r < rows - 1 && c > 0 && c < cols - 1) {
+                tiles[r][c] = TILE.FLOOR;
+            }
+        }
+    } else if (direction === 'S') {
+        const colStart = halfCols - half;
+        for (let dc = 0; dc < entranceWidth; dc++) {
+            const c = colStart + dc;
+            const r = wallRowS;
+            if (r > 0 && r < rows - 1 && c > 0 && c < cols - 1) {
+                tiles[r][c] = TILE.FLOOR;
+            }
+        }
+    } else if (direction === 'W') {
+        const rowStart = halfRows - half;
+        for (let dr = 0; dr < entranceWidth; dr++) {
+            const r = rowStart + dr;
+            const c = wallColW;
+            if (r > 0 && r < rows - 1 && c > 0 && c < cols - 1) {
+                tiles[r][c] = TILE.FLOOR;
+            }
+        }
+    } else if (direction === 'E') {
+        const rowStart = halfRows - half;
+        for (let dr = 0; dr < entranceWidth; dr++) {
+            const r = rowStart + dr;
+            const c = wallColE;
+            if (r > 0 && r < rows - 1 && c > 0 && c < cols - 1) {
+                tiles[r][c] = TILE.FLOOR;
+            }
+        }
+    }
+}
+
+/**
+ * Build a solid wall ring around a rectangular boundary.
+ * Walls are placed on the perimeter at distance `dist` from center on all 4 sides,
+ * with corridor entrances carved at cardinal directions.
+ *
+ * @param {number[][]} tiles   - tile grid (modified in place)
+ * @param {number[][]} zones    - zone grid (read-only)
+ * @param {number} rows         - map rows
+ * @param {number} cols         - map cols
+ * @param {number} innerDist    - inner edge of the ring (in tiles from center)
+ * @param {number} outerDist    - outer edge of the ring (in tiles from center)
+ * @param {string[]} entrances   - list of directions to carve ('N','S','E','W')
+ * @param {number} entranceWidth - width of each entrance in tiles
+ */
+function buildWallRing(tiles, zones, rows, cols, innerDist, outerDist, entrances, entranceWidth) {
+    const centerCol = Math.floor(cols / 2);
+    const centerRow = Math.floor(rows / 2);
+
+    // Place a 1-tile-wide wall ring at every boundary tile of the ring band
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            // Compute Chebyshev distance from center (matches zone d calculation)
+            const dcx = Math.abs(c - centerCol) / (cols / 2);
+            const dcy = Math.abs(r - centerRow) / (rows / 2);
+            const d = Math.max(dcx, dcy);
+
+            // Convert tile dist to the same 0-1 scale as zone boundaries
+            const halfDim = Math.min(cols / 2, rows / 2);
+            const tileDist = Math.max(dcx, dcy); // already normalised 0-1
+
+            // Check if this tile lies on the ring boundary (outer or inner edge)
+            const outerThreshold = outerDist / halfDim;
+            const innerThreshold = innerDist / halfDim;
+
+            const isOnOuterEdge = Math.abs(tileDist - outerThreshold) < (1 / halfDim / 2);
+            const isOnInnerEdge = innerDist > 0 && Math.abs(tileDist - innerThreshold) < (1 / halfDim / 2);
+
+            if (isOnOuterEdge || isOnInnerEdge) {
+                // Only wall non-wall floor tiles (don't overwrite border or room walls)
+                if (tiles[r][c] !== TILE.WALL) {
+                    tiles[r][c] = TILE.WALL;
+                }
+            }
+        }
+    }
+
+    // Carve entrance corridors through the ring
+    for (const dir of entrances) {
+        // Place the entrance opening at the midpoint of each side
+        const wallDist = Math.round(outerDist);
+        carveEntrance(tiles, rows, cols, wallDist, dir, entranceWidth);
+        // Also open the inner edge if this is a double ring (innerDist > 0)
+        if (innerDist > 0) {
+            carveEntrance(tiles, rows, cols, Math.round(innerDist), dir, entranceWidth);
+        }
+    }
+}
+
+/**
+ * Main entry point — called from generateMap() after zone assignment
+ * and before open-floor position finding.
+ *
+ * Layout per difficulty:
+ *   easy / advanced / hell:
+ *     - COMBAT ring surrounded by walls → 4 entrances (N, S, E, W)
+ *     - HIGH_VALUE surrounded by walls → 3 entrances (N, E, W — no South)
+ *   chaos:
+ *     - COMBAT ring surrounded by walls → 4 entrances
+ *     - HIGH_VALUE surrounded by walls → 1 entrance (N only)
+ *
+ * Extraction points are placed later (always in SAFE zone) and
+ * the wall-carving there clears a small area, so no conflict.
+ */
+function buildZoneWalls(tiles, zones, rows, cols, difficulty) {
+    const centerCol = Math.floor(cols / 2);
+    const centerRow = Math.floor(rows / 2);
+
+    // Determine ring radii in tile units
+    // Use the tighter half-dimension so rings are perfectly square visually
+    const halfDim = Math.min(cols / 2, rows / 2);
+
+    // Ring boundaries at zone thresholds (0.25 and 0.6 of halfDim)
+    const hvOuter     = Math.round(0.25 * halfDim); // inner boundary of COMBAT
+    const combatOuter = Math.round(0.6  * halfDim); // outer boundary of COMBAT = edge of SAFE
+
+    // ── COMBAT zone wall ring ──────────────────────────────────────────────
+    // The combat ring is the band: [hvOuter, combatOuter] tiles from center.
+    // Build walls at hvOuter and combatOuter, leaving 4 entrances.
+    buildWallRing(tiles, zones, rows, cols, hvOuter, combatOuter, ['N', 'S', 'E', 'W'], 2);
+
+    // ── HIGH_VALUE zone wall ring ────────────────────────────────────────
+    // HV is d < 0.25, so its outer boundary is hvOuter tiles from center.
+    // Build walls at hvOuter, with entrances per difficulty.
+    const hvEntrances = difficulty === 'chaos' ? ['N'] : ['N', 'E', 'W'];
+    buildWallRing(tiles, zones, rows, cols, 0, hvOuter, hvEntrances, 2);
 }

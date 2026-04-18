@@ -878,6 +878,10 @@ export class Game {
                 this.crateMessage = `Healing with ${result.name}`;
                 this.crateMessageTimer = 1.2;
                 this._spawnParticles(this.player.x, this.player.y - 10, '#4caf50', 8);
+            } else if (result.action === 'instant') {
+                this.crateMessage = `${result.name} — Fully restored!`;
+                this.crateMessageTimer = 2.0;
+                this._spawnParticles(this.player.x, this.player.y - 10, '#81d4fa', 16);
             } else if (result.action === 'cancelled') {
                 this.crateMessage = `Stopped healing${result.name ? ` ${result.name}` : ''}`;
                 this.crateMessageTimer = 1.0;
@@ -1166,12 +1170,10 @@ export class Game {
         for (const bot of this.aiPlayers) {
             if (!bot.rosterId) continue;
             if (bot.aiExtracted) {
-                outcomes.push({ rosterId: bot.rosterId, extracted: true, eloKillBonus: bot.eloKillBonus || 0, deathPenaltyScale: 1.0 });
+                outcomes.push({ rosterId: bot.rosterId, extracted: true, eloKillBonus: bot.eloKillBonus || 0, deathPenaltyScale: 1.0, botElo: bot.elo || 1000 });
             } else if (!bot.alive) {
-                const deathScale = bot.killedByElo != null
-                    ? computeDeathPenaltyScale(bot.elo || 1000, bot.killedByElo)
-                    : 1.0;
-                outcomes.push({ rosterId: bot.rosterId, extracted: false, eloKillBonus: bot.eloKillBonus || 0, deathPenaltyScale: deathScale });
+                const deathScale = computeDeathPenaltyScale(bot.elo || 1000, bot.killedByElo);
+                outcomes.push({ rosterId: bot.rosterId, extracted: false, eloKillBonus: bot.eloKillBonus || 0, deathPenaltyScale: deathScale, botElo: bot.elo || 1000 });
             } else {
                 // Bot is still alive — simulate outcome.
                 // Higher HP ratio & wanting to extract → more likely to survive
@@ -1184,7 +1186,7 @@ export class Game {
                 } else {
                     incrementRosterStat(bot.rosterId, 'deaths');
                 }
-                outcomes.push({ rosterId: bot.rosterId, extracted, eloKillBonus: bot.eloKillBonus || 0, deathPenaltyScale: 1.0 });
+                outcomes.push({ rosterId: bot.rosterId, extracted, eloKillBonus: bot.eloKillBonus || 0, deathPenaltyScale: 1.0, botElo: bot.elo || 1000 });
             }
         }
         return outcomes;

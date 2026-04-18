@@ -608,6 +608,26 @@ export class Player {
         if (!definition || !isConsumableDefinition(definitionId)) {
             return { ok: false, reason: 'missing', name: '' };
         }
+
+        // Instant cure: full HP + shield + energy in one tick, consumes 1 unit
+        if (definition.instantCure) {
+            if (this.hp >= this.maxHp && this.energy >= this.energyMax &&
+                (!this.shieldLayers || this.shieldLayers.every(s => s.hp >= s.maxHp))) {
+                return { ok: false, reason: 'full', name: definition.name };
+            }
+            if (!this._consumeConsumableUnit(definitionId)) {
+                return { ok: false, reason: 'missing', name: definition.name };
+            }
+            this.hp = this.maxHp;
+            this.energy = this.energyMax;
+            if (this.shieldLayers) {
+                for (const shield of this.shieldLayers) {
+                    shield.hp = shield.maxHp;
+                }
+            }
+            return { ok: true, reason: 'instant', name: definition.name };
+        }
+
         if (this.hp >= this.maxHp) {
             return { ok: false, reason: 'full', name: definition.name };
         }
@@ -1205,6 +1225,10 @@ export class Player {
             return result.reason === 'full'
                 ? { action: 'full', name: result.name }
                 : false;
+        }
+        // Instant cure (e.g. cure_spell) applies immediately with no tick-based healing
+        if (result.reason === 'instant') {
+            return { action: 'instant', definitionId, name: result.name };
         }
         return { action: 'started', definitionId, name: result.name };
     }
