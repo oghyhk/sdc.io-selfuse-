@@ -7,24 +7,62 @@ import uuid
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import RLock
 from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parent
 DATA_FILE = ROOT / 'data' / 'users.json'
+DATA_FILE_BACKUP = ROOT / 'data' / 'users.json.runtime.bak'
 DEV_CONFIG_FILE = ROOT / 'data' / 'dev-config.json'
 HOST = '0.0.0.0'
 PORT = 8765
 USERNAME_PATTERN = re.compile(r'^(?:[A-Za-z0-9]|❤(?:️)?)+$')
+STORE_LOCK = RLock()
+
+
+def _default_store() -> dict:
+    return {'users': {}}
+
+
+def _ensure_store_file() -> None:
+    if not DATA_FILE.exists():
+        DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _load_store_file(path: Path) -> dict:
+    store = json.loads(path.read_text(encoding='utf-8'))
+    if not isinstance(store, dict):
+        raise ValueError('store must be a dict')
+    users = store.get('users')
+    if not isinstance(users, dict):
+        raise ValueError('store.users must be a dict')
+    return store
+
+
+def _atomic_write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f'{path.name}.{uuid.uuid4().hex}.tmp')
+    tmp_path.write_text(json.dumps(payload, indent=2), encoding='utf-8')
+    tmp_path.replace(path)
 
 
 def read_store() -> dict:
-    if not DATA_FILE.exists():
-        DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-        DATA_FILE.write_text(json.dumps({'users': {}}, indent=2), encoding='utf-8')
-    try:
-        return json.loads(DATA_FILE.read_text(encoding='utf-8'))
-    except json.JSONDecodeError:
-        return {'users': {}}
+    with STORE_LOCK:
+        _ensure_store_file()
+        if not DATA_FILE.exists():
+            store = _default_store()
+            _atomic_write_json(DATA_FILE, store)
+            _atomic_write_json(DATA_FILE_BACKUP, store)
+            return store
+        try:
+            return _load_store_file(DATA_FILE)
+        except (json.JSONDecodeError, OSError, ValueError):
+            if DATA_FILE_BACKUP.exists():
+                try:
+                    return _load_store_file(DATA_FILE_BACKUP)
+                except (json.JSONDecodeError, OSError, ValueError):
+                    pass
+            return _default_store()
 
 
 def write_store(store: dict) -> None:
@@ -35,7 +73,9 @@ def write_store(store: dict) -> None:
     # Prevent wiping users with empty dict
     if not isinstance(store.get('users'), dict):
         raise ValueError('store.users must be a dict')
-    DATA_FILE.write_text(json.dumps(store, indent=2), encoding='utf-8')
+    with STORE_LOCK:
+        _atomic_write_json(DATA_FILE, store)
+        _atomic_write_json(DATA_FILE_BACKUP, store)
     _auto_git_commit_push()
 
 
