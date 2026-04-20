@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import json
 import re
 import time
@@ -723,6 +724,14 @@ class ApiHandler(SimpleHTTPRequestHandler):
             # Raid history — include value fields so netValue computes correctly
             value_extracted = int(summary.get('valueExtracted', 0) or 0)
             lost_value = int(summary.get('lostValue', 0) or 0)
+            # Compute duration server-side from activeRaid.startedAt
+            raid_started_at = active_raid.get('startedAt')
+            now_ms = int(time.time() * 1000)
+            raid_duration = max(0.0, (now_ms - raid_started_at) / 1000) if raid_started_at else float(summary.get('duration', 0) or 0)
+            raid_dur_mins = int(raid_duration // 60)
+            raid_dur_secs = int(raid_duration % 60)
+            raid_duration_label = f'{raid_dur_mins:02d}:{raid_dur_secs:02d}'
+            raid_created_at = datetime.datetime.fromtimestamp(raid_started_at / 1000, tz=datetime.timezone.utc).isoformat().replace('+00:00', 'Z') if raid_started_at else datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
             history = list(profile.get('raidHistory') or [])
             history.append({
                 'status': status,
@@ -730,11 +739,13 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 'kills': kills,
                 'operatorKills': int(summary.get('operatorKills', 0) or 0),
                 'aiEnemyKills': int(summary.get('aiEnemyKills', 0) or 0),
-                'duration': float(summary.get('duration', 0) or 0),
+                'duration': raid_duration,
+                'durationLabel': raid_duration_label,
                 'elo': profile['elo'],
                 'coins': profile['coins'],
                 'items': summary.get('items') or [],
-                'timestamp': int(time.time() * 1000),
+                'timestamp': now_ms,
+                'createdAt': raid_created_at,
                 'valueExtracted': value_extracted,
                 'lostValue': lost_value,
                 'netValue': value_extracted - lost_value if status == 'extracted' else -lost_value,

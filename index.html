@@ -31,6 +31,7 @@
             animation: ap-frame-pulse 1.8s ease-in-out infinite, legend-text-shimmer 1.8s ease-in-out infinite;
         }
         .secondary-button { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.08); }
+        .secondary-button:disabled, .primary-button:disabled { opacity: 0.35; cursor: not-allowed; }
         .hidden { display: none !important; }
         #loading {
             position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;

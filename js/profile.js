@@ -1137,7 +1137,7 @@ function normalizeRaidHistoryEntry(entry, options = {}) {
     const netValue = entry.netValue == null
         ? (extractedSuccess ? valueExtracted - lostValue : -lostValue)
         : toNumberOrFallback(entry.netValue, 0);
-    const createdAt = entry.createdAt || new Date().toISOString();
+    const createdAt = entry.createdAt || (entry.timestamp ? new Date(entry.timestamp).toISOString() : new Date().toISOString());
 
     const duration = Math.max(0, toNumberOrFallback(entry.duration, 0));
     const durationMins = Math.floor(duration / 60);
@@ -1859,7 +1859,7 @@ export class ProfileStore {
         this.currentProfile.safeboxItems = normalizePersistentEntries(result?.safeboxItems || [], SAFEBOX_CAPACITY);
 
         if (result?.status === 'extracted') {
-            this.recordExtraction({
+            await this.recordExtraction({
                 ...result.summary,
                 items: Array.isArray(result.summary?.items) ? result.summary.items : []
             });
