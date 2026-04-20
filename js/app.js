@@ -72,6 +72,13 @@ const placeholderContent = document.getElementById('placeholderContent');
 const placeholderBackButton = document.getElementById('placeholderBackButton');
 const mailButton = document.getElementById('mailButton');
 const mailBadge = document.getElementById('mailBadge');
+const raidChancesEl = document.getElementById('raidChances');
+const hellChancesEl = document.getElementById('hellChances');
+const chaosChancesEl = document.getElementById('chaosChances');
+const hellTimerEl = document.getElementById('hellTimer');
+const chaosTimerEl = document.getElementById('chaosTimer');
+const buyHellChanceBtn = document.getElementById('buyHellChance');
+const buyChaosChanceBtn = document.getElementById('buyChaosChance');
 const mailScreen = document.getElementById('mailScreen');
 const mailList = document.getElementById('mailList');
 const mailSubtitle = document.getElementById('mailSubtitle');
@@ -201,6 +208,16 @@ const game = new Game(canvas, {
     onRunComplete: async (result) => {
         try {
             await store.applyRaidOutcome(result);
+            // Mark tutorial complete after first successful extraction
+            if (result.status === 'extracted' && game.isTutorial) {
+                store.currentProfile.hasCompletedTutorial = true;
+                await store.saveCurrentProfile();
+            }
+            // Refund raid chance on successful extraction
+            if (result.status === 'extracted' && window._lastRaidDifficulty) {
+                refundRaidChance(window._lastRaidDifficulty);
+                await store.saveCurrentProfile();
+            }
         } catch (e) {
             console.warn('applyRaidOutcome failed:', e);
         }
@@ -1264,11 +1281,17 @@ function renderMenu() {
     ensureSelectedMenuLoadout(profile);
     const summary = summarizeProfile(profile);
 
+    // Lock difficulty select until tutorial is complete
+    const tutorialLocked = !profile.hasCompletedTutorial;
+    difficultySelect.value = tutorialLocked ? 'easy' : (difficultySelect.value || 'easy');
+    difficultySelect.disabled = tutorialLocked;
+
     menuSummary.innerHTML = `
         <div class="summary-tile"><span class="summary-label">Operator</span><strong>${profile.username}</strong></div>
         <div class="summary-tile"><span class="summary-label">Coins</span><strong>${formatCoinAmountMarkup(summary.coins)}</strong></div>
         <div class="summary-tile"><span class="summary-label">Extractions</span><strong>${summary.extractedRuns}</strong></div>
         <div class="summary-tile"><span class="summary-label">Last Haul</span><strong>${summary.lastExtractItemCount} items</strong></div>
+        ${tutorialLocked ? '<div class="summary-tile" style="grid-column:1/-1;color:#ffb74d"><strong>\u{1F393} Complete your first raid to unlock all difficulties</strong></div>' : ''}
     `;
 
     renderMenuLoadoutSelection(profile);
@@ -1453,6 +1476,7 @@ function renderRaidDetail(message = '') {
     raidDetailDescription.textContent = item.description;
     raidDetailMeta.innerHTML = `
         <span class="${item.rarity === 'legend' ? 'legend-text' : ''}" style="color:${item.rarityColor}">${item.rarityLabel}</span>
+        <span>Size ${item.size || 1}</span>
         <span>${formatLabeledCoinMarkup('Value', item.sellValue)}</span>
         ${activeRaidDetail.source === 'backpack' ? '<span>Backpack item</span>' : activeRaidDetail.source === 'safebox' ? '<span>Safebox item</span>' : '<span>Equipped item</span>'}
     `;
@@ -1508,6 +1532,7 @@ function renderEquipmentDetail(message = '') {
     detailDescription.textContent = sourceStackQuantity ? getStackableEntryDescription(definition, sourceStackQuantity) : definition.description;
     detailMeta.innerHTML = `
         <span class="${definition.rarity === 'legend' ? 'legend-text' : ''}" style="color:${rarity.color}">${rarity.label}</span>
+        <span>Size ${definition.size || 1}</span>
         <span>${sourceStackQuantity ? `Pack ${sourceStackQuantity}` : `Owned ${owned}`}</span>
         <span>${formatLabeledCoinMarkup('Value', sourceEntry?.sellValue || definition.sellValue)}</span>
         <span>${formatLabeledCoinMarkup('Sell', getSellTradeTotal(definition.id, 1))}</span>
@@ -1723,6 +1748,7 @@ function renderMarket() {
                             <p>${item.description}</p>
                             <div class="item-stats">
                                 <span>${getItemCategoryLabel(item)}</span>
+                                <span>Size ${item.size || 1}</span>
                                 <span>${formatLabeledCoinMarkup('Value', item.sellValue)}</span>
                                 <span>${formatLabeledCoinMarkup('Buy', getBuyTradeTotal(item.id, 1))}</span>
                                 <span>${formatLabeledCoinMarkup('Sell', getSellTradeTotal(item.id, 1))}</span>
@@ -1806,6 +1832,7 @@ function renderRuntimeUi() {
                     <p>${item.description}</p>
                     <div class="item-stats">
                         <span>${getItemCategoryLabel(item)}</span>
+                        <span>Size ${item.size || 1}</span>
                         <span>${formatLabeledCoinMarkup('Value', item.sellValue)}</span>
                         <span>Click to take</span>
                     </div>
@@ -1926,17 +1953,181 @@ async function startRaidWithSelectedLoadout() {
     }
 
     if (difficultySelect.value === 'chaos') {
+        const profile2 = store.getCurrentProfile();
+        if ((profile2.chaosChances || 0) <= 0) { window.alert('No Chaos chances remaining. Wait for regen or buy more.'); return; }
         const shouldContinue = await confirmChaosStart();
         if (!shouldContinue) return;
+    } else if (difficultySelect.value === 'hell') {
+        const profile2 = store.getCurrentProfile();
+        if ((profile2.hellChances || 0) <= 0) { window.alert('No Hell chances remaining. Wait for regen or buy more.'); return; }
+        showRaidLoadingOverlay();
     } else {
         showRaidLoadingOverlay();
     }
+
+    // Deduct raid chance for hell/chaos (server-authoritative)
+    const diff = difficultySelect.value;
+    if (diff === 'hell' || diff === 'chaos') {
+        await deductRaidChance(diff);
+        updateRaidChancesUI();
+        // Check if deduction succeeded (server may reject if no chances)
+        const updatedProfile = store.getCurrentProfile();
+        const chanceKey = diff === 'hell' ? 'hellChances' : 'chaosChances';
+        if ((updatedProfile[chanceKey] || 0) < 0) {
+            window.alert('No chances remaining.');
+            return;
+        }
+    }
+    window._lastRaidDifficulty = diff;
 
     await store.applyRaidLoadoutSelection(selectedSlot, { autoBuyMissing: preview.totalCost > 0 });
     showRaidLoadingOverlay();
     game.startGame(store.getCurrentProfile(), { difficulty: difficultySelect.value });
     renderVisibility();
     requestAnimationFrame(() => requestAnimationFrame(hideRaidLoadingOverlay));
+}
+
+// ─── Raid Chances System ──────────────────────────
+const HELL_REGEN_MS = 5 * 60 * 60 * 1000;    // 5 hours
+const CHAOS_REGEN_MS = 23 * 60 * 60 * 1000;   // 23 hours
+const HELL_COST = 150000;
+const CHAOS_COST = 1280000;
+let _chanceTimerInterval = null;
+
+function _processChanceRegen(profile, now) {
+    let changed = false;
+    // Hell regen
+    if ((profile.hellChances || 0) < (profile.hellChanceMax || 12)) {
+        if (!profile.hellChanceRegenAt) {
+            profile.hellChanceRegenAt = now + HELL_REGEN_MS;
+            changed = true;
+        } else if (now >= profile.hellChanceRegenAt) {
+            profile.hellChances = Math.min((profile.hellChances || 0) + 1, profile.hellChanceMax || 12);
+            profile.hellChanceRegenAt = (profile.hellChances || 0) < (profile.hellChanceMax || 12) ? now + HELL_REGEN_MS : 0;
+            changed = true;
+        }
+    }
+    // Chaos regen
+    if ((profile.chaosChances || 0) < (profile.chaosChanceMax || 3)) {
+        if (!profile.chaosChanceRegenAt) {
+            profile.chaosChanceRegenAt = now + CHAOS_REGEN_MS;
+            changed = true;
+        } else if (now >= profile.chaosChanceRegenAt) {
+            profile.chaosChances = Math.min((profile.chaosChances || 0) + 1, profile.chaosChanceMax || 3);
+            profile.chaosChanceRegenAt = (profile.chaosChances || 0) < (profile.chaosChanceMax || 3) ? now + CHAOS_REGEN_MS : 0;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+function _formatCountdown(ms) {
+    if (ms <= 0) return '';
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    return `${h}h ${m}m`;
+}
+
+function updateRaidChancesUI() {
+    const profile = store.getCurrentProfile();
+    if (!profile || !store.isAuthenticated()) {
+        raidChancesEl?.classList.add('hidden');
+        return;
+    }
+    raidChancesEl?.classList.remove('hidden');
+    const now = Date.now();
+    const regened = _processChanceRegen(profile, now);
+    if (regened) store.saveCurrentProfile();
+
+    const hc = profile.hellChances || 0;
+    const cc = profile.chaosChances || 0;
+    if (hellChancesEl) hellChancesEl.textContent = `${hc}/${profile.hellChanceMax || 12}`;
+    if (chaosChancesEl) chaosChancesEl.textContent = `${cc}/${profile.chaosChanceMax || 3}`;
+
+    const hellRemain = hc < (profile.hellChanceMax || 12) && profile.hellChanceRegenAt ? Math.max(0, profile.hellChanceRegenAt - now) : 0;
+    const chaosRemain = cc < (profile.chaosChanceMax || 3) && profile.chaosChanceRegenAt ? Math.max(0, profile.chaosChanceRegenAt - now) : 0;
+    if (hellTimerEl) hellTimerEl.textContent = _formatCountdown(hellRemain);
+    if (chaosTimerEl) chaosTimerEl.textContent = _formatCountdown(chaosRemain);
+
+    if (buyHellChanceBtn) buyHellChanceBtn.disabled = hc >= (profile.hellChanceMax || 12);
+    if (buyChaosChanceBtn) buyChaosChanceBtn.disabled = cc >= (profile.chaosChanceMax || 3);
+}
+
+function startChanceTimer() {
+    stopChanceTimer();
+    _chanceTimerInterval = setInterval(updateRaidChancesUI, 30000);
+    updateRaidChancesUI();
+}
+
+function stopChanceTimer() {
+    if (_chanceTimerInterval) { clearInterval(_chanceTimerInterval); _chanceTimerInterval = null; }
+}
+
+buyHellChanceBtn?.addEventListener('click', async () => {
+    const result = await buyRaidChance('hell');
+    if (!result?.ok) { window.alert(result?.message || 'Failed to buy chance.'); return; }
+    updateRaidChancesUI();
+    renderMenu();
+});
+
+buyChaosChanceBtn?.addEventListener('click', async () => {
+    const result = await buyRaidChance('chaos');
+    if (!result?.ok) { window.alert(result?.message || 'Failed to buy chance.'); return; }
+    updateRaidChancesUI();
+    renderMenu();
+});
+
+async function deductRaidChance(difficulty) {
+    const profile = store.getCurrentProfile();
+    if (!profile || !store.activeUsername) return;
+    if (difficulty !== 'hell' && difficulty !== 'chaos') return;
+    try {
+        const result = await apiFetch('/start-raid', {
+            method: 'POST',
+            body: JSON.stringify({ username: store.activeUsername, difficulty })
+        });
+        if (result.ok && result.profile) {
+            store.currentProfile = normalizeProfile(result.profile, store.activeUsername, false);
+        }
+    } catch (e) {
+        console.warn('Failed to deduct raid chance:', e);
+    }
+}
+
+async function refundRaidChance(difficulty) {
+    const profile = store.getCurrentProfile();
+    if (!profile || !store.activeUsername) return;
+    if (difficulty !== 'hell' && difficulty !== 'chaos') return;
+    try {
+        const result = await apiFetch('/complete-raid', {
+            method: 'POST',
+            body: JSON.stringify({ username: store.activeUsername, difficulty, status: 'extracted' })
+        });
+        if (result.ok && result.profile) {
+            store.currentProfile = normalizeProfile(result.profile, store.activeUsername, false);
+        }
+    } catch (e) {
+        console.warn('Failed to refund raid chance:', e);
+    }
+}
+
+async function buyRaidChance(difficulty) {
+    const profile = store.getCurrentProfile();
+    if (!profile || !store.activeUsername) return;
+    if (difficulty !== 'hell' && difficulty !== 'chaos') return;
+    try {
+        const result = await apiFetch('/buy-chance', {
+            method: 'POST',
+            body: JSON.stringify({ username: store.activeUsername, difficulty })
+        });
+        if (result.ok && result.profile) {
+            store.currentProfile = normalizeProfile(result.profile, store.activeUsername, false);
+        }
+        return result;
+    } catch (e) {
+        console.warn('Failed to buy raid chance:', e);
+        return { ok: false, message: e.message };
+    }
 }
 
 // ─── Mail System ──────────────────────────
@@ -1975,7 +2166,12 @@ async function fetchMail() {
 function updateMailBadge() {
     if (!mailButton || !mailBadge) return;
     mailButton.classList.toggle('hidden', !store.isAuthenticated());
-    if (!store.isAuthenticated()) return;
+    raidChancesEl?.classList.toggle('hidden', !store.isAuthenticated());
+    if (!store.isAuthenticated()) {
+        stopChanceTimer();
+        return;
+    }
+    startChanceTimer();
     const now = Date.now();
     const unclaimed = _cachedMail.filter(m => !m.claimedAt && !m.expiredAt && (now - m.createdAt) < 86400000).length;
     if (unclaimed > 0) {

@@ -1173,6 +1173,17 @@
             </div>
             <div id="authMenuWrap" class="topbar-account">
                 <div style="display:flex;gap:8px;align-items:center;pointer-events:auto">
+                    <!-- Raid chances -->
+                    <div id="raidChances" class="hidden" style="display:flex;gap:10px;align-items:center;font-size:11px;font-family:monospace">
+                        <div style="text-align:center">
+                            <div style="color:#b388ff;white-space:nowrap">Hell <span id="hellChances">12/12</span> <button id="buyHellChance" class="secondary-button" style="font-size:10px;padding:1px 5px;vertical-align:middle" title="Buy 1 chance (150k)">+</button></div>
+                            <div id="hellTimer" style="color:#666;font-size:10px"></div>
+                        </div>
+                        <div style="text-align:center">
+                            <div style="color:#ff4d4d;white-space:nowrap">Chaos <span id="chaosChances">3/3</span> <button id="buyChaosChance" class="secondary-button" style="font-size:10px;padding:1px 5px;vertical-align:middle" title="Buy 1 chance (1.28M)">+</button></div>
+                            <div id="chaosTimer" style="color:#666;font-size:10px"></div>
+                        </div>
+                    </div>
                     <button id="mailButton" class="mail-button hidden" title="Mail">
                         <span class="mail-icon">✉</span>
                         <span id="mailBadge" class="mail-badge hidden">0</span>
@@ -1194,8 +1205,8 @@
                     <div class="menu-difficulty-inline">
                         <label for="difficultySelect">Difficulty</label>
                         <select id="difficultySelect">
-                            <option value="easy">Easy</option>
-                            <option value="advanced" selected>Advanced</option>
+                            <option value="easy" selected>Easy</option>
+                            <option value="advanced">Advanced</option>
                             <option value="hell">Hell</option>
                             <option value="chaos">Chaos</option>
                         </select>

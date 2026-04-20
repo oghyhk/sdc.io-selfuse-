@@ -105,8 +105,38 @@ export const CRATE_TIERS = {
         pool: ['blue', 'purple', 'gold', 'gold', 'red', 'red'],
         itemCount: { min: 1, max: 3 },
         color: '#c62828'
+    },
+    safe: {
+        label: 'Safe',
+        description: 'Locked safe — extremely high-value loot. Gold 5%, Red 94.7%, Legend 0.3%.',
+        pool: ['gold', 'red', 'red', 'legend'],
+        itemCount: { min: 1, max: 4 },
+        color: '#ff9f1a',
+        image: '/assets/items/crate_safe.png'
     }
 };
+
+// Per-rarity drop quantities for stackable items [ammo, consumable]
+// White: no ammo drop. Legend ammo is 20 (configured in dev-config).
+const RARITY_DROP_QUANTITIES = {
+    white:   { ammo: 0,   consumable: 999 },
+    green:   { ammo: 999, consumable: 999 },
+    blue:    { ammo: 999, consumable: 499 },
+    purple:  { ammo: 399, consumable: 499 },
+    gold:    { ammo: 99,  consumable: 999 },
+    red:     { ammo: 60,  consumable: 299 },
+    legend:  { ammo: 20,  consumable: 30  },
+};
+
+function getDropQuantity(definitionId) {
+    const def = ITEM_DEFS[definitionId];
+    if (!def) return undefined;
+    const qt = RARITY_DROP_QUANTITIES[def.rarity];
+    if (!qt) return undefined;
+    if (isAmmoDefinition(definitionId)) return qt.ammo || undefined;
+    if (isConsumableDefinition(definitionId)) return qt.consumable || undefined;
+    return undefined;
+}
 
 const LOOT_POOLS = {
     0: ['white', 'white', 'green', 'green', 'blue'],
@@ -375,6 +405,9 @@ export function getRarityMeta(rarity) {
 }
 
 export function getCrateTierMeta(rarity) {
+    if (rarity === 'safe') {
+        return { key: 'safe', label: 'Safe', color: '#ff9f1a' };
+    }
     const meta = getRarityMeta(rarity);
     return {
         key: rarity,
@@ -452,6 +485,21 @@ function defaultStash() {
 
 function defaultSavedLoadouts() {
     return Array.from({ length: 5 }, () => null);
+}
+
+function _buildStarterInventory() {
+    const EQUIP_CATS = new Set(['gun', 'armor', 'helmet', 'shoes', 'backpack']);
+    const starter = [];
+    for (const rarity of ['white', 'green', 'blue']) {
+        for (const [iid, def] of Object.entries(ITEM_DEFS)) {
+            if (def.rarity === rarity && EQUIP_CATS.has(def.category)) {
+                for (let i = 0; i < 3; i++) {
+                    starter.push({ definitionId: iid });
+                }
+            }
+        }
+    }
+    return starter;
 }
 
 function getLegacyLoadoutValue(loadout, slot) {
@@ -784,21 +832,34 @@ export function createDefaultProfile(username = 'Guest Operative', isGuest = fal
         username,
         isGuest,
         password: '',
-        coins: 0,
+        coins: 100_000,
         playerExp: 0,
         elo: 1000,
         claimedPlayerLevelRewards: [],
         loadout: defaultLoadout(),
-        stashItems: defaultStash(),
+        stashItems: [
+            ..._buildStarterInventory(),
+            { definitionId: 'med_kit', quantity: 4999 },
+            { definitionId: 'field_bandage', quantity: 9999 },
+        ],
         stashAmmo: {},
-        backpackItems: [],
+        backpackItems: [
+            { definitionId: 'field_bandage', quantity: 999 },
+        ],
         safeboxItems: [],
         savedLoadouts: defaultSavedLoadouts(),
         extractedRuns: [],
         raidHistory: [],
-        stats: { totalRuns: 0, totalExtractions: 0, totalKills: 0, totalCoinsEarned: 0, totalMarketTrades: 0 },
+        stats: { totalRuns: 0, totalExtractions: 0, totalKills: 0, totalDeaths: 0, totalCoinsEarned: 0, totalMarketTrades: 0 },
         pinnedAchievements: [],
         unlockedAchievements: ['welcome'],
+        hasCompletedTutorial: false,
+        hellChances: 12,
+        hellChanceMax: 12,
+        hellChanceRegenAt: 0,   // timestamp when next regen happens
+        chaosChances: 3,
+        chaosChanceMax: 3,
+        chaosChanceRegenAt: 0,
         avatarDataUrl: ''
     };
 }
@@ -1273,42 +1334,108 @@ function getCrateItemCount(crateRarity) {
         case 'purple': return { min: 2, max: 4 };
         case 'gold': return { min: 1, max: 3 };
         case 'red': return { min: 1, max: 2 };
+        case 'safe': return { min: 1, max: 4 };
         default: return { min: 2, max: 4 };
     }
 }
 
-function getCrateDropRarity(crateRarity) {
-    if (crateRarity === 'red') {
-        return pickWeighted([
-            { value: 'red', weight: 0.9 },
-            { value: 'gold', weight: 0.1 }
-        ]);
-    }
+function getCrateDropRarity(crateRarity, isDev = false) {
+    // Legend crates don't exist as a normal crate tier — fall back to red behavior
+    if (crateRarity === 'legend') crateRarity = 'red';
 
     const baseIndex = CRATE_RARITY_ORDER.indexOf(crateRarity);
     if (baseIndex === -1) return crateRarity;
 
-    const weighted = [{ value: crateRarity, weight: 0.88 }];
-    if (CRATE_RARITY_ORDER[baseIndex + 1]) {
-        weighted.push({ value: CRATE_RARITY_ORDER[baseIndex + 1], weight: 0.1 });
+    // White crate: no -1 rarity exists
+    if (crateRarity === 'white') {
+        const sameWeight = isDev ? 0.60 : 0.80;
+        const plus1Weight = isDev ? 0.35 : 0.18;
+        const plus2Weight = isDev ? 0.05 : 0.02;
+        return pickWeighted([
+            { value: 'white', weight: sameWeight },
+            { value: CRATE_RARITY_ORDER[baseIndex + 1], weight: plus1Weight },
+            { value: CRATE_RARITY_ORDER[baseIndex + 2], weight: plus2Weight },
+        ].filter(e => e.value));
     }
-    if (CRATE_RARITY_ORDER[baseIndex + 2]) {
-        weighted.push({ value: CRATE_RARITY_ORDER[baseIndex + 2], weight: 0.02 });
+
+    // Dev rates: -1 rl 10%, same rl 50%, +1 rl 35%, +2 rl 5%
+    // Normal rates: -1 rl 20%, same rl 60%, +1 rl 19%, +2 rl 1%
+    const minus1Weight = isDev ? 0.10 : 0.20;
+    const sameWeight   = isDev ? 0.50 : 0.60;
+    const plus1Weight  = isDev ? 0.35 : 0.19;
+    const plus2Weight  = isDev ? 0.05 : 0.01;
+
+    // Cap at 'red' — legend is never in the normal drop table
+    const weighted = [];
+    if (CRATE_RARITY_ORDER[baseIndex - 1]) {
+        weighted.push({ value: CRATE_RARITY_ORDER[baseIndex - 1], weight: minus1Weight });
+    }
+    weighted.push({ value: crateRarity, weight: sameWeight });
+    const plus1 = CRATE_RARITY_ORDER[baseIndex + 1];
+    if (plus1 && plus1 !== 'legend') {
+        weighted.push({ value: plus1, weight: plus1Weight });
+    } else if (plus1 === 'legend') {
+        weighted[weighted.length - 1].weight += plus1Weight;
+    }
+    const plus2 = CRATE_RARITY_ORDER[baseIndex + 2];
+    if (plus2 && plus2 !== 'legend') {
+        weighted.push({ value: plus2, weight: plus2Weight });
+    } else if (plus2 === 'legend') {
+        weighted[weighted.length - 1].weight += plus2Weight;
     }
     return pickWeighted(weighted);
 }
 
-export function createLootItemsForCrateRarity(crateRarity) {
+export function createLootItemsForCrateRarity(crateRarity, playerProfile = null) {
     const countRange = getCrateItemCount(crateRarity);
     const count = countRange.min + Math.floor(Math.random() * (countRange.max - countRange.min + 1));
-    const itemIds = Object.keys(ITEM_DEFS).filter((id) => isSupportedItemDefinition(ITEM_DEFS[id]) && ITEM_DEFS[id].lootType !== 'ammo');
+    const isDev = Array.isArray(playerProfile?.unlockedAchievements) && playerProfile.unlockedAchievements.includes('developer');
+    const itemIds = Object.keys(ITEM_DEFS).filter((id) => isSupportedItemDefinition(ITEM_DEFS[id]) && (ITEM_DEFS[id].lootType !== 'ammo' || ITEM_DEFS[id].rarity === 'legend'));
     const items = [];
 
+    // Safe crate: gold 5%, red 94.7%, legend 0.3% per item
+    const isSafe = crateRarity === 'safe';
+    const safeRarityRoll = () => {
+        const r = Math.random();
+        if (r < 0.003) return 'legend';
+        if (r < 0.05) return 'gold';
+        return 'red';
+    };
+
     for (let i = 0; i < count; i++) {
-        const rarity = getCrateDropRarity(crateRarity);
-        const candidates = itemIds.filter((id) => ITEM_DEFS[id].rarity === rarity);
-        const picked = candidates[Math.floor(Math.random() * candidates.length)] || itemIds[0];
-        items.push(createLootItem(picked));
+        const rarity = isSafe ? safeRarityRoll() : getCrateDropRarity(crateRarity, isDev);
+        const candidates = itemIds.filter((id) => ITEM_DEFS[id].rarity === rarity && getDropQuantity(id) !== 0);
+        if (candidates.length === 0) continue;
+        const picked = candidates[Math.floor(Math.random() * candidates.length)];
+        const quantity = getDropQuantity(picked);
+        items.push(createLootItem(picked, quantity ? { quantity } : {}));
+    }
+
+    // Legend drops — independent rolls for +1 and +2
+    const legendCandidates = itemIds.filter((id) => ITEM_DEFS[id].rarity === 'legend');
+    if (legendCandidates.length > 0) {
+        let chance1, chance2;
+        if (isSafe || isDev) {
+            // Safe crates use dev rates: 1/100 for +1, 1/500 for +2
+            chance1 = 1 / 100;
+            chance2 = 1 / 500;
+        } else if (crateRarity === 'red') {
+            chance1 = 1 / 500;
+            chance2 = 1 / 1280;
+        } else {
+            chance1 = 1 / 2500;
+            chance2 = 1 / 25000;
+        }
+        if (Math.random() < chance1) {
+            const picked = legendCandidates[Math.floor(Math.random() * legendCandidates.length)];
+            const quantity = getDropQuantity(picked);
+            items.push(createLootItem(picked, quantity ? { quantity } : {}));
+        }
+        if (Math.random() < chance2) {
+            const picked = legendCandidates[Math.floor(Math.random() * legendCandidates.length)];
+            const quantity = getDropQuantity(picked);
+            items.push(createLootItem(picked, quantity ? { quantity } : {}));
+        }
     }
 
     return items.filter(Boolean);
@@ -1320,9 +1447,11 @@ export function createLootItemsForZone(zone, count) {
     const items = [];
     for (let i = 0; i < count; i++) {
         const rarity = pool[Math.floor(Math.random() * pool.length)];
-        const candidates = itemIds.filter((id) => ITEM_DEFS[id].rarity === rarity);
-        const picked = candidates[Math.floor(Math.random() * candidates.length)] || itemIds[0];
-        items.push(createLootItem(picked));
+        const candidates = itemIds.filter((id) => ITEM_DEFS[id].rarity === rarity && getDropQuantity(id) !== 0);
+        if (candidates.length === 0) continue;
+        const picked = candidates[Math.floor(Math.random() * candidates.length)];
+        const quantity = getDropQuantity(picked);
+        items.push(createLootItem(picked, quantity ? { quantity } : {}));
     }
     return items.filter(Boolean);
 }
@@ -1715,17 +1844,17 @@ export class ProfileStore {
 
     async applyRaidOutcome(result) {
         const difficulty = result?.difficulty || 'advanced';
+
+        // Apply client-side first (for immediate UI feedback)
         this.currentProfile.backpackItems = [];
         this.currentProfile.safeboxItems = normalizePersistentEntries(result?.safeboxItems || [], SAFEBOX_CAPACITY);
 
         if (result?.status === 'extracted') {
-            return this.recordExtraction({
+            this.recordExtraction({
                 ...result.summary,
                 items: Array.isArray(result.summary?.items) ? result.summary.items : []
             });
-        }
-
-        if (result?.status === 'dead') {
+        } else if (result?.status === 'dead') {
             this.currentProfile.stats.totalRuns += 1;
             this.currentProfile.stats.totalKills += Number(result?.summary?.kills) || 0;
             awardProfileExp(this.currentProfile, getExpRewardForRunSummary(result?.summary));
@@ -1738,7 +1867,22 @@ export class ProfileStore {
             }, 'dead');
         }
 
-        return this.saveCurrentProfile();
+        // Sync with server (server-authoritative)
+        if (this.activeUsername) {
+            try {
+                const serverResult = await apiFetch('/raid-outcome', {
+                    method: 'POST',
+                    body: JSON.stringify({ username: this.activeUsername, result })
+                });
+                if (serverResult.ok && serverResult.profile) {
+                    this.currentProfile = normalizeProfile(serverResult.profile, this.activeUsername, false);
+                }
+            } catch (e) {
+                console.warn('Server raid-outcome sync failed, saving locally:', e);
+                await this.saveCurrentProfile();
+            }
+        }
+        return this.getCurrentProfile();
     }
 
     async moveItemToSafebox(definitionId, quantity = 1) {

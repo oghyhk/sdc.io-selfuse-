@@ -14,55 +14,70 @@ import { createLootItemsForCrateRarity, getCrateTierMeta } from './profile.js';
 const DIFFICULTY_CRATE_POOLS = {
     easy: {
         [ZONE.SAFE]: [
-            { rarity: 'white', weight: 0.68 },
+            { rarity: 'white', weight: 0.64 },
             { rarity: 'green', weight: 0.24 },
-            { rarity: 'blue', weight: 0.08 }
+            { rarity: 'blue', weight: 0.08 },
+            { rarity: 'purple', weight: 0.04 }
         ],
         [ZONE.COMBAT]: [
             { rarity: 'green', weight: 0.34 },
             { rarity: 'blue', weight: 0.38 },
-            { rarity: 'purple', weight: 0.28 }
+            { rarity: 'purple', weight: 0.27 },
+            { rarity: 'gold', weight: 0.01 }
         ],
         [ZONE.HIGH_VALUE]: [
-            { rarity: 'purple', weight: 0.94 },
-            { rarity: 'gold', weight: 0.06 }
+            { rarity: 'purple', weight: 0.95 },
+            { rarity: 'gold', weight: 0.05 }
         ]
     },
     advanced: {
         [ZONE.SAFE]: [
             { rarity: 'green', weight: 0.58 },
-            { rarity: 'blue', weight: 0.3 },
+            { rarity: 'blue', weight: 0.30 },
             { rarity: 'purple', weight: 0.12 }
         ],
         [ZONE.COMBAT]: [
             { rarity: 'blue', weight: 0.34 },
-            { rarity: 'purple', weight: 0.38 },
-            { rarity: 'gold', weight: 0.28 }
+            { rarity: 'purple', weight: 0.58 },
+            { rarity: 'gold', weight: 0.08 }
         ],
         [ZONE.HIGH_VALUE]: [
-            { rarity: 'gold', weight: 0.94 },
+            { rarity: 'purple', weight: 0.50 },
+            { rarity: 'gold', weight: 0.44 },
             { rarity: 'red', weight: 0.06 }
         ]
     },
     hell: {
         [ZONE.SAFE]: [
-            { rarity: 'blue', weight: 0.54 },
+            { rarity: 'blue', weight: 0.64 },
             { rarity: 'purple', weight: 0.34 },
-            { rarity: 'gold', weight: 0.12 }
+            { rarity: 'gold', weight: 0.02 }
         ],
         [ZONE.COMBAT]: [
-            { rarity: 'purple', weight: 0.34 },
-            { rarity: 'gold', weight: 0.4 },
-            { rarity: 'red', weight: 0.26 }
+            { rarity: 'purple', weight: 0.54 },
+            { rarity: 'gold', weight: 0.40 },
+            { rarity: 'red', weight: 0.06 }
+        ],
+        [ZONE.HIGH_VALUE]: [
+            { rarity: 'gold', weight: 0.60 },
+            { rarity: 'red', weight: 0.40 }
+        ]
+    },
+    chaos: {
+        [ZONE.SAFE]: [
+            { rarity: 'blue', weight: 0.30 },
+            { rarity: 'purple', weight: 0.50 },
+            { rarity: 'gold', weight: 0.18 },
+            { rarity: 'red', weight: 0.02 }
+        ],
+        [ZONE.COMBAT]: [
+            { rarity: 'purple', weight: 0.20 },
+            { rarity: 'gold', weight: 0.58 },
+            { rarity: 'red', weight: 0.22 }
         ],
         [ZONE.HIGH_VALUE]: [
             { rarity: 'red', weight: 1 }
         ]
-    },
-    chaos: {
-        [ZONE.SAFE]: [],
-        [ZONE.COMBAT]: [],
-        [ZONE.HIGH_VALUE]: []
     }
 };
 
@@ -70,7 +85,7 @@ const DIFFICULTY_ENEMY_COUNTS = {
     easy: { combatDrones: 15, safeDrones: 5, highSentinels: 6, combatSentinels: 3 },
     advanced: { combatDrones: 15, safeDrones: 5, highSentinels: 6, combatSentinels: 3 },
     hell: { combatDrones: 60, safeDrones: 20, highSentinels: 28, combatSentinels: 14 },
-    chaos: { combatDrones: 320, safeDrones: 100, highSentinels: 140, combatSentinels: 90 },
+    chaos: { combatDrones: 160, safeDrones: 50, highSentinels: 70, combatSentinels: 45 },
 };
 
 function pickWeightedRarity(pool) {
@@ -100,6 +115,12 @@ const EXTRACTION_COUNTS = {
 };
 
 // Generate the map — returns { tiles[][], walls[], lootCrates[], extractionPoints[], enemySpawns[], playerSpawn }
+function _entrancePos(dir, ringDist, centerR, centerC) {
+    const row = dir === 'N' ? centerR - ringDist : dir === 'S' ? centerR + ringDist : centerR;
+    const col = dir === 'W' ? centerC - ringDist : dir === 'E' ? centerC + ringDist : centerC;
+    return { x: col * TILE_SIZE + TILE_SIZE / 2, y: row * TILE_SIZE + TILE_SIZE / 2, dir };
+}
+
 export function generateMap(options = {}) {
     const difficulty = typeof options === 'string' ? options : options?.difficulty || 'advanced';
     const cratePools = DIFFICULTY_CRATE_POOLS[difficulty] || DIFFICULTY_CRATE_POOLS.advanced;
@@ -235,6 +256,23 @@ export function generateMap(options = {}) {
     // ---------- Zone wall rings with fixed entrances ----------
     buildZoneWalls(tiles, zones, MAP_ROWS, MAP_COLS, difficulty);
 
+    // ---------- Compute entrance positions for minimap ----------
+    const entrances = [];
+    const halfDim = Math.min(MAP_COLS / 2, MAP_ROWS / 2);
+    const hvOuter = Math.round(0.25 * halfDim);
+    const combatOuter = Math.round(0.6 * halfDim);
+    const centerR = Math.floor(MAP_ROWS / 2);
+    const centerC = Math.floor(MAP_COLS / 2);
+    // Combat ring entrances: N, S, E, W
+    for (const dir of ['N', 'S', 'E', 'W']) {
+        entrances.push(_entrancePos(dir, combatOuter, centerR, centerC));
+    }
+    // HV ring entrances
+    const hvEntrances = difficulty === 'chaos' ? ['N'] : ['N', 'E', 'W'];
+    for (const dir of hvEntrances) {
+        entrances.push(_entrancePos(dir, hvOuter, centerR, centerC));
+    }
+
     // ---------- Find open floor positions ----------
     function isOpenFloor(r, c) {
         return r > 0 && r < MAP_ROWS - 1 && c > 0 && c < MAP_COLS - 1 &&
@@ -256,10 +294,17 @@ export function generateMap(options = {}) {
     // ---------- Loot crates with tiers ----------
     const lootCrates = [];
     const addCrates = (count, zone) => {
-        const pool = cratePools[zone] || cratePools[ZONE.SAFE];
         for (let i = 0; i < count; i++) {
-            const pos = randomOpenPos(zone);
-            const crateRarity = pickWeightedRarity(pool);
+            let pos, crateRarity;
+            if (zone === 'safe' || zone === 'guaranteed_safe') {
+                // Safe crate: guaranteed, placed in high-value zone
+                pos = randomOpenPos(ZONE.HIGH_VALUE, 3);
+                crateRarity = 'safe';
+            } else {
+                const pool = cratePools[zone] || cratePools[ZONE.SAFE];
+                pos = randomOpenPos(zone);
+                crateRarity = pickWeightedRarity(pool);
+            }
             const tierMeta = getCrateTierMeta(crateRarity);
             lootCrates.push({
                 id: generateId(),
@@ -277,11 +322,27 @@ export function generateMap(options = {}) {
         }
     };
     if (difficulty === 'chaos') {
-        addCrates(1, ZONE.COMBAT);
+        addCrates(300, ZONE.SAFE);
+        addCrates(1, 'safe'); // +1 safe in safe zone
+        addCrates(80, ZONE.COMBAT);
+        addCrates(1, 'safe'); // +1 safe in combat zone
+        addCrates(22, ZONE.HIGH_VALUE);
+        // +3 safe in high-value zone
+        for (let i = 0; i < 3; i++) addCrates(1, 'safe');
+    } else if (difficulty === 'hell') {
+        addCrates(80, ZONE.SAFE);
+        addCrates(40, ZONE.COMBAT);
+        addCrates(18, ZONE.HIGH_VALUE);
+        addCrates(1, 'safe'); // +1 safe in high-value zone
+    } else if (difficulty === 'advanced') {
+        addCrates(40, ZONE.SAFE);
+        addCrates(18, ZONE.COMBAT);
+        addCrates(12, ZONE.HIGH_VALUE);
     } else {
-        addCrates(Math.round(10 * areaScale), ZONE.SAFE);
-        addCrates(Math.round(11 * areaScale), ZONE.COMBAT);
-        addCrates(Math.round(8 * areaScale), ZONE.HIGH_VALUE);
+        // easy
+        addCrates(10, ZONE.SAFE);
+        addCrates(11, ZONE.COMBAT);
+        addCrates(8, ZONE.HIGH_VALUE);
     }
 
     // ---------- Health packs ----------
@@ -297,6 +358,25 @@ export function generateMap(options = {}) {
     // ---------- Extraction points (on map edges, in safe zone) ----------
     const extractionPoints = [];
     const extractCount = EXTRACTION_COUNTS[difficulty] || 4;
+
+    // Chaos: single extraction in high-value area (center of map)
+    if (difficulty === 'chaos') {
+        const pos = randomOpenPos(ZONE.HIGH_VALUE, 3);
+        const col = Math.floor(pos.x / TILE_SIZE);
+        const row = Math.floor(pos.y / TILE_SIZE);
+        for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+                const rr = clampRow(row + dr);
+                const cc = clampCol(col + dc);
+                if (tiles[rr][cc] === TILE.WALL && rr > 0 && rr < MAP_ROWS - 1 && cc > 0 && cc < MAP_COLS - 1) {
+                    tiles[rr][cc] = TILE.FLOOR;
+                }
+            }
+        }
+        extractionPoints.push({
+            id: generateId(), x: pos.x, y: pos.y, radius: EXTRACTION_RADIUS
+        });
+    } else {
     const edgePositions = [
         () => randomOpenPos(ZONE.SAFE, 2),
         () => ({ x: randInt(3, 8) * TILE_SIZE, y: randInt(10, MAP_ROWS - 10) * TILE_SIZE }),
@@ -324,6 +404,7 @@ export function generateMap(options = {}) {
             id: generateId(), x: pos.x, y: pos.y, radius: EXTRACTION_RADIUS
         });
     }
+    } // end else (non-chaos)
 
     // ---------- Enemy spawns ----------
     const enemySpawns = [];
@@ -382,7 +463,8 @@ export function generateMap(options = {}) {
         healthPacks,
         extractionPoints,
         enemySpawns,
-        playerSpawn
+        playerSpawn,
+        entrances
     };
 }
 

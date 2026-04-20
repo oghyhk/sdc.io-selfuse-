@@ -242,6 +242,88 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 
 <!-- ============= CRATES PANEL ============= -->
 <div class="panel" id="panel-crates">
+  <h3 style="margin-bottom:12px;color:var(--text2)">Crate Spawn Rules by Difficulty & Zone</h3>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:20px">
+    <div class="card"><h3>Easy (29 crates)</h3>
+      <div class="meta">Map: 80×60 · Extractions: 4</div>
+      <div style="margin-top:8px;font-size:12px;line-height:1.8">
+        <b>Safe (10):</b> <span style="color:#eceff1">white 64%</span> · <span style="color:#81c784">green 24%</span> · <span style="color:#64b5f6">blue 8%</span> · <span style="color:#b388ff">purple 4%</span><br>
+        <b>Combat (11):</b> <span style="color:#81c784">green 34%</span> · <span style="color:#64b5f6">blue 38%</span> · <span style="color:#b388ff">purple 27%</span> · <span style="color:#ffca28">gold 1%</span><br>
+        <b>High Value (8):</b> <span style="color:#b388ff">purple 95%</span> · <span style="color:#ffca28">gold 5%</span>
+      </div>
+    </div>
+    <div class="card"><h3>Advanced (70 crates)</h3>
+      <div class="meta">Map: 80×60 · Extractions: 4</div>
+      <div style="margin-top:8px;font-size:12px;line-height:1.8">
+        <b>Safe (40):</b> <span style="color:#81c784">green 58%</span> · <span style="color:#64b5f6">blue 30%</span> · <span style="color:#b388ff">purple 12%</span><br>
+        <b>Combat (18):</b> <span style="color:#64b5f6">blue 34%</span> · <span style="color:#b388ff">purple 58%</span> · <span style="color:#ffca28">gold 8%</span><br>
+        <b>High Value (12):</b> <span style="color:#b388ff">purple 50%</span> · <span style="color:#ffca28">gold 44%</span> · <span style="color:#ff4d4d">red 6%</span>
+      </div>
+    </div>
+    <div class="card"><h3>Hell (139 crates)</h3>
+      <div class="meta">Map: 160×120 · Extractions: 2</div>
+      <div style="margin-top:8px;font-size:12px;line-height:1.8">
+        <b>Safe (80):</b> <span style="color:#64b5f6">blue 64%</span> · <span style="color:#b388ff">purple 34%</span> · <span style="color:#ffca28">gold 2%</span><br>
+        <b>Combat (40):</b> <span style="color:#b388ff">purple 54%</span> · <span style="color:#ffca28">gold 40%</span> · <span style="color:#ff4d4d">red 6%</span><br>
+        <b>High Value (18+1 safe):</b> <span style="color:#ffca28">gold 60%</span> · <span style="color:#ff4d4d">red 40%</span> · +1 <span style="color:#ff9f1a">Safe</span>
+      </div>
+    </div>
+    <div class="card"><h3>Chaos (408 crates)</h3>
+      <div class="meta">Map: 320×240 · Extraction in high-value zone</div>
+      <div style="margin-top:8px;font-size:12px;line-height:1.8">
+        <b>Safe (300+1 safe):</b> <span style="color:#64b5f6">blue 30%</span> · <span style="color:#b388ff">purple 50%</span> · <span style="color:#ffca28">gold 18%</span> · <span style="color:#ff4d4d">red 2%</span> · +1 <span style="color:#ff9f1a">Safe</span><br>
+        <b>Combat (80+1 safe):</b> <span style="color:#b388ff">purple 20%</span> · <span style="color:#ffca28">gold 58%</span> · <span style="color:#ff4d4d">red 22%</span> · +1 <span style="color:#ff9f1a">Safe</span><br>
+        <b>High Value (22+3 safe):</b> <span style="color:#ff4d4d">red 100%</span> · +3 <span style="color:#ff9f1a">Safe</span>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-bottom:12px;color:var(--text2)">Safe Crate (special tier)</h3>
+  <div class="card" style="margin-bottom:20px;border-color:#ff9f1a">
+    <h3 style="color:#ff9f1a">🔒 Safe</h3>
+    <div style="font-size:12px;line-height:1.8">
+      <b>Items:</b> 1–4 · <b>Per-item rarity:</b> gold 5% · red 94.7% · legend 0.3%<br>
+      <b>Additional legends:</b> 1/100 (+1) · 1/500 (+2) — independent rolls<br>
+      <b>Spawns:</b> guaranteed in high-value zone (hell +1, chaos +5 total)
+    </div>
+  </div>
+
+  <h3 style="margin-bottom:12px;color:var(--text2)">Per-Item Drop Rates (inside each crate)</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+    <div class="card"><h3>Normal Player</h3>
+      <div style="font-size:12px;line-height:1.8">
+        <b>Green–Red crates:</b> −1 rl 20% · same 60% · +1 19% · +2 1%<br>
+        <b>White crates:</b> same 80% · +1 18% · +2 2%<br>
+        <b>Legend capped at red</b> (truncated downward)<br>
+        <b>Legend bonus:</b> 1/2500 (+1) · 1/25000 (+2) — independent rolls<br>
+        <b>Red crate legend:</b> 1/500 (+1) · 1/1280 (+2) — independent
+      </div>
+    </div>
+    <div class="card"><h3>Developer (achievement: developer)</h3>
+      <div style="font-size:12px;line-height:1.8">
+        <b>Green–Red crates:</b> −1 rl 10% · same 50% · +1 35% · +2 5%<br>
+        <b>White crates:</b> same 60% · +1 35% · +2 5%<br>
+        <b>Legend capped at red</b> (truncated downward)<br>
+        <b>Legend bonus:</b> 1/100 (+1) · 1/500 (+2) — independent rolls
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-bottom:12px;color:var(--text2)">Drop Quantities per Rarity</h3>
+  <table class="data-table" style="margin-bottom:20px">
+    <thead><tr><th>Rarity</th><th>Ammo</th><th>Consumable</th></tr></thead>
+    <tbody>
+      <tr><td><span class="rarity-dot" style="background:#eceff1"></span>White</td><td>no drop</td><td>×999</td></tr>
+      <tr><td><span class="rarity-dot" style="background:#81c784"></span>Green</td><td>×999</td><td>×999</td></tr>
+      <tr><td><span class="rarity-dot" style="background:#64b5f6"></span>Blue</td><td>×999</td><td>×499</td></tr>
+      <tr><td><span class="rarity-dot" style="background:#b388ff"></span>Purple</td><td>×399</td><td>×499</td></tr>
+      <tr><td><span class="rarity-dot" style="background:#ffca28"></span>Gold</td><td>×99</td><td>×999</td></tr>
+      <tr><td><span class="rarity-dot" style="background:#ff4d4d"></span>Red</td><td>×60</td><td>×299</td></tr>
+      <tr><td><span class="rarity-dot" style="background:#ff9f1a"></span>Legend</td><td>×20</td><td>×30</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin-bottom:12px;color:var(--text2)">Crate Tier Editor</h3>
   <div class="grid" id="crateGrid"></div>
 </div>
 

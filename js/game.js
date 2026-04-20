@@ -13,12 +13,12 @@ import { Renderer } from './renderer.js';
 import { AudioManager } from './audio.js';
 import {
     EXTRACTION_RADIUS, EXTRACTION_TIME, LOOT_PICKUP_RANGE, CRATE_INTERACT_RANGE,
-    HEALTHPACK_HEAL, MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, COLORS, CRATE_WIDTH, CRATE_HEIGHT
+    HEALTHPACK_HEAL, MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, COLORS, CRATE_WIDTH, CRATE_HEIGHT, ZONE
 } from './constants.js';
 import {
     dist, circleCollision, circleRectCollision, clamp, generateId, randInt, resetIdCounter
 } from './utils.js';
-import { calculateDeathLosses, calculateSafeboxDeathLosses, computeEloChange, computePerKillElo, computeDeathPenaltyScale, createLootItem, createPersistentEntryFromLootItem, getItemCategoryLabel, getItemDefinition, getRarityMeta, getSlotLabel, ITEM_DEFS } from './profile.js';
+import { calculateDeathLosses, calculateSafeboxDeathLosses, computeEloChange, computePerKillElo, computeDeathPenaltyScale, createLootItem, createLootItemsForCrateRarity, createPersistentEntryFromLootItem, getItemCategoryLabel, getItemDefinition, getRarityMeta, getSlotLabel, ITEM_DEFS } from './profile.js';
 
 // Game states
 export const GAME_STATE = {
@@ -65,6 +65,9 @@ export class Game {
         this.activeDifficulty = 'advanced';
         this.lastExtractSummary = null;
         this._deathHandled = false;
+        this.isTutorial = false;  // true for the guided first-raid experience
+        this.tutorialStep = 0;    // 0=moving, 1=dashing, 2=shooting, 3=looting, 4=healing, 5=extracting
+        this.tutorialStepDone = {}; // tracks which steps the player has completed
 
         // Particles (simple)
         this.particles = [];
@@ -124,6 +127,10 @@ export class Game {
         this.audio.init();
         this.activeProfile = profile || null;
         this.activeDifficulty = options?.difficulty || 'advanced';
+        // Auto-enable tutorial for first-time players on easy difficulty
+        this.isTutorial = Boolean(!profile?.hasCompletedTutorial && this.activeDifficulty === 'easy');
+        this.tutorialStep = 0;
+        this.tutorialStepDone = {};
         this._startGame();
     }
 
@@ -362,10 +369,13 @@ export class Game {
 
     _getRandomOperatorSpawn(avoidPositions = []) {
         const tiles = this.mapData?.tiles || [];
+        const zones = this.mapData?.zones || [];
         for (let attempt = 0; attempt < 260; attempt += 1) {
             const col = randInt(2, Math.max(2, Math.floor(MAP_WIDTH / TILE_SIZE) - 3));
             const row = randInt(2, Math.max(2, Math.floor(MAP_HEIGHT / TILE_SIZE) - 3));
             if (tiles[row]?.[col] === 1) continue;
+            // Operators must spawn in safe zone only
+            if (zones[row]?.[col] !== ZONE.SAFE) continue;
             const x = col * TILE_SIZE + TILE_SIZE / 2;
             const y = row * TILE_SIZE + TILE_SIZE / 2;
             if (avoidPositions.some((point) => dist(point.x, point.y, x, y) < 170)) continue;
@@ -417,6 +427,53 @@ export class Game {
         if (!wasDashing && this.player.dashing) {
             this.audio.playDash();
         }
+
+        // ── Tutorial step advancement ─────────────────────────────────────
+        if (this.isTutorial) {
+            const input = this.input;
+
+            // Step 0 — Moving (WASD): done as soon as player moves
+            if (this.tutorialStep === 0 && (input.moveDir.x !== 0 || input.moveDir.y !== 0)) {
+                this.tutorialStepDone[0] = true;
+                this.tutorialStep = 1;
+            }
+
+            // Step 1 — Dashing (Shift): done when player dashes
+            if (this.tutorialStep === 1 && !wasDashing && this.player.dashing) {
+                this.tutorialStepDone[1] = true;
+                this.tutorialStep = 2;
+            }
+
+            // Step 2 — Shooting: done when player fires a bullet
+            if (this.tutorialStep === 2 && this.bullets.length > bulletsBefore) {
+                const b = this.bullets[this.bullets.length - 1];
+                if (b.owner === 'player') {
+                    this.tutorialStepDone[2] = true;
+                    this.tutorialStep = 3;
+                }
+            }
+
+            // Step 3 — Looting (open crate with F, pick up item): done when crate opened AND player took an item
+            if (this.tutorialStep === 3 && this.openCrateId !== null) {
+                const crate = this.mapData.lootCrates.find((c) => c.id === this.openCrateId);
+                if (crate && crate.items.length > 0 && this.player.inventoryItems.length > 0) {
+                    this.tutorialStepDone[3] = true;
+                    this.tutorialStep = 4;
+                }
+            }
+
+            // Step 4 — Healing (Q): done when player uses consumable
+            if (this.tutorialStep === 4 && this.player.isHealing) {
+                this.tutorialStepDone[4] = true;
+                this.tutorialStep = 5;
+            }
+
+            // Step 5 — Extracting: done when extraction completes
+            if (this.tutorialStep === 5 && this.extracting) {
+                this.tutorialStepDone[5] = true;
+            }
+        }
+        // ── End tutorial ─────────────────────────────────────────────────
 
         if (this.input.weaponSwitchRequested) {
             this.crateMessage = `${this.player.weapon?.name || 'Gun'} equipped`;
@@ -913,6 +970,13 @@ export class Game {
         }
 
         crate.inspected = true;
+        // Re-roll items on first open using player's profile (for dev drop rates)
+        // Only for map-generated crates (valid tiers), not death crates or dynamic ones
+        const validRerollTiers = new Set(['white', 'green', 'blue', 'purple', 'gold', 'red', 'safe']);
+        if (!crate.itemsRolled && validRerollTiers.has(crate.tier)) {
+            crate.itemsRolled = true;
+            crate.items = createLootItemsForCrateRarity(crate.tier, this.activeProfile);
+        }
         crate.opened = !wasOpen;
         this.openCrateId = crate.opened ? crate.id : null;
         this.inventoryUiOpen = crate.opened;
@@ -1434,7 +1498,98 @@ export class Game {
             ctx.restore();
         }
 
-        r.drawMinimap(this.mapData.tiles, this.player, this.enemies, this.aiPlayers, this.mapData.lootCrates, this.mapData.extractionPoints);
+        // Tutorial HUD overlay
+        if (this.isTutorial) {
+            this._renderTutorialHUD();
+        }
+
+        r._entrances = this.mapData.entrances || [];
+        r.drawMinimap(this.mapData.tiles, this.player, this.enemies, this.aiPlayers, this.mapData.lootCrates, this.mapData.extractionPoints, this.activeDifficulty);
+    }
+
+    _renderTutorialHUD() {
+        const ctx = this.ctx;
+        const cam = this.camera;
+        const done = this.tutorialStepDone;
+        const step = this.tutorialStep; // current/next step to complete
+
+        const steps = [
+            { key: 'WASD', label: 'Move around', done: !!done[0] },
+            { key: 'Shift', label: 'Dash to dodge', done: !!done[1] },
+            { key: 'LMB', label: 'Shoot your weapon', done: !!done[2] },
+            { key: 'F + Click', label: 'Open crate & take item', done: !!done[3] },
+            { key: 'Q', label: 'Use a bandage to heal', done: !!done[4] },
+            { key: 'Walk to ✈', label: 'Find extraction on minimap (top-left)', done: !!done[5] },
+        ];
+
+        const boxW = 280;
+        const boxH = 20 + steps.length * 28 + 16;
+        const boxX = cam.width / 2 - boxW / 2;
+        const boxY = 80;
+
+        // Background panel
+        ctx.save();
+        ctx.fillStyle = 'rgba(12,12,20,0.88)';
+        ctx.strokeStyle = '#ffb74d';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(boxX, boxY, boxW, boxH, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        // Title
+        ctx.fillStyle = '#ffb74d';
+        ctx.font = 'bold 13px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('\u{1F393} TUTORIAL \u2014 Complete all steps', cam.width / 2, boxY + 20);
+
+        // Steps
+        steps.forEach((s, i) => {
+            const y = boxY + 46 + i * 28;
+            const isActive = (i === step);
+            const isPending = !s.done && i > step;
+            const isDone = s.done;
+
+            // Row background for active step
+            if (isActive) {
+                ctx.fillStyle = 'rgba(255,183,77,0.15)';
+                ctx.fillRect(boxX + 6, y - 10, boxW - 12, 20);
+            }
+
+            // Check mark or bullet
+            ctx.textAlign = 'left';
+            ctx.font = 'bold 11px monospace';
+            if (isDone) {
+                ctx.fillStyle = '#4caf50';
+                ctx.fillText('\u2713', boxX + 12, y + 4);
+            } else if (isActive) {
+                ctx.fillStyle = '#ffb74d';
+                ctx.fillText('\u25B8', boxX + 12, y + 4);
+            } else {
+                ctx.fillStyle = '#666';
+                ctx.fillText('\u25CB', boxX + 12, y + 4);
+            }
+
+            // Key hint
+            ctx.fillStyle = isActive ? '#fff' : isDone ? '#81c784' : '#888';
+            ctx.font = 'bold 11px monospace';
+            ctx.fillText(s.key, boxX + 30, y + 4);
+
+            // Label
+            ctx.fillStyle = isDone ? '#81c784' : isActive ? '#fff' : '#666';
+            ctx.font = '11px monospace';
+            ctx.fillText(s.label, boxX + 120, y + 4);
+        });
+
+        // "All steps done!" when complete
+        if (step > 5 || (step === 5 && done[5])) {
+            ctx.fillStyle = '#4caf50';
+            ctx.font = 'bold 12px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('All tutorial steps complete!', cam.width / 2, boxY + boxH - 6);
+        }
+
+        ctx.restore();
     }
 
     _renderMenu() {

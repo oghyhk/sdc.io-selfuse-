@@ -794,21 +794,17 @@ data/dev-config.json  →  server.py  →  GET /api/dev-config  →  loadRuntime
 User data is stored in two places simultaneously:
 
 1. **Local VPS file** (`data/users.json`) — the primary store used by the live game server running on this VPS.
-2. **GitHub-tracked file** (`data/users.json` in the repo) — a mirrored copy committed automatically on every save.
+2. **GitHub-tracked file** (`data/users.json` in the repo) — included in meaningful commits manually.
 
 This ensures:
-- The localhost game client always has a recent copy of user data synced via `git pull`.
 - The VPS server is the authoritative source of truth during development.
-- Any device running the game locally can `git pull` to receive the latest user data.
+- User data is committed alongside feature changes in meaningful commits.
 
-### Auto-Sync Mechanism
-On every profile save (`write_store`), the server:
-1. Writes the updated JSON to `data/users.json` on the VPS.
-2. Runs `git add data/users.json && git commit -m "chore: auto-commit user data" && git push origin HEAD`.
-3. Errors are silently swallowed — git failures never crash the game server.
+### Data Sync
+The server writes `data/users.json` on every profile save. There is **no auto-commit** — user data is included in git when you make a meaningful commit manually (e.g., `git add data/users.json && git commit -m "feat: ..."`). This keeps git history clean without hundreds of "auto-commit user data" noise commits.
 
 ### .gitignore Policy
-- `data/users.json` is **tracked** in git — it MUST be committed.
+- `data/users.json` is **tracked** in git — include it in meaningful commits.
 - `data/dev-config.json` is **ignored** — per-instance configuration.
 - `cron-state/` is **ignored** — per-instance development state.
 - `__pycache__/`, `*.log`, `nohup.out` are **ignored** — generated artifacts.
@@ -846,3 +842,63 @@ python3 server.py
 
 **Note**: During active development, the VPS is the live server and localhost is a read-only mirror. Once the game is deployed to production, the data flow will be reversed — localhost clients push changes and the production server pulls.
 
+
+---
+
+## 14. Tutorial System
+
+New players (profile `hasCompletedTutorial === false`) are locked into **Easy** difficulty until they complete their first raid. This section documents the implementation.
+
+### Trigger Condition
+Tutorial activates when **both** conditions are true:
+1. `profile.hasCompletedTutorial` is `false` (or missing)
+2. Selected difficulty is `easy`
+
+### Five Guided Steps
+The tutorial HUD displays a step-by-step checklist overlaid on the game canvas:
+
+| Step | Key | Action | Detection |
+|------|-----|--------|-----------|
+| 0 | WASD | Move around | `input.moveDir.x !== 0 \|\| input.moveDir.y !== 0` |
+| 1 | LMB | Shoot your weapon | New bullet created with `owner === 'player'` |
+| 2 | F + Click | Open crate & take item | `openCrateId !== null` AND crate has items AND player inventory not empty |
+| 3 | Q | Use a bandage to heal | `player.isHealing` |
+| 4 | Walk to ✈ | Find extraction zone | `this.extracting` is truthy |
+
+### Completion
+- Steps advance sequentially — each step must be completed before the next activates.
+- When the player successfully extracts (`result.status === 'extracted'`), `hasCompletedTutorial` is set to `true` and saved to the server.
+- On next login, the difficulty selector unlocks and the tutorial banner disappears.
+
+### Menu UI
+- Difficulty `<select>` is **disabled** with value forced to `easy` while tutorial is locked.
+- A banner tile reads: "🎓 Complete your first raid to unlock all difficulties"
+
+---
+
+## 15. New Player Starter Loadout
+
+Every new account (no `source_profile` passed to `build_profile`) receives:
+
+| Category | Contents |
+|----------|----------|
+| Coins | 100,000 |
+| Loadout (equipped) | G17 (primary), Cloth Vest, Scout Cap, Trail Shoes, Sling Pack |
+| Stash — Equipment | 3× each white/green/blue item in categories: gun, armor, helmet, shoes, backpack |
+| Stash — Consumables | med_kit ×4999, field_bandage ×9999 |
+| Backpack | field_bandage ×999 |
+
+The `_get_starter_inventory()` server function reads `dev-config.json` items and filters by rarity + equipment category. This keeps starter gear in sync with the item catalog automatically.
+
+---
+
+## 16. Optimistic Concurrency Control
+
+The `/api/save-profile` endpoint uses a `_clientVersion` field to prevent silent data loss from concurrent writes:
+
+1. Every `write_store()` call increments `store._version`.
+2. Login/signup/auth responses include `_clientVersion` in the profile.
+3. When the client sends a save request with `_clientVersion`, the server checks it matches `store._version`.
+4. If versions differ → **409 Conflict** response, client must reload before retrying.
+
+This prevents the "last write wins" problem when multiple browser tabs or the cron AI simulation are active simultaneously.

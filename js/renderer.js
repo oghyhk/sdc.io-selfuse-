@@ -935,11 +935,13 @@ export class Renderer {
     }
 
     // ---------- Minimap ----------
-    drawMinimap(tiles, player, enemies, aiPlayers, crates, extractionPoints) {
+    drawMinimap(tiles, player, enemies, aiPlayers, crates, extractionPoints, difficulty = 'advanced') {
         const { ctx, cam } = this;
-        const mmW = 160;
-        const mmH = 120;
-        const mmX = cam.width - mmW - 15;
+        // Scale minimap by difficulty: hell 1.5x, chaos 2.5x
+        const scaleMultiplier = difficulty === 'chaos' ? 2.5 : difficulty === 'hell' ? 1.5 : 1;
+        const mmW = Math.round(160 * scaleMultiplier);
+        const mmH = Math.round(120 * scaleMultiplier);
+        const mmX = 15;
         const mmY = 15;
         const scaleX = mmW / MAP_WIDTH;
         const scaleY = mmH / MAP_HEIGHT;
@@ -967,19 +969,37 @@ export class Renderer {
             }
         }
 
-        // Extraction zones
+        // Extraction zones (✈ symbol)
         ctx.fillStyle = COLORS.MINIMAP_EXTRACTION;
+        ctx.font = `${Math.round(10 * scaleMultiplier)}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
         for (const ez of extractionPoints) {
-            ctx.beginPath();
-            ctx.arc(mmX + ez.x * scaleX, mmY + ez.y * scaleY, 3, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillText('✈', mmX + ez.x * scaleX, mmY + ez.y * scaleY);
         }
 
-        // Loot crates with remaining items
-        ctx.fillStyle = COLORS.MINIMAP_LOOT;
+        // Safe crates only — with legend glow effect
         for (const crate of crates) {
-            if (crate.items.length === 0) continue;
-            ctx.fillRect(mmX + crate.x * scaleX - 1, mmY + crate.y * scaleY - 1, 2, 2);
+            if (crate.tier !== 'safe' || crate.items.length === 0) continue;
+            const cx = mmX + crate.x * scaleX;
+            const cy = mmY + crate.y * scaleY;
+            // Legend glow
+            ctx.shadowColor = '#ff9f1a';
+            ctx.shadowBlur = 4;
+            ctx.fillStyle = '#ff9f1a';
+            ctx.beginPath();
+            ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        // Zone entrance markers (⬡ symbol)
+        ctx.fillStyle = '#aaa';
+        ctx.font = `${Math.round(8 * scaleMultiplier)}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (const ent of (this._entrances || [])) {
+            ctx.fillText('⬡', mmX + ent.x * scaleX, mmY + ent.y * scaleY);
         }
 
         // Enemies (alive only)
@@ -987,12 +1007,6 @@ export class Renderer {
         for (const e of enemies) {
             if (!e.alive) continue;
             ctx.fillRect(mmX + e.x * scaleX - 1, mmY + e.y * scaleY - 1, 2, 2);
-        }
-
-        ctx.fillStyle = COLORS.MINIMAP_AI_PLAYER;
-        for (const bot of aiPlayers || []) {
-            if (!bot.alive || bot.aiExtracted) continue;
-            ctx.fillRect(mmX + bot.x * scaleX - 1, mmY + bot.y * scaleY - 1, 3, 3);
         }
 
         // Player

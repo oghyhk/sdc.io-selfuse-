@@ -19,9 +19,53 @@ PORT = 8765
 USERNAME_PATTERN = re.compile(r'^(?:[A-Za-z0-9]|❤(?:️)?)+$')
 STORE_LOCK = RLock()
 
+# Cached dev-config — loaded lazily, refreshed on conflict
+_cached_dev_config: dict | None = None
+_cached_dev_config_mtime: float = 0.0
+
+
+def _load_dev_config_cached() -> dict:
+    global _cached_dev_config, _cached_dev_config_mtime
+    try:
+        mtime = DEV_CONFIG_FILE.stat().st_mtime
+    except OSError:
+        mtime = 0
+    if _cached_dev_config is None or mtime != _cached_dev_config_mtime:
+        try:
+            _cached_dev_config = json.loads(DEV_CONFIG_FILE.read_text(encoding='utf-8'))
+            _cached_dev_config_mtime = mtime
+        except (FileNotFoundError, json.JSONDecodeError):
+            _cached_dev_config = {}
+    return _cached_dev_config
+
+
+# White starter loadout (must match STARTER_LOADOUT in profile.js)
+_STARTER_LOADOUT = {
+    'gunPrimary': 'g17',
+    'gunSecondary': None,
+    'armor': 'cloth_vest',
+    'helmet': 'scout_cap',
+    'shoes': 'trail_shoes',
+    'backpack': 'sling_pack',
+}
+
+
+def _get_starter_inventory() -> list[dict]:
+    """Return 3x white/green/blue equipment items for new players (equipment categories only)."""
+    config = _load_dev_config_cached()
+    items = config.get('items', {})
+    EQUIP_CATS = {'gun', 'armor', 'helmet', 'shoes', 'backpack'}
+    starter = []
+    for rarity in ('white', 'green', 'blue'):
+        for iid, it in items.items():
+            if it.get('rarity') == rarity and it.get('category') in EQUIP_CATS:
+                for _ in range(3):
+                    starter.append({'definitionId': iid})
+    return starter
+
 
 def _default_store() -> dict:
-    return {'users': {}}
+    return {'users': {}, '_version': 0}
 
 
 def _ensure_store_file() -> None:
@@ -78,48 +122,9 @@ def write_store(store: dict) -> None:
     if not isinstance(store.get('users'), dict):
         raise ValueError('store.users must be a dict')
     with STORE_LOCK:
+        store['_version'] = store.get('_version', 0) + 1
         _atomic_write_json(DATA_FILE, store)
         _atomic_write_json(DATA_FILE_BACKUP, store)
-    _auto_git_commit_push()
-
-
-def _auto_git_commit_push() -> None:
-    """Auto-commit + push users.json to GitHub so local clones stay in sync."""
-    import subprocess, sys
-    try:
-        root = Path(__file__).resolve().parent
-        git_dir = root / '.git'
-        data_path = DATA_FILE.relative_to(root)
-        # Stage only users.json
-        result = subprocess.run(
-            ['git', '-C', str(git_dir.parent), 'add', str(data_path)],
-            capture_output=True, text=True, timeout=10
-        )
-        if result.returncode != 0:
-            print(f'git add failed: {result.stderr}', file=sys.stderr)
-            return
-        # Check if there is anything to commit
-        status = subprocess.run(
-            ['git', '-C', str(git_dir.parent), 'status', '--porcelain', str(data_path)],
-            capture_output=True, text=True, timeout=10
-        )
-        if not status.stdout.strip():
-            return  # nothing to commit
-        result = subprocess.run(
-            ['git', '-C', str(git_dir.parent), 'commit', '-m', 'chore: auto-commit user data'],
-            capture_output=True, text=True, timeout=10
-        )
-        if result.returncode != 0:
-            print(f'git commit failed: {result.stderr}', file=sys.stderr)
-            return
-        result = subprocess.run(
-            ['git', '-C', str(git_dir.parent), 'push', 'origin', 'HEAD'],
-            capture_output=True, text=True, timeout=30
-        )
-        if result.returncode != 0:
-            print(f'git push failed: {result.stderr}', file=sys.stderr)
-    except Exception as e:
-        print(f'auto-git-commit-push error: {e}', file=sys.stderr)
 
 
 def normalize_username_key(username: str) -> str:
@@ -155,18 +160,31 @@ def get_user_record(users: dict, username: str) -> tuple[str | None, dict | None
 def build_profile(username: str, password: str, source_profile: dict | None = None, *, is_ai: bool = False) -> dict:
     source_profile = source_profile or {}
     source_stats = source_profile.get('stats') or {}
+
+    # New players get 100k coins + 3x white/green/blue items unless source_profile overrides
+    is_new_player = not source_profile
+    starter_inventory = _get_starter_inventory() if is_new_player else []
+    # Consumables: med_kit x4999 (stash) + field_bandage x9999 (stash) + field_bandage x999 (backpack)
+    starter_consumables = [
+        {'definitionId': 'med_kit', 'quantity': 4999},
+        {'definitionId': 'field_bandage', 'quantity': 9999},
+    ] if is_new_player else []
+    starter_backpack = [
+        {'definitionId': 'field_bandage', 'quantity': 999},
+    ] if is_new_player else []
+
     return {
         'username': username,
         'isGuest': source_profile.get('isGuest', False),
         'isAI': is_ai,
-        'coins': source_profile.get('coins', 0),
+        'coins': source_profile.get('coins', 100_000 if is_new_player else 0),
         'playerExp': source_profile.get('playerExp', 0),
         'elo': source_profile.get('elo', 1000),
         'claimedPlayerLevelRewards': source_profile.get('claimedPlayerLevelRewards', []),
-        'loadout': source_profile.get('loadout', {}),
-        'stashItems': source_profile.get('stashItems', []),
+        'loadout': source_profile.get('loadout', dict(_STARTER_LOADOUT) if is_new_player else {}),
+        'stashItems': source_profile.get('stashItems', starter_inventory + starter_consumables),
         'stashAmmo': source_profile.get('stashAmmo', {}),
-        'backpackItems': source_profile.get('backpackItems', []),
+        'backpackItems': source_profile.get('backpackItems', starter_backpack),
         'safeboxItems': source_profile.get('safeboxItems', []),
         'savedLoadouts': source_profile.get('savedLoadouts', []),
         'extractedRuns': source_profile.get('extractedRuns', []),
@@ -174,10 +192,18 @@ def build_profile(username: str, password: str, source_profile: dict | None = No
         'avatarDataUrl': source_profile.get('avatarDataUrl', ''),
         'pinnedAchievements': source_profile.get('pinnedAchievements', []),
         'unlockedAchievements': source_profile.get('unlockedAchievements', ['welcome']),
+        'hasCompletedTutorial': source_profile.get('hasCompletedTutorial', False),
+        'hellChances': source_profile.get('hellChances', 12),
+        'hellChanceMax': source_profile.get('hellChanceMax', 12),
+        'hellChanceRegenAt': source_profile.get('hellChanceRegenAt', 0),
+        'chaosChances': source_profile.get('chaosChances', 3),
+        'chaosChanceMax': source_profile.get('chaosChanceMax', 3),
+        'chaosChanceRegenAt': source_profile.get('chaosChanceRegenAt', 0),
         'stats': {
             'totalRuns': source_stats.get('totalRuns', 0),
             'totalExtractions': source_stats.get('totalExtractions', 0),
             'totalKills': source_stats.get('totalKills', 0),
+            'totalDeaths': source_stats.get('totalDeaths', 0),
             'totalCoinsEarned': source_stats.get('totalCoinsEarned', 0),
             'totalMarketTrades': source_stats.get('totalMarketTrades', 0),
         },
@@ -248,15 +274,39 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 self._send_json({'ok': False, 'message': str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
             return
 
+        if parsed.path == '/api/image-review-data':
+            config = json.loads(DEV_CONFIG_FILE.read_text(encoding='utf-8'))
+            items = config.get('items', {})
+            assets_dir = ROOT / 'assets' / 'items'
+            results = []
+            RARITY_COLORS = {'white':'#eceff1','gray':'#9e9e9e','green':'#81c784','blue':'#64b5f6','purple':'#b388ff','gold':'#ffca28'}
+            for item_id, item in items.items():
+                rarity = item.get('rarity', '')
+                category = item.get('category', '')
+                if rarity in ('red', 'legend') or category == 'gun':
+                    continue
+                png = assets_dir / f'{item_id}_2nd.png'
+                jpg = assets_dir / f'{item_id}_2nd.jpg'
+                if png.exists():
+                    results.append({'id': item_id, 'name': item.get('name',''), 'rarity': rarity, 'file': f'{item_id}_2nd.png', 'source': 'MiniMax', 'bgColor': RARITY_COLORS.get(rarity, '#999')})
+                elif jpg.exists():
+                    results.append({'id': item_id, 'name': item.get('name',''), 'rarity': rarity, 'file': f'{item_id}_2nd.jpg', 'source': 'CF FLUX', 'bgColor': RARITY_COLORS.get(rarity, '#999')})
+            self._send_json(results)
+            return
+
         if parsed.path == '/api/leaderboard':
             store = read_store()
             users = store.get('users', {})
             entries = []
+            params = parse_qs(parsed.query)
+            requesting_username = (params.get('username') or [''])[0]
+            norm_requesting = normalize_username_key(requesting_username) if requesting_username else None
+            player_entry = None
             for _key, user in users.items():
                 username = user.get('username', _key)
                 elo = int(user.get('elo', 1000))
                 stats = user.get('stats') or {}
-                entries.append({
+                entry = {
                     'username': username,
                     'elo': elo,
                     'totalRuns': stats.get('totalRuns', 0),
@@ -264,19 +314,13 @@ class ApiHandler(SimpleHTTPRequestHandler):
                     'totalKills': stats.get('totalKills', 0),
                     'isAI': user.get('isAI', False),
                     'isBoss': bool(user.get('isBoss', False)),
-                })
+                }
+                if norm_requesting and normalize_username_key(username) == norm_requesting:
+                    player_entry = entry
+                entries.append(entry)
             entries.sort(key=lambda e: -e['elo'])
             for i, entry in enumerate(entries):
                 entry['rank'] = i + 1
-            params = parse_qs(parsed.query)
-            requesting_username = (params.get('username') or [''])[0]
-            player_entry = None
-            if requesting_username:
-                norm_name = normalize_username_key(requesting_username)
-                player_entry = next(
-                    (e for e in entries if normalize_username_key(e['username']) == norm_name),
-                    None
-                )
             top_entries = entries[:100]
             self._send_json({
                 'ok': True,
@@ -436,16 +480,12 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 if 'totalKills' in upd:
                     entry['stats']['totalKills'] = max(0, int(entry['stats'].get('totalKills', 0) + upd['totalKills']))
                 if 'totalDeaths' in upd:
-                    entry['totalDeaths'] = max(0, int(entry.get('totalDeaths', 0) + upd['totalDeaths']))
+                    entry['stats']['totalDeaths'] = max(0, int(entry['stats'].get('totalDeaths', 0) + upd['totalDeaths']))
                 if 'coins' in upd:
                     entry['coins'] = max(0, int(entry.get('coins', 0) + upd['coins']))
                 users[user_key] = entry
                 saved += 1
             store['users'] = users
-            write_store(store)
-            self._send_json({'ok': True, 'saved': saved})
-            return
-            store['aiRoster'] = ai_roster
             write_store(store)
             self._send_json({'ok': True, 'saved': saved})
             return
@@ -468,6 +508,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                     self._send_json({'ok': False, 'message': 'Invalid password.'}, HTTPStatus.UNAUTHORIZED)
                     return
                 safe_user = {k: v for k, v in user.items() if k != 'password'}
+                safe_user['_clientVersion'] = store.get('_version', 0)
                 self._send_json({'ok': True, 'created': False, 'profile': safe_user})
                 return
 
@@ -475,6 +516,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             users[canonical_key] = profile
             write_store(store)
             safe_user = {k: v for k, v in profile.items() if k != 'password'}
+            safe_user['_clientVersion'] = store.get('_version', 0)
             self._send_json({'ok': True, 'created': True, 'profile': safe_user}, HTTPStatus.CREATED)
             return
 
@@ -498,6 +540,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             users[canonical_key] = profile
             write_store(store)
             safe_user = {k: v for k, v in profile.items() if k != 'password'}
+            safe_user['_clientVersion'] = store.get('_version', 0)
             self._send_json({'ok': True, 'profile': safe_user})
             return
 
@@ -510,24 +553,291 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 self._send_json({'ok': False, 'message': 'Invalid username or password.'}, HTTPStatus.UNAUTHORIZED)
                 return
             safe_user = {k: v for k, v in user.items() if k != 'password'}
+            safe_user['_clientVersion'] = store.get('_version', 0)
             self._send_json({'ok': True, 'profile': safe_user})
             return
 
         if parsed.path == '/api/save-profile':
             username = str(body.get('username', '')).strip()
             profile = body.get('profile') or {}
+            client_version = body.get('_clientVersion')
             store = read_store()
             users = store.setdefault('users', {})
             existing_key, user = get_user_record(users, username)
             if not user or not existing_key:
                 self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
                 return
+            if client_version is not None and store.get('_version', 0) != client_version:
+                self._send_json({
+                    'ok': False,
+                    'message': 'Conflict: profile was modified by another session. Please reload and try again.',
+                    '_conflictVersion': store.get('_version', 0),
+                }, HTTPStatus.CONFLICT)
+                return
+            # Protect server-authoritative fields from client manipulation
+            SERVER_FIELDS = {
+                'coins', 'elo',
+                'hellChances', 'hellChanceMax', 'hellChanceRegenAt',
+                'chaosChances', 'chaosChanceMax', 'chaosChanceRegenAt',
+            }
+            # Safe merge: start from server data, overlay client changes
+            # This prevents client from wiping fields it doesn't send
+            merged = dict(user)
+            for key, val in profile.items():
+                if key in ('password', 'username'):
+                    continue
+                if key in SERVER_FIELDS:
+                    continue  # server-authoritative, never accept client value
+                if key == 'hasCompletedTutorial':
+                    # Can only go false→true
+                    if val or not user.get('hasCompletedTutorial'):
+                        merged[key] = val
+                    continue
+                if key == 'stats':
+                    # Merge incrementally — client can add but not reset
+                    server_stats = user.get('stats') or {}
+                    client_stats = val or {}
+                    for sk, sv in client_stats.items():
+                        if isinstance(sv, (int, float)) and sv > server_stats.get(sk, 0):
+                            merged.setdefault('stats', {})[sk] = sv
+                    continue
+                # For list fields, keep the larger list (server has full data, client may have partial)
+                if key in ('stashItems', 'backpackItems', 'safeboxItems', 'savedLoadouts',
+                           'extractedRuns', 'raidHistory', 'pinnedAchievements', 'unlockedAchievements',
+                           'claimedPlayerLevelRewards'):
+                    server_list = user.get(key) or []
+                    client_list = val if isinstance(val, list) else []
+                    if len(client_list) >= len(server_list):
+                        merged[key] = client_list
+                    # else: keep server's larger list
+                    continue
+                # For dict fields (loadout), only accept if client sent non-empty
+                if key == 'loadout':
+                    if isinstance(val, dict) and any(v for v in val.values() if v):
+                        merged[key] = val
+                    continue
+                # Other fields: accept client value
+                merged[key] = val
+            merged['password'] = user.get('password', '')
+            merged['username'] = user.get('username', username)
+            profile = merged
+            users[existing_key] = profile
+            write_store(store)
+            safe_user = {k: v for k, v in profile.items() if k != 'password'}
+            safe_user['_clientVersion'] = store.get('_version', 0)
+            self._send_json({'ok': True, 'profile': safe_user})
+            return
+
+        if parsed.path == '/api/raid-outcome':
+            # Server-authoritative: apply raid outcome (coins, stats, elo, items)
+            username = str(body.get('username', '')).strip()
+            result = body.get('result') or {}
+            store = read_store()
+            users = store.setdefault('users', {})
+            existing_key, user = get_user_record(users, username)
+            if not user or not existing_key:
+                self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
+                return
+            profile = dict(user)  # work on a copy
+            status = result.get('status', '')
+            summary = result.get('summary') or {}
+            difficulty = result.get('difficulty', 'advanced')
+            # Update stats
+            stats = profile.get('stats') or {}
+            stats['totalRuns'] = stats.get('totalRuns', 0) + 1
+            kills = int(summary.get('kills', 0) or 0)
+            stats['totalKills'] = stats.get('totalKills', 0) + kills
+            if status == 'extracted':
+                stats['totalExtractions'] = stats.get('totalExtractions', 0) + 1
+                # Add extracted items
+                extracted_items = summary.get('items') or []
+                stash = list(profile.get('stashItems') or [])
+                for item in extracted_items:
+                    if item and item.get('definitionId'):
+                        stash.append({'definitionId': item['definitionId'], 'quantity': item.get('quantity')})
+                profile['stashItems'] = stash
+                # Add coins from extraction
+                loot_value = int(summary.get('lootValue', 0) or 0)
+                profile['coins'] = profile.get('coins', 0) + loot_value
+                stats['totalCoinsEarned'] = stats.get('totalCoinsEarned', 0) + loot_value
+            elif status == 'dead':
+                stats['totalDeaths'] = stats.get('totalDeaths', 0) + 1
+                # Apply death coin loss
+                death_loss = int(summary.get('deathCoinLoss', 0) or 0)
+                profile['coins'] = max(0, profile.get('coins', 0) - death_loss)
+            # Apply ELO
+            elo_bonus = int(summary.get('eloKillBonus', 0) or 0)
+            is_win = status == 'extracted'
+            current_elo = profile.get('elo', 1000)
+            flat_per_kill = 8
+            gain_mult = 1
+            loss_mult = 1
+            if current_elo <= 900: gain_mult = 3
+            elif current_elo <= 1200: gain_mult = 2
+            if current_elo >= 2401: loss_mult = 5
+            elif current_elo >= 2101: loss_mult = 3
+            elif current_elo >= 1801: loss_mult = 2
+            if is_win:
+                elo_change = (flat_per_kill * gain_mult * kills) + (elo_bonus * gain_mult)
+            else:
+                death_penalty = float(summary.get('deathPenaltyScale', 1.0) or 1.0)
+                elo_change = -((flat_per_kill * loss_mult * death_penalty) + (elo_bonus * loss_mult))
+            profile['elo'] = max(0, int(current_elo + elo_change))
+            # Update safebox/backpack
+            profile['safeboxItems'] = result.get('safeboxItems') or profile.get('safeboxItems') or []
+            profile['backpackItems'] = []
+            # Raid history
+            history = list(profile.get('raidHistory') or [])
+            history.append({
+                'status': status,
+                'difficulty': difficulty,
+                'kills': kills,
+                'elo': profile['elo'],
+                'coins': profile['coins'],
+                'items': summary.get('items') or [],
+                'timestamp': int(time.time() * 1000),
+            })
+            profile['raidHistory'] = history[-100:]  # keep last 100
+            # Preserve password/username
             profile['password'] = user.get('password', '')
             profile['username'] = user.get('username', username)
             users[existing_key] = profile
             write_store(store)
-            safe_user = {k: v for k, v in profile.items() if k != 'password'}
-            self._send_json({'ok': True, 'profile': safe_user})
+            safe = {k: v for k, v in profile.items() if k != 'password'}
+            safe['_clientVersion'] = store.get('_version', 0)
+            self._send_json({'ok': True, 'profile': safe})
+            return
+
+        if parsed.path == '/api/start-raid':
+            # Server-authoritative: deduct raid chance for hell/chaos
+            username = str(body.get('username', '')).strip()
+            difficulty = str(body.get('difficulty', '')).strip()
+            if difficulty not in ('hell', 'chaos'):
+                self._send_json({'ok': True})  # no chance needed
+                return
+            store = read_store()
+            users = store.setdefault('users', {})
+            existing_key, user = get_user_record(users, username)
+            if not user or not existing_key:
+                self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
+                return
+            chance_key = f'{difficulty}Chances'
+            current = user.get(chance_key, 0)
+            if current <= 0:
+                self._send_json({'ok': False, 'message': f'No {difficulty.title()} chances remaining.'}, HTTPStatus.FORBIDDEN)
+                return
+            max_key = f'{difficulty}ChanceMax'
+            regen_key = f'{difficulty}ChanceRegenAt'
+            max_val = user.get(max_key, 12 if difficulty == 'hell' else 3)
+            user[chance_key] = current - 1
+            if user.get(regen_key, 0) == 0:
+                regen_ms = 5 * 3600 * 1000 if difficulty == 'hell' else 23 * 3600 * 1000
+                user[regen_key] = int(time.time() * 1000) + regen_ms
+            users[existing_key] = user
+            write_store(store)
+            safe = {k: v for k, v in user.items() if k != 'password'}
+            safe['_clientVersion'] = store.get('_version', 0)
+            self._send_json({'ok': True, 'profile': safe})
+            return
+
+        if parsed.path == '/api/complete-raid':
+            # Server-authoritative: refund chance on successful extraction
+            username = str(body.get('username', '')).strip()
+            difficulty = str(body.get('difficulty', '')).strip()
+            status = str(body.get('status', '')).strip()
+            if difficulty not in ('hell', 'chaos') or status != 'extracted':
+                self._send_json({'ok': True})  # no refund needed
+                return
+            store = read_store()
+            users = store.setdefault('users', {})
+            existing_key, user = get_user_record(users, username)
+            if not user or not existing_key:
+                self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
+                return
+            chance_key = f'{difficulty}Chances'
+            max_key = f'{difficulty}ChanceMax'
+            max_val = user.get(max_key, 12 if difficulty == 'hell' else 3)
+            user[chance_key] = min(user.get(chance_key, 0) + 1, max_val)
+            if user.get(chance_key, 0) >= max_val:
+                user[f'{difficulty}ChanceRegenAt'] = 0
+            users[existing_key] = user
+            write_store(store)
+            safe = {k: v for k, v in user.items() if k != 'password'}
+            safe['_clientVersion'] = store.get('_version', 0)
+            self._send_json({'ok': True, 'profile': safe})
+            return
+
+        if parsed.path == '/api/buy-chance':
+            # Server-authoritative: buy a raid chance with coins
+            username = str(body.get('username', '')).strip()
+            difficulty = str(body.get('difficulty', '')).strip()
+            if difficulty not in ('hell', 'chaos'):
+                self._send_json({'ok': False, 'message': 'Invalid difficulty.'}, HTTPStatus.BAD_REQUEST)
+                return
+            cost = 150000 if difficulty == 'hell' else 1280000
+            store = read_store()
+            users = store.setdefault('users', {})
+            existing_key, user = get_user_record(users, username)
+            if not user or not existing_key:
+                self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
+                return
+            chance_key = f'{difficulty}Chances'
+            max_key = f'{difficulty}ChanceMax'
+            max_val = user.get(max_key, 12 if difficulty == 'hell' else 3)
+            if user.get(chance_key, 0) >= max_val:
+                self._send_json({'ok': False, 'message': 'Already at max chances.'}, HTTPStatus.BAD_REQUEST)
+                return
+            coins = user.get('coins', 0)
+            if coins < cost:
+                self._send_json({'ok': False, 'message': f'Not enough coins. Need {cost}.'}, HTTPStatus.BAD_REQUEST)
+                return
+            user['coins'] = coins - cost
+            user[chance_key] = user.get(chance_key, 0) + 1
+            if user.get(chance_key, 0) >= max_val:
+                user[f'{difficulty}ChanceRegenAt'] = 0
+            users[existing_key] = user
+            write_store(store)
+            safe = {k: v for k, v in user.items() if k != 'password'}
+            safe['_clientVersion'] = store.get('_version', 0)
+            self._send_json({'ok': True, 'profile': safe})
+            return
+
+        if parsed.path == '/api/image-review-apply':
+            import shutil
+            approved = body.get('approved', [])
+            denied = body.get('denied', [])
+            assets_dir = ROOT / 'assets' / 'items'
+            replaced = 0
+            deleted = 0
+            errors = []
+            for item_id in approved:
+                src_png = assets_dir / f'{item_id}_2nd.png'
+                src_jpg = assets_dir / f'{item_id}_2nd.jpg'
+                dst_png = assets_dir / f'{item_id}.png'
+                dst_jpg = assets_dir / f'{item_id}.jpg'
+                try:
+                    if src_png.exists():
+                        shutil.copy2(str(src_png), str(dst_png))
+                        replaced += 1
+                    elif src_jpg.exists():
+                        # If original is png, convert to png by just copying jpg
+                        if dst_png.exists():
+                            shutil.copy2(str(src_jpg), str(dst_png))
+                        else:
+                            shutil.copy2(str(src_jpg), str(dst_jpg))
+                        replaced += 1
+                except Exception as e:
+                    errors.append(f'{item_id}: {e}')
+            for item_id in denied:
+                for suffix in ('_2nd.png', '_2nd.jpg'):
+                    p = assets_dir / f'{item_id}{suffix}'
+                    if p.exists():
+                        p.unlink()
+                        deleted += 1
+            msg = f'Replaced {replaced} originals, deleted {deleted} rejected images.'
+            if errors:
+                msg += f' Errors: {"; ".join(errors)}'
+            self._send_json({'ok': True, 'message': msg, 'replaced': replaced, 'deleted': deleted})
             return
 
         if parsed.path == '/api/change-password':
