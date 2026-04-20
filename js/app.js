@@ -633,7 +633,7 @@ function renderPlayerLevelPage(profile) {
 }
 
 function renderRaidHistoryPage(profile) {
-    const history = Array.isArray(profile?.raidHistory) ? profile.raidHistory.slice(0, 100) : [];
+    const history = Array.isArray(profile?.raidHistory) ? profile.raidHistory.slice().reverse().slice(0, 100) : [];
     const historySummary = getRaidHistorySummary(profile);
 
     placeholderTitle.textContent = 'Raid History';
@@ -1253,12 +1253,21 @@ function escapeHtml(str) {
 function renderPlaceholderScreen() {
     const profile = store.getCurrentProfile();
     const page = getCurrentPlaceholderPage();
+    // Save scroll position of raid history shell (scrollable container) before re-render
+    const raidShell = document.querySelector('.raid-history-shell');
+    const _savedScroll = raidShell ? raidShell.scrollTop : null;
     if (page.id === 'player-level') {
         renderPlayerLevelPage(profile);
         return;
     }
     if (page.id === 'raid-history') {
         renderRaidHistoryPage(profile);
+        if (_savedScroll != null) {
+            requestAnimationFrame(() => {
+                const el = document.querySelector('.raid-history-shell');
+                if (el) el.scrollTop = _savedScroll;
+            });
+        }
         return;
     }
     if (page.id === 'stats') {

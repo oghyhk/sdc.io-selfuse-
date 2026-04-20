@@ -665,28 +665,33 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 # Apply death coin loss
                 death_loss = int(summary.get('deathCoinLoss', 0) or 0)
                 profile['coins'] = max(0, profile.get('coins', 0) - death_loss)
-            # Apply ELO
-            elo_bonus = int(summary.get('eloKillBonus', 0) or 0)
-            is_win = status == 'extracted'
+            # Apply ELO (skip for easy difficulty)
             current_elo = profile.get('elo', 1000)
-            flat_per_kill = 8
-            gain_mult = 1
-            loss_mult = 1
-            if current_elo <= 900: gain_mult = 3
-            elif current_elo <= 1200: gain_mult = 2
-            if current_elo >= 2401: loss_mult = 5
-            elif current_elo >= 2101: loss_mult = 3
-            elif current_elo >= 1801: loss_mult = 2
-            if is_win:
-                elo_change = (flat_per_kill * gain_mult * kills) + (elo_bonus * gain_mult)
+            if difficulty == 'easy':
+                elo_change = 0
             else:
-                death_penalty = float(summary.get('deathPenaltyScale', 1.0) or 1.0)
-                elo_change = -((flat_per_kill * loss_mult * death_penalty) + (elo_bonus * loss_mult))
+                elo_bonus = int(summary.get('eloKillBonus', 0) or 0)
+                is_win = status == 'extracted'
+                flat_per_kill = 8
+                gain_mult = 1
+                loss_mult = 1
+                if current_elo <= 900: gain_mult = 3
+                elif current_elo <= 1200: gain_mult = 2
+                if current_elo >= 2401: loss_mult = 5
+                elif current_elo >= 2101: loss_mult = 3
+                elif current_elo >= 1801: loss_mult = 2
+                if is_win:
+                    elo_change = (flat_per_kill * gain_mult * kills) + (elo_bonus * gain_mult)
+                else:
+                    death_penalty = float(summary.get('deathPenaltyScale', 1.0) or 1.0)
+                    elo_change = -((flat_per_kill * loss_mult * death_penalty) + (elo_bonus * loss_mult))
             profile['elo'] = max(0, int(current_elo + elo_change))
             # Update safebox/backpack
             profile['safeboxItems'] = result.get('safeboxItems') or profile.get('safeboxItems') or []
             profile['backpackItems'] = []
-            # Raid history
+            # Raid history — include value fields so netValue computes correctly
+            value_extracted = int(summary.get('valueExtracted', 0) or 0)
+            lost_value = int(summary.get('lostValue', 0) or 0)
             history = list(profile.get('raidHistory') or [])
             history.append({
                 'status': status,
@@ -696,6 +701,9 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 'coins': profile['coins'],
                 'items': summary.get('items') or [],
                 'timestamp': int(time.time() * 1000),
+                'valueExtracted': value_extracted,
+                'lostValue': lost_value,
+                'netValue': value_extracted - lost_value if status == 'extracted' else -lost_value,
             })
             profile['raidHistory'] = history[-100:]  # keep last 100
             # Preserve password/username
