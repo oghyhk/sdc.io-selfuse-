@@ -270,15 +270,29 @@ class ApiHandler(SimpleHTTPRequestHandler):
             params = parse_qs(parsed.query)
             username = (params.get('username') or [''])[0]
             store = read_store()
-            _, user = get_user_record(store.get('users', {}), username)
-            if not user:
+            users = store.get('users', {})
+            existing_key, user = get_user_record(users, username)
+            if not user or not existing_key:
                 self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
                 return
             raid = user.get('activeRaid')
             if not raid:
                 self._send_json({'ok': True, 'active': False})
                 return
-            elapsed = int(time.time() * 1000) - raid.get('startedAt', 0)
+            # Check if a raid outcome was already recorded for this raid
+            raid_started = raid.get('startedAt', 0)
+            history = user.get('raidHistory') or []
+            for entry in history[-5:]:
+                entry_ts = entry.get('timestamp', 0)
+                # If a history entry was recorded after the raid started, it's already completed
+                if entry_ts and entry_ts >= raid_started:
+                    # Clear stale activeRaid marker
+                    user['activeRaid'] = None
+                    users[existing_key] = user
+                    write_store(store)
+                    self._send_json({'ok': True, 'active': False})
+                    return
+            elapsed = int(time.time() * 1000) - raid_started
             AFK_TIMEOUT_MS = 120_000  # 2 minutes
             expired = elapsed >= AFK_TIMEOUT_MS
             self._send_json({
@@ -662,6 +676,11 @@ class ApiHandler(SimpleHTTPRequestHandler):
             if not user or not existing_key:
                 self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
                 return
+            # Skip if no active raid (prevents duplicate outcomes)
+            if not user.get('activeRaid'):
+                safe = {k: v for k, v in user.items() if k != 'password'}
+                self._send_json({'ok': True, 'profile': safe, 'skipped': True})
+                return
             profile = dict(user)  # work on a copy
             status = result.get('status', '')
             summary = result.get('summary') or {}
@@ -721,6 +740,8 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 'status': status,
                 'difficulty': difficulty,
                 'kills': kills,
+                'operatorKills': int(summary.get('operatorKills', 0) or 0),
+                'aiEnemyKills': int(summary.get('aiEnemyKills', 0) or 0),
                 'elo': profile['elo'],
                 'coins': profile['coins'],
                 'items': summary.get('items') or [],
