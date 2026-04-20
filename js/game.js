@@ -11,6 +11,7 @@ import { Enemy } from './enemy.js';
 import { Camera } from './camera.js';
 import { Renderer } from './renderer.js';
 import { AudioManager } from './audio.js';
+import { RemotePlayer, drawRemotePlayers } from './remote_player.js';
 import {
     EXTRACTION_RADIUS, EXTRACTION_TIME, LOOT_PICKUP_RANGE, CRATE_INTERACT_RANGE,
     HEALTHPACK_HEAL, MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, COLORS, CRATE_WIDTH, CRATE_HEIGHT, ZONE
@@ -50,6 +51,8 @@ export class Game {
         this.wallGrid = null;
         this.player = null;
         this.aiPlayers = [];
+        this.remotePlayers = [];  // other human players
+        this.network = null;      // NetworkManager instance (set externally)
         this.enemies = [];
         this.bullets = [];
         this.totalPlayersInRaid = 1;
@@ -127,6 +130,7 @@ export class Game {
         this.audio.init();
         this.activeProfile = profile || null;
         this.activeDifficulty = options?.difficulty || 'advanced';
+        this._mapSeed = options?.mapSeed || null;
         // Auto-enable tutorial for first-time players on easy difficulty
         this.isTutorial = Boolean(!profile?.hasCompletedTutorial && this.activeDifficulty === 'easy');
         this.tutorialStep = 0;
@@ -136,6 +140,51 @@ export class Game {
 
     goToMenu() {
         this._setState(GAME_STATE.MENU);
+    }
+
+    setNetwork(networkManager) {
+        this.network = networkManager;
+        if (!networkManager) return;
+
+        networkManager.onPlayersUpdate = (states) => {
+            for (const state of states) {
+                let rp = this.remotePlayers.find(p => p.username === state.username);
+                if (!rp) {
+                    rp = new RemotePlayer(state.username);
+                    this.remotePlayers.push(rp);
+                }
+                rp.applyState(state);
+            }
+        };
+
+        networkManager.onPlayerLeft = ({ username }) => {
+            this.remotePlayers = this.remotePlayers.filter(p => p.username !== username);
+        };
+
+        networkManager.onPlayerDeath = ({ username, x, y }) => {
+            const rp = this.remotePlayers.find(p => p.username === username);
+            if (rp) {
+                rp.alive = false;
+                rp.x = x; rp.y = y;
+            }
+        };
+
+        networkManager.onPlayerExtract = ({ username }) => {
+            this.remotePlayers = this.remotePlayers.filter(p => p.username !== username);
+        };
+
+        networkManager.onPlayerShoot = ({ username, x, y, angle }) => {
+            // Visual-only: spawn a short muzzle flash particle
+            this.particles.push({
+                x, y,
+                vx: Math.cos(angle) * 200,
+                vy: Math.sin(angle) * 200,
+                life: 0.1,
+                maxLife: 0.1,
+                color: '#69f0ae',
+                radius: 3,
+            });
+        };
     }
 
     _getContinueButtonBounds() {
@@ -206,9 +255,12 @@ export class Game {
         this.stats = { kills: 0, operatorKills: 0, aiEnemyKills: 0, lootCollected: 0, timeSurvived: 0, eloKillBonus: 0 };
         this.playerElo = this.activeProfile?.elo || 1000;
         this.playerKillerElo = null;
+        this.remotePlayers = [];
 
-        // Generate map
-        this.mapData = generateMap({ difficulty: this.activeDifficulty });
+        // Generate map (use shared seed if provided for multiplayer)
+        const mapOpts = { difficulty: this.activeDifficulty };
+        if (this._mapSeed) mapOpts.mapSeed = this._mapSeed;
+        this.mapData = generateMap(mapOpts);
         this.wallGrid = new WallGrid(this.mapData.walls);
 
         // Create player
@@ -420,7 +472,10 @@ export class Game {
         // Detect player shot
         if (this.bullets.length > bulletsBefore) {
             const newBullet = this.bullets[this.bullets.length - 1];
-            if (newBullet.owner === 'player') this.audio.playShoot();
+            if (newBullet.owner === 'player') {
+                this.audio.playShoot();
+                if (this.network) this.network.sendShoot(this.player.x, this.player.y, this.player.angle, this.player.weaponId || '');
+            }
         }
 
         // Detect player dash
@@ -498,6 +553,12 @@ export class Game {
             this.audio.playEnemyShoot();
         }
 
+        // ── Network: send position, update remote players ──
+        if (this.network) {
+            this.network.sendPosition(this.player);
+            for (const rp of this.remotePlayers) rp.update(dt);
+        }
+
         // Check player death
         if (!this.player.alive) {
             if (!this._deathHandled) {
@@ -514,6 +575,7 @@ export class Game {
                 const deathSummary = this._buildRunSummary({ deathLosses, deathBackpackValue, deathEquipmentValue, deathSafeboxValue });
                 this.lastExtractSummary = deathSummary;
                 this._applyAiRosterElo();
+                if (this.network) this.network.sendDeath(this.player.x, this.player.y);
                 if (this.onRunComplete) {
                     this.onRunComplete({
                         status: 'dead',
@@ -1169,6 +1231,7 @@ export class Game {
                     this.onExtraction(this.lastExtractSummary);
                 }
                 this._applyAiRosterElo();
+                if (this.network) this.network.sendExtract();
                 if (this.onRunComplete) {
                     this.onRunComplete({
                         status: 'extracted',
@@ -1475,6 +1538,10 @@ export class Game {
         r.drawHealthPacks(this.mapData.healthPacks);
         r.drawEnemies(this.enemies);
         r.drawAiPlayers(this.aiPlayers, this.player);
+        // Draw other human players
+        if (this.remotePlayers.length) {
+            drawRemotePlayers(this.ctx, this.camera, this.remotePlayers);
+        }
         r.drawBullets(this.bullets);
         r.drawPlayer(this.player);
         this._renderParticles();

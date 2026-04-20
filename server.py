@@ -1173,6 +1173,11 @@ class ApiHandler(SimpleHTTPRequestHandler):
 
 
 if __name__ == '__main__':
+    # Start WebSocket server in background thread
+    from ws_server import start_ws_in_thread, WS_PORT
+    start_ws_in_thread()
+    print(f'WebSocket server started on ws://{HOST}:{WS_PORT}')
+
     server = ThreadingHTTPServer((HOST, PORT), ApiHandler)
     print(f'Serving SDC.IO at http://{HOST}:{PORT}')
     try:

@@ -49,8 +49,10 @@ import {
     runtimeAchievements
 } from './profile.js';
 import { prefetchRoster, invalidateRosterCache } from './ai_roster.js';
+import { NetworkManager } from './network.js';
 
 const store = new ProfileStore();
+const net = new NetworkManager();
 
 const canvas = document.getElementById('gameCanvas');
 const loading = document.getElementById('loading');
@@ -221,6 +223,12 @@ const game = new Game(canvas, {
         } catch (e) {
             console.warn('applyRaidOutcome failed:', e);
         }
+        // Disconnect from multiplayer
+        if (net.isInRaid()) {
+            net.sendLeave();
+        }
+        net.disconnect();
+        game.setNetwork(null);
         invalidateRosterCache();
         _leaderboardCache = null;
         renderAll();
@@ -1999,7 +2007,31 @@ async function startRaidWithSelectedLoadout() {
     } catch (e) {
         console.warn('Failed to mark raid active:', e);
     }
-    game.startGame(store.getCurrentProfile(), { difficulty: difficultySelect.value });
+
+    // Connect to WebSocket for multiplayer
+    let mapSeed = null;
+    if (store.isAuthenticated()) {
+        try {
+            await net.connect(store.activeUsername);
+            // Wait for raid_start (server sends after lobby countdown)
+            const raidReady = new Promise((resolve) => {
+                net.onRaidStart = (info) => { mapSeed = info.mapSeed; resolve(); };
+                // Fallback: use raid_joined seed if raid_start doesn't arrive in time
+                net.onRaidJoined = (info) => { mapSeed = info.mapSeed; };
+                setTimeout(resolve, 5000); // safety timeout
+            });
+            net.joinRaid(difficultySelect.value);
+            await raidReady;
+        } catch (e) {
+            console.warn('WebSocket connect failed, playing solo:', e);
+        }
+    }
+
+    game.setNetwork(net.isInRaid() ? net : null);
+    game.startGame(store.getCurrentProfile(), {
+        difficulty: difficultySelect.value,
+        mapSeed: mapSeed || undefined,
+    });
     renderVisibility();
     requestAnimationFrame(() => requestAnimationFrame(hideRaidLoadingOverlay));
 }

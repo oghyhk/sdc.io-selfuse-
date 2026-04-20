@@ -8,7 +8,7 @@ import {
     HEALTHPACK_RADIUS, CRATE_WIDTH, CRATE_HEIGHT,
     setMapSize
 } from './constants.js';
-import { randInt, generateId } from './utils.js';
+import { randInt, generateId, seedRng, clearRngSeed, seededRandom } from './utils.js';
 import { createLootItemsForCrateRarity, getCrateTierMeta } from './profile.js';
 
 const DIFFICULTY_CRATE_POOLS = {
@@ -90,7 +90,7 @@ const DIFFICULTY_ENEMY_COUNTS = {
 
 function pickWeightedRarity(pool) {
     const total = pool.reduce((sum, entry) => sum + entry.weight, 0);
-    let roll = Math.random() * total;
+    let roll = seededRandom() * total;
     for (const entry of pool) {
         roll -= entry.weight;
         if (roll <= 0) return entry.rarity;
@@ -126,8 +126,12 @@ function _entrancePos(dir, ringDist, centerR, centerC) {
 
 export function generateMap(options = {}) {
     const difficulty = typeof options === 'string' ? options : options?.difficulty || 'advanced';
+    const mapSeed = (typeof options === 'object' && options?.mapSeed != null) ? options.mapSeed : Math.floor(Math.random() * 2147483647);
     const cratePools = DIFFICULTY_CRATE_POOLS[difficulty] || DIFFICULTY_CRATE_POOLS.advanced;
     const enemyCounts = DIFFICULTY_ENEMY_COUNTS[difficulty] || DIFFICULTY_ENEMY_COUNTS.advanced;
+
+    // Seed the PRNG so all clients generate the same map
+    seedRng(mapSeed);
 
     // ── Set map dimensions for this difficulty ──
     const preset = MAP_SIZE_PRESETS[difficulty] || MAP_SIZE_PRESETS.advanced;
@@ -455,6 +459,9 @@ export function generateMap(options = {}) {
     // Build navigation grid for A* pathfinding
     const navGrid = buildNavGrid(tiles, MAP_ROWS, MAP_COLS);
 
+    // Restore unseeded RNG so non-map code isn't affected
+    clearRngSeed();
+
     return {
         tiles,
         zones,
@@ -467,7 +474,8 @@ export function generateMap(options = {}) {
         extractionPoints,
         enemySpawns,
         playerSpawn,
-        entrances
+        entrances,
+        mapSeed
     };
 }
 
