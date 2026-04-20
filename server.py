@@ -742,6 +742,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 'kills': kills,
                 'operatorKills': int(summary.get('operatorKills', 0) or 0),
                 'aiEnemyKills': int(summary.get('aiEnemyKills', 0) or 0),
+                'duration': float(summary.get('duration', 0) or 0),
                 'elo': profile['elo'],
                 'coins': profile['coins'],
                 'items': summary.get('items') or [],

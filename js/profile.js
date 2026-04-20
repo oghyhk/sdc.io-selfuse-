@@ -1137,6 +1137,11 @@ function normalizeRaidHistoryEntry(entry, options = {}) {
         : toNumberOrFallback(entry.netValue, 0);
     const createdAt = entry.createdAt || new Date().toISOString();
 
+    const duration = Math.max(0, toNumberOrFallback(entry.duration, 0));
+    const durationMins = Math.floor(duration / 60);
+    const durationSecs = Math.floor(duration % 60);
+    const durationLabel = entry.durationLabel || (duration > 0 ? `${String(durationMins).padStart(2, '0')}:${String(durationSecs).padStart(2, '0')}` : '00:00');
+
     return {
         ...clone(entry),
         id: entry.id || `${Date.parse(createdAt) || Date.now()}-${Math.floor(Math.random() * 10000)}`,
@@ -1147,6 +1152,8 @@ function normalizeRaidHistoryEntry(entry, options = {}) {
         operatorKills,
         aiEnemyKills,
         kills: operatorKills + aiEnemyKills,
+        duration,
+        durationLabel,
         valueExtracted,
         lostValue,
         netValue,
