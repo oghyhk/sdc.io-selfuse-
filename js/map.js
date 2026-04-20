@@ -495,8 +495,11 @@ export function getNearbyWalls(x, y, radius, walls) {
 export class WallGrid {
     constructor(walls, cellSize = TILE_SIZE * 4) {
         this.cellSize = cellSize;
+        this._scratch = [];
+        this._nearbyGen = 1;
         this.grid = new Map();
         for (const w of walls) {
+            w._nearbyId = 0;
             const minCX = Math.floor(w.x / cellSize);
             const maxCX = Math.floor((w.x + w.w) / cellSize);
             const minCY = Math.floor(w.y / cellSize);
@@ -517,15 +520,27 @@ export class WallGrid {
         const maxCX = Math.floor((x + radius) / cs);
         const minCY = Math.floor((y - radius) / cs);
         const maxCY = Math.floor((y + radius) / cs);
-        const result = new Set();
+        // Reuse scratch array to avoid GC pressure
+        const result = this._scratch;
+        let len = 0;
         for (let cy = minCY; cy <= maxCY; cy++) {
             for (let cx = minCX; cx <= maxCX; cx++) {
                 const key = `${cx},${cy}`;
                 const cell = this.grid.get(key);
-                if (cell) cell.forEach(w => result.add(w));
+                if (cell) {
+                    for (let i = 0; i < cell.length; i++) {
+                        const w = cell[i];
+                        if (w._nearbyId !== this._nearbyGen) {
+                            w._nearbyId = this._nearbyGen;
+                            result[len++] = w;
+                        }
+                    }
+                }
             }
         }
-        return Array.from(result);
+        result.length = len;
+        this._nearbyGen++;
+        return result;
     }
 }
 

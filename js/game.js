@@ -551,6 +551,7 @@ export class Game {
     _loop(timestamp) {
         if (!this._running) return;
 
+        if (this._lastTime === 0) this._lastTime = timestamp; // prevent first-frame spike
         const dt = Math.min((timestamp - this._lastTime) / 1000, 0.05); // cap at 50ms
         this._lastTime = timestamp;
 
@@ -1525,29 +1526,34 @@ export class Game {
     }
 
     _updateParticles(dt) {
-        for (let i = this.particles.length - 1; i >= 0; i--) {
+        let writeIdx = 0;
+        for (let i = 0; i < this.particles.length; i++) {
             const p = this.particles[i];
             p.x += p.vx * dt;
             p.y += p.vy * dt;
             p.vx *= 0.95;
             p.vy *= 0.95;
             p.life -= dt;
-            if (p.life <= 0) {
-                this.particles.splice(i, 1);
+            if (p.life > 0) {
+                this.particles[writeIdx++] = p;
             }
         }
+        this.particles.length = writeIdx;
     }
 
     _updateFloatingDamageNumbers(dt) {
-        for (let i = this.floatingDamageNumbers.length - 1; i >= 0; i -= 1) {
+        let writeIdx = 0;
+        for (let i = 0; i < this.floatingDamageNumbers.length; i++) {
             const entry = this.floatingDamageNumbers[i];
             entry.life -= dt;
             entry.yOffset -= entry.riseSpeed * dt;
             entry.xOffset += entry.driftX * dt;
-            if (entry.life <= 0) {
-                this.floatingDamageNumbers.splice(i, 1);
+            if (entry.life > 0) {
+                this.floatingDamageNumbers[writeIdx++] = entry;
             }
         }
+        this.floatingDamageNumbers.length = writeIdx;
+    }
     }
 
     _updateKillFeedback(dt) {

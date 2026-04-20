@@ -1128,23 +1128,40 @@ export class Player {
     }
 
     _resolveWalls(wallGrid) {
-        const nearby = wallGrid.getNearby(this.x, this.y, this.radius + 10);
-        for (const w of nearby) {
-            const closestX = clamp(this.x, w.x, w.x + w.w);
-            const closestY = clamp(this.y, w.y, w.y + w.h);
-            const dx = this.x - closestX;
-            const dy = this.y - closestY;
-            const dSq = dx * dx + dy * dy;
-            if (dSq < this.radius * this.radius && dSq > 0) {
-                const d = Math.sqrt(dSq);
-                const overlap = this.radius - d;
-                this.x += (dx / d) * overlap;
-                this.y += (dy / d) * overlap;
-            } else if (dSq === 0) {
-                // Inside wall — push out
-                this.x += 1;
-                this.y += 1;
+        // Multi-pass to prevent corner oscillation
+        for (let pass = 0; pass < 3; pass++) {
+            let pushed = false;
+            const nearby = wallGrid.getNearby(this.x, this.y, this.radius + 10);
+            for (let j = 0; j < nearby.length; j++) {
+                const w = nearby[j];
+                const closestX = clamp(this.x, w.x, w.x + w.w);
+                const closestY = clamp(this.y, w.y, w.y + w.h);
+                const dx = this.x - closestX;
+                const dy = this.y - closestY;
+                const dSq = dx * dx + dy * dy;
+                if (dSq < this.radius * this.radius && dSq > 0) {
+                    const d = Math.sqrt(dSq);
+                    const overlap = this.radius - d;
+                    this.x += (dx / d) * overlap;
+                    this.y += (dy / d) * overlap;
+                    pushed = true;
+                } else if (dSq === 0) {
+                    // Inside wall — push toward center of nearest open side
+                    const cx = w.x + w.w / 2;
+                    const cy = w.y + w.h / 2;
+                    const toCenterX = this.x - cx;
+                    const toCenterY = this.y - cy;
+                    const absTCX = Math.abs(toCenterX);
+                    const absTCY = Math.abs(toCenterY);
+                    if (absTCX > absTCY) {
+                        this.x += toCenterX > 0 ? this.radius + 1 : -(this.radius + 1);
+                    } else {
+                        this.y += toCenterY > 0 ? this.radius + 1 : -(this.radius + 1);
+                    }
+                    pushed = true;
+                }
             }
+            if (!pushed) break;
         }
     }
 
