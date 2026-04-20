@@ -15,6 +15,8 @@ export class Renderer {
         this.cam = camera;
         this.coinImage = new Image();
         this.coinImage.src = '/assets/items/coin.png';
+        this.safeImage = new Image();
+        this.safeImage.src = '/assets/safe.png';
     }
 
     clear() {
@@ -169,27 +171,44 @@ export class Renderer {
             const baseY = sy - CRATE_HEIGHT / 2;
             const baseX = sx - CRATE_WIDTH / 2;
 
-            // Use tier color for crate base
-            const crateColor = crate.tierColor || COLORS.CRATE;
-            ctx.fillStyle = crate.inspected ? COLORS.CRATE_OPENED : crateColor;
-            ctx.fillRect(baseX, baseY, CRATE_WIDTH, CRATE_HEIGHT);
-            ctx.strokeStyle = isNearby ? COLORS.CRATE_INTERACT : COLORS.CRATE_DARK;
-            ctx.lineWidth = isNearby ? 2 : 1.5;
-            ctx.strokeRect(baseX, baseY, CRATE_WIDTH, CRATE_HEIGHT);
-
-            ctx.fillStyle = COLORS.CRATE_DARK;
-            if (isOpen) {
-                ctx.fillRect(baseX - 1, baseY - 7, CRATE_WIDTH + 2, 8);
+            // Safe crates use image; others use colored rectangle
+            if (crate.tier === 'safe' && this.safeImage.complete && this.safeImage.naturalWidth > 0) {
+                const imgScale = 1.6;
+                const imgW = CRATE_WIDTH * imgScale;
+                const imgH = CRATE_HEIGHT * imgScale;
+                const imgX = sx - imgW / 2;
+                const imgY = sy - imgH / 2;
+                if (crate.inspected) ctx.globalAlpha = 0.45;
+                ctx.drawImage(this.safeImage, imgX, imgY, imgW, imgH);
+                if (crate.inspected) ctx.globalAlpha = 1;
+                if (isNearby) {
+                    ctx.strokeStyle = COLORS.CRATE_INTERACT;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(imgX, imgY, imgW, imgH);
+                }
             } else {
-                ctx.fillRect(baseX - 1, baseY + 3, CRATE_WIDTH + 2, 7);
-            }
+                // Use tier color for crate base
+                const crateColor = crate.tierColor || COLORS.CRATE;
+                ctx.fillStyle = crate.inspected ? COLORS.CRATE_OPENED : crateColor;
+                ctx.fillRect(baseX, baseY, CRATE_WIDTH, CRATE_HEIGHT);
+                ctx.strokeStyle = isNearby ? COLORS.CRATE_INTERACT : COLORS.CRATE_DARK;
+                ctx.lineWidth = isNearby ? 2 : 1.5;
+                ctx.strokeRect(baseX, baseY, CRATE_WIDTH, CRATE_HEIGHT);
 
-            if (crate.inspected) {
-                ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-                ctx.beginPath();
-                ctx.moveTo(baseX + 5, baseY + 6);
-                ctx.lineTo(baseX + CRATE_WIDTH - 5, baseY + CRATE_HEIGHT - 6);
-                ctx.stroke();
+                ctx.fillStyle = COLORS.CRATE_DARK;
+                if (isOpen) {
+                    ctx.fillRect(baseX - 1, baseY - 7, CRATE_WIDTH + 2, 8);
+                } else {
+                    ctx.fillRect(baseX - 1, baseY + 3, CRATE_WIDTH + 2, 7);
+                }
+
+                if (crate.inspected) {
+                    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+                    ctx.beginPath();
+                    ctx.moveTo(baseX + 5, baseY + 6);
+                    ctx.lineTo(baseX + CRATE_WIDTH - 5, baseY + CRATE_HEIGHT - 6);
+                    ctx.stroke();
+                }
             }
 
             // Show highest rarity dot

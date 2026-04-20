@@ -1558,7 +1558,6 @@ export class Game {
         }
         this.floatingDamageNumbers.length = writeIdx;
     }
-    }
 
     _updateKillFeedback(dt) {
         if (this.operatorKillChainTimer > 0) {

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SDC.IO Map Review</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; }
+h1 { text-align: center; margin-bottom: 8px; font-size: 22px; }
+.subtitle { text-align: center; color: #8b949e; margin-bottom: 20px; font-size: 14px; }
+.difficulty-section { margin-bottom: 40px; }
+.difficulty-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; padding: 8px 12px; border-radius: 6px; display: inline-block; }
+.difficulty-title.easy { background: #238636; }
+.difficulty-title.advanced { background: #1f6feb; }
+.difficulty-title.hell { background: #da3633; }
+.difficulty-title.chaos { background: #6e40c9; }
+.selection-info { color: #8b949e; font-size: 13px; margin: 6px 0 12px 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.map-card { background: #161b22; border: 2px solid #30363d; border-radius: 10px; overflow: hidden; cursor: pointer; transition: border-color 0.2s, transform 0.15s; }
+.map-card:hover { border-color: #58a6ff; transform: translateY(-2px); }
+.map-card.selected { border-color: #3fb950; box-shadow: 0 0 12px rgba(63,185,80,0.3); }
+.map-card.selected .card-header { background: #238636; }
+.card-header { padding: 8px 12px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; }
+.card-header .seed { font-size: 11px; color: #8b949e; font-weight: 400; font-family: monospace; }
+.map-card.selected .card-header .seed { color: #e6edf3; }
+canvas { display: block; width: 100%; }
+.toolbar { text-align: center; margin: 24px 0; position: sticky; top: 0; background: #0d1117; padding: 12px 0; z-index: 10; border-bottom: 1px solid #30363d; }
+.toolbar button { padding: 10px 24px; border: none; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer; margin: 0 6px; }
+.toolbar .regen-btn { background: #1f6feb; color: #fff; }
+.toolbar .regen-btn:hover { opacity: 0.85; }
+.toolbar .export-btn { background: #238636; color: #fff; }
+.toolbar .export-btn:hover { opacity: 0.85; }
+.output-box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin: 20px auto; max-width: 800px; font-family: monospace; font-size: 13px; white-space: pre-wrap; display: none; }
+.check-mark { display: none; }
+.map-card.selected .check-mark { display: inline; color: #3fb950; margin-right: 4px; }
+.legend { display: flex; gap: 16px; justify-content: center; margin: 10px 0 20px; font-size: 12px; color: #8b949e; }
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-swatch { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+</style>
+</head>
+<body>
+<h1>SDC.IO Map Review</h1>
+<p class="subtitle">Select 2 maps per difficulty. Click a map to toggle selection.</p>
+<div class="legend">
+  <div class="legend-item"><span class="legend-swatch" style="background:#1a1a2e"></span> Safe Zone</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#2a1a1a"></span> Combat Zone</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#2a2a0a"></span> High Value</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#5a5a8c"></span> Walls</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#448aff"></span> Extraction</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#ff9f1a"></span> Safe Crate</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#aaa"></span> Entrance</div>
+</div>
+<div class="toolbar">
+  <button class="regen-btn" onclick="regenerateAll()">↻ Regenerate All Maps</button>
+  <button class="export-btn" onclick="exportSelection()">Export Selected Seeds</button>
+</div>
+<div id="sections"></div>
+<div class="output-box" id="output"></div>
+
+<script type="module">
+import { generateMap } from '../js/map.js';
+import { TILE_SIZE, TILE, ZONE, MAP_COLS, MAP_ROWS, MAP_WIDTH, MAP_HEIGHT, setMapSize } from '../js/constants.js';
+
+const DIFFICULTIES = ['easy', 'advanced', 'hell', 'chaos'];
+const MAPS_PER_DIFF = 12;
+const MAX_SELECTED = 2;
+
+// Zone colors for background tinting
+const ZONE_BG = {
+  [ZONE.SAFE]: '#1a1a2e',
+  [ZONE.COMBAT]: '#2a1a1a',
+  [ZONE.HIGH_VALUE]: '#2a2a0a',
+};
+
+// State: { difficulty: [{ seed, mapData }] }
+const allMaps = {};
+// Selection: { difficulty: Set of seed numbers }
+const selections = {};
+
+for (const d of DIFFICULTIES) {
+  selections[d] = new Set();
+}
+
+function generateMapsForDifficulty(diff) {
+  allMaps[diff] = [];
+  for (let i = 0; i < MAPS_PER_DIFF; i++) {
+    const seed = Math.floor(Math.random() * 2147483647);
+    const mapData = generateMap({ difficulty: diff, mapSeed: seed });
+    allMaps[diff].push({ seed, mapData, cols: MAP_COLS, rows: MAP_ROWS });
+  }
+}
+
+function drawMinimap(canvas, mapEntry) {
+  const { mapData, cols, rows } = mapEntry;
+  const { tiles, zones, lootCrates, extractionPoints, entrances } = mapData;
+  const tileSize = TILE_SIZE;
+
+  // Canvas size: fixed pixel dimensions for good readability
+  const scale = Math.max(1, Math.ceil(280 / cols));
+  const w = cols * scale;
+  const h = rows * scale;
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  // Draw zone backgrounds
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      ctx.fillStyle = ZONE_BG[zones[r][c]] || ZONE_BG[ZONE.SAFE];
+      ctx.fillRect(c * scale, r * scale, scale, scale);
+    }
+  }
+
+  // Draw walls
+  ctx.fillStyle = '#5a5a8c';
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (tiles[r][c] === TILE.WALL) {
+        ctx.fillRect(c * scale, r * scale, scale, scale);
+      }
+    }
+  }
+
+  // Draw extraction points
+  const mapW = cols * tileSize;
+  const mapH = rows * tileSize;
+  const scaleX = w / mapW;
+  const scaleY = h / mapH;
+
+  ctx.fillStyle = '#448aff';
+  for (const ez of extractionPoints) {
+    const ex = ez.x * scaleX;
+    const ey = ez.y * scaleY;
+    ctx.beginPath();
+    ctx.arc(ex, ey, Math.max(3, scale), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Draw safe crates
+  ctx.fillStyle = '#ff9f1a';
+  for (const crate of lootCrates) {
+    if (crate.tier !== 'safe') continue;
+    const cx = crate.x * scaleX;
+    const cy = crate.y * scaleY;
+    ctx.shadowColor = '#ff9f1a';
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.max(2, scale * 0.8), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+
+  // Draw entrances
+  ctx.fillStyle = '#aaa';
+  ctx.font = `${Math.max(8, scale * 2)}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const ent of entrances) {
+    ctx.fillText('⬡', ent.x * scaleX, ent.y * scaleY);
+  }
+}
+
+function render() {
+  const container = document.getElementById('sections');
+  container.innerHTML = '';
+
+  for (const diff of DIFFICULTIES) {
+    const section = document.createElement('div');
+    section.className = 'difficulty-section';
+
+    const selCount = selections[diff].size;
+    section.innerHTML = `
+      <div class="difficulty-title ${diff}">${diff.toUpperCase()}</div>
+      <div class="selection-info">${selCount}/${MAX_SELECTED} selected</div>
+      <div class="grid" id="grid-${diff}"></div>
+    `;
+    container.appendChild(section);
+
+    const grid = section.querySelector('.grid');
+
+    allMaps[diff].forEach((entry, idx) => {
+      const card = document.createElement('div');
+      card.className = 'map-card' + (selections[diff].has(entry.seed) ? ' selected' : '');
+      card.innerHTML = `
+        <div class="card-header">
+          <span><span class="check-mark">✓</span>Map #${idx + 1}</span>
+          <span class="seed">seed: ${entry.seed}</span>
+        </div>
+      `;
+
+      const canvas = document.createElement('canvas');
+      card.appendChild(canvas);
+
+      card.addEventListener('click', () => {
+        const sel = selections[diff];
+        if (sel.has(entry.seed)) {
+          sel.delete(entry.seed);
+        } else if (sel.size < MAX_SELECTED) {
+          sel.add(entry.seed);
+        } else {
+          // Already 2 selected — flash card red briefly
+          card.style.borderColor = '#f85149';
+          setTimeout(() => { card.style.borderColor = ''; }, 300);
+          return;
+        }
+        render();
+      });
+
+      grid.appendChild(card);
+      drawMinimap(canvas, entry);
+    });
+  }
+}
+
+function init() {
+  for (const diff of DIFFICULTIES) {
+    generateMapsForDifficulty(diff);
+  }
+  render();
+}
+
+window.regenerateAll = function() {
+  for (const diff of DIFFICULTIES) {
+    selections[diff].clear();
+    generateMapsForDifficulty(diff);
+  }
+  render();
+  document.getElementById('output').style.display = 'none';
+};
+
+window.exportSelection = function() {
+  const output = document.getElementById('output');
+  let text = '// Selected map seeds per difficulty\nconst FIXED_MAP_SEEDS = {\n';
+  let allComplete = true;
+
+  for (const diff of DIFFICULTIES) {
+    const seeds = [...selections[diff]];
+    if (seeds.length !== MAX_SELECTED) {
+      allComplete = false;
+    }
+    text += `    ${diff}: [${seeds.join(', ')}],\n`;
+  }
+  text += '};\n';
+
+  if (!allComplete) {
+    text = '⚠ Select exactly 2 maps per difficulty before exporting!\n\n' + text;
+  }
+
+  output.textContent = text;
+  output.style.display = 'block';
+};
+
+init();
+</script>
+</body>
+</html>

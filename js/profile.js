@@ -112,7 +112,7 @@ export const CRATE_TIERS = {
         pool: ['gold', 'red', 'red', 'legend'],
         itemCount: { min: 1, max: 4 },
         color: '#ff9f1a',
-        image: '/assets/items/crate_safe.png'
+        image: '/assets/safe.png'
     }
 };
 

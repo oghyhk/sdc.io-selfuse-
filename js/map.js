@@ -115,18 +115,36 @@ const EXTRACTION_COUNTS = {
 };
 
 // Generate the map — returns { tiles[][], walls[], lootCrates[], extractionPoints[], enemySpawns[], playerSpawn }
-function _entrancePos(dir, ringDist, centerR, centerC) {
+function _entrancePos(dir, ringDist, centerR, centerC, offset = 0) {
     // Chebyshev walls normalize by each axis independently; for E/W the
     // actual wall column is ringDist scaled by cols/rows ratio.
     const colDist = Math.round(ringDist * MAP_COLS / MAP_ROWS);
-    const row = dir === 'N' ? centerR - ringDist : dir === 'S' ? centerR + ringDist : centerR;
-    const col = dir === 'W' ? centerC - colDist : dir === 'E' ? centerC + colDist : centerC;
+    let row = dir === 'N' ? centerR - ringDist : dir === 'S' ? centerR + ringDist : centerR;
+    let col = dir === 'W' ? centerC - colDist : dir === 'E' ? centerC + colDist : centerC;
+    // Apply offset: for N/S walls, offset shifts column; for E/W walls, offset shifts row
+    if (dir === 'N' || dir === 'S') col += offset;
+    else row += offset;
     return { x: col * TILE_SIZE + TILE_SIZE / 2, y: row * TILE_SIZE + TILE_SIZE / 2, dir };
 }
 
+// Fixed map seeds per difficulty (2 maps each, selected via review.html)
+const FIXED_MAP_SEEDS = {
+    easy: [1062687203, 395009747],
+    advanced: [773094102, 2065863835],
+    hell: [330431476, 1934777592],
+    chaos: [512524695, 542972295],
+};
+
 export function generateMap(options = {}) {
     const difficulty = typeof options === 'string' ? options : options?.difficulty || 'advanced';
-    const mapSeed = (typeof options === 'object' && options?.mapSeed != null) ? options.mapSeed : Math.floor(Math.random() * 2147483647);
+    let mapSeed;
+    if (typeof options === 'object' && options?.mapSeed != null) {
+        mapSeed = options.mapSeed;
+    } else {
+        // Pick one of the 2 fixed maps at random
+        const seeds = FIXED_MAP_SEEDS[difficulty] || FIXED_MAP_SEEDS.advanced;
+        mapSeed = seeds[Math.floor(Math.random() * seeds.length)];
+    }
     const cratePools = DIFFICULTY_CRATE_POOLS[difficulty] || DIFFICULTY_CRATE_POOLS.advanced;
     const enemyCounts = DIFFICULTY_ENEMY_COUNTS[difficulty] || DIFFICULTY_ENEMY_COUNTS.advanced;
 
@@ -225,25 +243,8 @@ export function generateMap(options = {}) {
         }
     }
 
-    // ---------- Connectivity fix: ensure no closed-off areas ----------
+    // ---------- Pre-zone connectivity fix ----------
     ensureConnectivity(tiles, MAP_ROWS, MAP_COLS);
-
-    // ---------- Build walls array (rects for collision) ----------
-    const walls = [];
-    for (let r = 0; r < MAP_ROWS; r++) {
-        for (let c = 0; c < MAP_COLS; c++) {
-            if (tiles[r][c] === TILE.WALL) {
-                walls.push({
-                    x: c * TILE_SIZE,
-                    y: r * TILE_SIZE,
-                    w: TILE_SIZE,
-                    h: TILE_SIZE,
-                    row: r,
-                    col: c
-                });
-            }
-        }
-    }
 
     // ---------- Zone assignment ----------
     const zones = [];
@@ -263,6 +264,26 @@ export function generateMap(options = {}) {
     // ---------- Zone wall rings with fixed entrances ----------
     buildZoneWalls(tiles, zones, MAP_ROWS, MAP_COLS, difficulty);
 
+    // ---------- Post-zone connectivity fix: no enclosed areas ----------
+    ensureConnectivity(tiles, MAP_ROWS, MAP_COLS);
+
+    // ---------- Build walls array (rects for collision) ----------
+    const walls = [];
+    for (let r = 0; r < MAP_ROWS; r++) {
+        for (let c = 0; c < MAP_COLS; c++) {
+            if (tiles[r][c] === TILE.WALL) {
+                walls.push({
+                    x: c * TILE_SIZE,
+                    y: r * TILE_SIZE,
+                    w: TILE_SIZE,
+                    h: TILE_SIZE,
+                    row: r,
+                    col: c
+                });
+            }
+        }
+    }
+
     // ---------- Compute entrance positions for minimap ----------
     const entrances = [];
     const halfDim = Math.min(MAP_COLS / 2, MAP_ROWS / 2);
@@ -270,9 +291,11 @@ export function generateMap(options = {}) {
     const combatOuter = Math.round(0.6 * halfDim);
     const centerR = Math.floor(MAP_ROWS / 2);
     const centerC = Math.floor(MAP_COLS / 2);
-    // Combat ring entrances: N, S, E, W
+    const entOffset = Math.round(0.25 * halfDim);
+    // Combat ring entrances: 8 (2 per side, offset)
     for (const dir of ['N', 'S', 'E', 'W']) {
-        entrances.push(_entrancePos(dir, combatOuter, centerR, centerC));
+        entrances.push(_entrancePos(dir, combatOuter, centerR, centerC, -entOffset));
+        entrances.push(_entrancePos(dir, combatOuter, centerR, centerC, entOffset));
     }
     // HV ring entrances
     const hvEntrances = difficulty === 'chaos' ? ['N'] : ['N', 'E', 'W'];
@@ -300,12 +323,12 @@ export function generateMap(options = {}) {
 
     // ---------- Loot crates with tiers ----------
     const lootCrates = [];
-    const addCrates = (count, zone) => {
+    const addCrates = (count, zone, forceRarity) => {
         for (let i = 0; i < count; i++) {
             let pos, crateRarity;
-            if (zone === 'safe' || zone === 'guaranteed_safe') {
-                // Safe crate: guaranteed, placed in high-value zone
-                pos = randomOpenPos(ZONE.HIGH_VALUE, 3);
+            if (forceRarity === 'safe') {
+                // Safe crate placed in the specified zone
+                pos = randomOpenPos(zone, 3);
                 crateRarity = 'safe';
             } else {
                 const pool = cratePools[zone] || cratePools[ZONE.SAFE];
@@ -330,17 +353,17 @@ export function generateMap(options = {}) {
     };
     if (difficulty === 'chaos') {
         addCrates(300, ZONE.SAFE);
-        addCrates(1, 'safe'); // +1 safe in safe zone
+        addCrates(1, ZONE.SAFE, 'safe');        // 1 safe in safe zone
         addCrates(80, ZONE.COMBAT);
-        addCrates(1, 'safe'); // +1 safe in combat zone
+        addCrates(1, ZONE.COMBAT, 'safe');       // 1 safe in combat zone
         addCrates(22, ZONE.HIGH_VALUE);
-        // +3 safe in high-value zone
-        for (let i = 0; i < 3; i++) addCrates(1, 'safe');
+        // 3 safe in high-value zone
+        for (let i = 0; i < 3; i++) addCrates(1, ZONE.HIGH_VALUE, 'safe');
     } else if (difficulty === 'hell') {
         addCrates(80, ZONE.SAFE);
         addCrates(40, ZONE.COMBAT);
         addCrates(18, ZONE.HIGH_VALUE);
-        addCrates(1, 'safe'); // +1 safe in high-value zone
+        addCrates(1, ZONE.HIGH_VALUE, 'safe');   // 1 safe in high-value zone
     } else if (difficulty === 'advanced') {
         addCrates(40, ZONE.SAFE);
         addCrates(18, ZONE.COMBAT);
@@ -733,7 +756,7 @@ export function getZoneRadii(rows, cols) {
  * @param {string} direction         - 'N' | 'S' | 'E' | 'W'
  * @param {number} entranceWidth      - how many tiles wide the opening is (1 or 2)
  */
-function carveEntrance(tiles, rows, cols, ringDist, direction, entranceWidth) {
+function carveEntrance(tiles, rows, cols, ringDist, direction, entranceWidth, offset = 0) {
     const halfRows = Math.floor(rows / 2);
     const halfCols = Math.floor(cols / 2);
     const half = Math.floor(entranceWidth / 2);
@@ -748,7 +771,7 @@ function carveEntrance(tiles, rows, cols, ringDist, direction, entranceWidth) {
     const wallColE = halfCols + colRingDist;  // east wall col
 
     if (direction === 'N') {
-        const colStart = halfCols - half;
+        const colStart = halfCols + offset - half;
         for (let dc = 0; dc < entranceWidth; dc++) {
             const c = colStart + dc;
             const r = wallRowN;
@@ -757,7 +780,7 @@ function carveEntrance(tiles, rows, cols, ringDist, direction, entranceWidth) {
             }
         }
     } else if (direction === 'S') {
-        const colStart = halfCols - half;
+        const colStart = halfCols + offset - half;
         for (let dc = 0; dc < entranceWidth; dc++) {
             const c = colStart + dc;
             const r = wallRowS;
@@ -766,7 +789,7 @@ function carveEntrance(tiles, rows, cols, ringDist, direction, entranceWidth) {
             }
         }
     } else if (direction === 'W') {
-        const rowStart = halfRows - half;
+        const rowStart = halfRows + offset - half;
         for (let dr = 0; dr < entranceWidth; dr++) {
             const r = rowStart + dr;
             const c = wallColW;
@@ -775,7 +798,7 @@ function carveEntrance(tiles, rows, cols, ringDist, direction, entranceWidth) {
             }
         }
     } else if (direction === 'E') {
-        const rowStart = halfRows - half;
+        const rowStart = halfRows + offset - half;
         for (let dr = 0; dr < entranceWidth; dr++) {
             const r = rowStart + dr;
             const c = wallColE;
@@ -833,13 +856,15 @@ function buildWallRing(tiles, zones, rows, cols, innerDist, outerDist, entrances
     }
 
     // Carve entrance corridors through the ring
-    for (const dir of entrances) {
+    for (const ent of entrances) {
+        const dir = typeof ent === 'string' ? ent : ent.dir;
+        const offset = typeof ent === 'string' ? 0 : (ent.offset || 0);
         // Place the entrance opening at the midpoint of each side
         const wallDist = Math.round(outerDist);
-        carveEntrance(tiles, rows, cols, wallDist, dir, entranceWidth);
+        carveEntrance(tiles, rows, cols, wallDist, dir, entranceWidth, offset);
         // Also open the inner edge if this is a double ring (innerDist > 0)
         if (innerDist > 0) {
-            carveEntrance(tiles, rows, cols, Math.round(innerDist), dir, entranceWidth);
+            carveEntrance(tiles, rows, cols, Math.round(innerDist), dir, entranceWidth, offset);
         }
     }
 }
@@ -872,9 +897,15 @@ function buildZoneWalls(tiles, zones, rows, cols, difficulty) {
     const combatOuter = Math.round(0.6  * halfDim); // outer boundary of COMBAT = edge of SAFE
 
     // ── COMBAT zone wall ring ──────────────────────────────────────────────
-    // The combat ring is the band: [hvOuter, combatOuter] tiles from center.
-    // Build walls at hvOuter and combatOuter, leaving 4 entrances.
-    buildWallRing(tiles, zones, rows, cols, hvOuter, combatOuter, ['N', 'S', 'E', 'W'], 2);
+    // 8 entrances: 2 per side, symmetrically offset from center
+    const entOffset = Math.round(0.25 * halfDim);  // offset in tiles from center
+    const combatEntrances = [
+        { dir: 'N', offset: -entOffset }, { dir: 'N', offset: entOffset },
+        { dir: 'S', offset: -entOffset }, { dir: 'S', offset: entOffset },
+        { dir: 'E', offset: -entOffset }, { dir: 'E', offset: entOffset },
+        { dir: 'W', offset: -entOffset }, { dir: 'W', offset: entOffset },
+    ];
+    buildWallRing(tiles, zones, rows, cols, hvOuter, combatOuter, combatEntrances, 2);
 
     // ── HIGH_VALUE zone wall ring ────────────────────────────────────────
     // HV is d < 0.25, so its outer boundary is hvOuter tiles from center.

@@ -311,26 +311,6 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 self._send_json({'ok': False, 'message': str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
             return
 
-        if parsed.path == '/api/image-review-data':
-            config = json.loads(DEV_CONFIG_FILE.read_text(encoding='utf-8'))
-            items = config.get('items', {})
-            assets_dir = ROOT / 'assets' / 'items'
-            results = []
-            RARITY_COLORS = {'white':'#eceff1','gray':'#9e9e9e','green':'#81c784','blue':'#64b5f6','purple':'#b388ff','gold':'#ffca28'}
-            for item_id, item in items.items():
-                rarity = item.get('rarity', '')
-                category = item.get('category', '')
-                if rarity in ('red', 'legend') or category == 'gun':
-                    continue
-                png = assets_dir / f'{item_id}_2nd.png'
-                jpg = assets_dir / f'{item_id}_2nd.jpg'
-                if png.exists():
-                    results.append({'id': item_id, 'name': item.get('name',''), 'rarity': rarity, 'file': f'{item_id}_2nd.png', 'source': 'MiniMax', 'bgColor': RARITY_COLORS.get(rarity, '#999')})
-                elif jpg.exists():
-                    results.append({'id': item_id, 'name': item.get('name',''), 'rarity': rarity, 'file': f'{item_id}_2nd.jpg', 'source': 'CF FLUX', 'bgColor': RARITY_COLORS.get(rarity, '#999')})
-            self._send_json(results)
-            return
-
         if parsed.path == '/api/leaderboard':
             store = read_store()
             users = store.get('users', {})
@@ -885,44 +865,6 @@ class ApiHandler(SimpleHTTPRequestHandler):
             safe = {k: v for k, v in user.items() if k != 'password'}
             safe['_clientVersion'] = store.get('_version', 0)
             self._send_json({'ok': True, 'profile': safe})
-            return
-
-        if parsed.path == '/api/image-review-apply':
-            import shutil
-            approved = body.get('approved', [])
-            denied = body.get('denied', [])
-            assets_dir = ROOT / 'assets' / 'items'
-            replaced = 0
-            deleted = 0
-            errors = []
-            for item_id in approved:
-                src_png = assets_dir / f'{item_id}_2nd.png'
-                src_jpg = assets_dir / f'{item_id}_2nd.jpg'
-                dst_png = assets_dir / f'{item_id}.png'
-                dst_jpg = assets_dir / f'{item_id}.jpg'
-                try:
-                    if src_png.exists():
-                        shutil.copy2(str(src_png), str(dst_png))
-                        replaced += 1
-                    elif src_jpg.exists():
-                        # If original is png, convert to png by just copying jpg
-                        if dst_png.exists():
-                            shutil.copy2(str(src_jpg), str(dst_png))
-                        else:
-                            shutil.copy2(str(src_jpg), str(dst_jpg))
-                        replaced += 1
-                except Exception as e:
-                    errors.append(f'{item_id}: {e}')
-            for item_id in denied:
-                for suffix in ('_2nd.png', '_2nd.jpg'):
-                    p = assets_dir / f'{item_id}{suffix}'
-                    if p.exists():
-                        p.unlink()
-                        deleted += 1
-            msg = f'Replaced {replaced} originals, deleted {deleted} rejected images.'
-            if errors:
-                msg += f' Errors: {"; ".join(errors)}'
-            self._send_json({'ok': True, 'message': msg, 'replaced': replaced, 'deleted': deleted})
             return
 
         if parsed.path == '/api/change-password':

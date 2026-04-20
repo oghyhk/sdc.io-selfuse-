@@ -2673,7 +2673,7 @@ detailActions.addEventListener('click', async (event) => {
         if (button.dataset.detailAction === 'equip') {
             await store.updateLoadout(definition.category === 'gun' ? 'gun' : definition.category, definition.id);
             renderAll();
-            renderEquipmentDetail('Equipped.');
+            closeEquipmentDetail();
             return;
         }
 
@@ -2688,6 +2688,7 @@ detailActions.addEventListener('click', async (event) => {
                 renderEquipmentDetail(`Trade total must be at least ${MIN_TRADE_TOTAL} coins.`);
                 return;
             }
+            closeEquipmentDetail();
             openTradeModal({
                 type: 'inventory-sell',
                 definitionId: definition.id,
@@ -2704,6 +2705,7 @@ detailActions.addEventListener('click', async (event) => {
 
         if (button.dataset.detailAction === 'safebox') {
             if (isAmmoDefinition(definition.id)) {
+                closeEquipmentDetail();
                 openTradeModal({
                     type: 'stash-to-safebox',
                     definitionId: definition.id,
@@ -2723,7 +2725,7 @@ detailActions.addEventListener('click', async (event) => {
             }
             await store.moveItemToSafebox(definition.id);
             renderAll();
-            renderEquipmentDetail(`${definition.name} moved to safebox.`);
+            closeEquipmentDetail();
             return;
         }
 
@@ -2732,6 +2734,7 @@ detailActions.addEventListener('click', async (event) => {
                 const availableAmount = isAmmoDefinition(definition.id)
                     ? getAmmoCountForProfile(profile, definition.id)
                     : (getOwnedCounts(profile)[definition.id] || 0);
+                closeEquipmentDetail();
                 openTradeModal({
                     type: 'stash-to-backpack',
                     definitionId: definition.id,
@@ -2752,7 +2755,7 @@ detailActions.addEventListener('click', async (event) => {
             }
             await store.moveItemToBackpack(definition.id, getInventoryBackpackCapacity(profile));
             renderAll();
-            renderEquipmentDetail(`${definition.name} put in backpack.`);
+            closeEquipmentDetail();
             return;
         }
 
@@ -2779,7 +2782,7 @@ detailActions.addEventListener('click', async (event) => {
             }
             await store.updateLoadout(equippedSlot, unequipTargetId === '__empty__' ? null : unequipTargetId);
             renderAll();
-            renderEquipmentDetail('Unequipped.');
+            closeEquipmentDetail();
         }
     } catch (error) {
         renderEquipmentDetail(error.message);
@@ -2902,9 +2905,6 @@ tradeForm.addEventListener('submit', async (event) => {
             await store.sellItem(activeTradeRequest.definitionId, quantity);
             renderAll();
             closeTradeModal();
-            if (!equipmentDetailModal.classList.contains('hidden') && activeDetailDefinitionId === activeTradeRequest.definitionId) {
-                renderEquipmentDetail(`Sold x${quantity} ${definition.name}.`);
-            }
             return;
         }
 
@@ -2912,11 +2912,6 @@ tradeForm.addEventListener('submit', async (event) => {
             await store.moveItemToBackpack(activeTradeRequest.definitionId, activeTradeRequest.capacity, quantity);
             renderAll();
             closeTradeModal();
-            if (!equipmentDetailModal.classList.contains('hidden') && activeDetailDefinitionId === activeTradeRequest.definitionId) {
-                const packCount = Math.ceil(quantity / AMMO_PACK_LIMIT);
-                const usedSpace = packCount * getEntrySpaceUsed({ definitionId: activeTradeRequest.definitionId });
-                renderEquipmentDetail(`Packed ${quantity} ${isAmmoDefinition(activeTradeRequest.definitionId) ? 'ammo' : 'consumable'} into backpack (${usedSpace} carrying space).`);
-            }
             return;
         }
 
@@ -2924,11 +2919,6 @@ tradeForm.addEventListener('submit', async (event) => {
             await store.moveItemToSafebox(activeTradeRequest.definitionId, quantity);
             renderAll();
             closeTradeModal();
-            if (!equipmentDetailModal.classList.contains('hidden') && activeDetailDefinitionId === activeTradeRequest.definitionId) {
-                const packCount = Math.ceil(quantity / AMMO_PACK_LIMIT);
-                const usedSpace = packCount * getEntrySpaceUsed({ definitionId: activeTradeRequest.definitionId });
-                renderEquipmentDetail(`Packed ${quantity} ${isAmmoDefinition(activeTradeRequest.definitionId) ? 'ammo' : 'item'} into safebox (${usedSpace} carrying space).`);
-            }
             return;
         }
     } catch (error) {
