@@ -174,7 +174,6 @@ export class Game {
         };
 
         networkManager.onPlayerShoot = ({ username, x, y, angle }) => {
-            // Visual-only: spawn a short muzzle flash particle
             this.particles.push({
                 x, y,
                 vx: Math.cos(angle) * 200,
@@ -184,6 +183,116 @@ export class Game {
                 color: '#69f0ae',
                 radius: 3,
             });
+        };
+
+        // Phase 2: Shared world — remote player takes crate item
+        networkManager.onCrateItemTaken = ({ crateId, itemId }) => {
+            if (!this.mapData) return;
+            const crate = this.mapData.lootCrates.find(c => c.id === crateId);
+            if (crate) {
+                crate.items = crate.items.filter(it => it.id !== itemId);
+            }
+        };
+
+        // Phase 2: Remote player picks up health pack
+        networkManager.onHpTaken = ({ hpId }) => {
+            if (!this.mapData) return;
+            const hp = this.mapData.healthPacks.find(h => h.id === hpId);
+            if (hp) hp.collected = true;
+        };
+
+        // Phase 2: Dynamic crate spawned by another player
+        networkManager.onCrateSpawned = ({ crate }) => {
+            if (this.mapData && crate) {
+                this.mapData.lootCrates.push(crate);
+            }
+        };
+
+        // Phase 2: Shared operator death count for extraction gate
+        networkManager.onOpDeathCount = ({ count }) => {
+            this.totalOperatorDeaths = count;
+            if (!this.extractionGateOpen && this.totalOperatorDeaths >= Math.ceil(this.totalPlayersInRaid / 2)) {
+                this.extractionGateOpen = true;
+                this.killFeed.unshift({
+                    text: 'EXTRACTION ZONE UNLOCKED',
+                    detail: '',
+                    color: '#82b1ff',
+                    life: 4, maxLife: 4,
+                });
+                this.killFeed = this.killFeed.slice(0, 6);
+            }
+        };
+
+        // Phase 3: PvP — this player got hit by another human
+        networkManager.onPvpDamage = ({ attacker, damage, hp, alive }) => {
+            if (!this.player || !this.player.alive) return;
+            this.player.hp = hp;
+            if (!alive) {
+                this.player.alive = false;
+                this.player.hp = 0;
+            }
+            this._spawnParticles(this.player.x, this.player.y, '#ff5252', 5);
+            this.audio.playHit();
+            this._spawnFloatingDamageNumber(this.player.x, this.player.y - 20, damage);
+            this.killFeed.unshift({
+                text: `${attacker} hit you`,
+                detail: `-${Math.round(damage)} HP`,
+                color: '#ff5252',
+                life: 2.5, maxLife: 2.5,
+            });
+            this.killFeed = this.killFeed.slice(0, 6);
+        };
+
+        // Phase 3: PvP visual — see someone else get hit
+        networkManager.onPvpHitVisual = ({ target, damage }) => {
+            const rp = this.remotePlayers.find(p => p.username === target);
+            if (rp) {
+                this._spawnParticles(rp.x, rp.y, '#ff5252', 4);
+                this._spawnFloatingDamageNumber(rp.x, rp.y - 20, damage);
+            }
+        };
+
+        // Phase 3: PvP kill broadcast
+        networkManager.onPvpKill = ({ killer, victim }) => {
+            this.killFeed.unshift({
+                text: `${killer} killed ${victim}`,
+                detail: 'PvP',
+                color: '#ff1744',
+                life: 4, maxLife: 4,
+            });
+            this.killFeed = this.killFeed.slice(0, 6);
+            // Remove dead remote player
+            const rp = this.remotePlayers.find(p => p.username === victim);
+            if (rp) rp.alive = false;
+        };
+
+        // Phase 4: Enemy state sync from host
+        networkManager.onEnemySync = ({ enemies }) => {
+            if (networkManager.isHost) return; // host doesn't consume its own sync
+            this._applyRemoteEnemySync(enemies);
+        };
+
+        // Phase 4: Another player hit an enemy
+        networkManager.onEnemyHit = ({ enemyId, damage, killed }) => {
+            const e = this.enemies.find(en => en.id === enemyId);
+            if (e && e.alive) {
+                e.takeDamage(killed ? e.maxHp : damage);
+                this._spawnParticles(e.x, e.y, '#ff9800', 4);
+            }
+        };
+
+        // Phase 4: Enemy bullet from host
+        networkManager.onEnemyBullet = ({ data }) => {
+            if (networkManager.isHost) return;
+            if (data) this.bullets.push(data);
+        };
+
+        // Phase 5: Server corrected our position
+        networkManager.onPosCorrect = ({ x, y }) => {
+            if (this.player) {
+                this.player.x = x;
+                this.player.y = y;
+            }
         };
     }
 
@@ -557,6 +666,21 @@ export class Game {
         if (this.network) {
             this.network.sendPosition(this.player);
             for (const rp of this.remotePlayers) rp.update(dt);
+
+            // Phase 4: Host sends enemy state at ~10Hz
+            if (this.network.isHost) {
+                this._enemySyncTimer = (this._enemySyncTimer || 0) + dt;
+                if (this._enemySyncTimer >= 0.1) {
+                    this._enemySyncTimer = 0;
+                    const snapshot = this.enemies.filter(e => e.alive).map(e => ({
+                        id: e.id, x: Math.round(e.x), y: Math.round(e.y),
+                        angle: +(e.angle || 0).toFixed(2),
+                        hp: Math.round(e.hp), alive: true,
+                        state: e.state,
+                    }));
+                    this.network.sendEnemySync(snapshot);
+                }
+            }
         }
 
         // Check player death
@@ -697,7 +821,7 @@ export class Game {
                         if (Math.random() < 0.01) {
                             const hvItems = this._generateHighValueCrateItems();
                             if (hvItems.length) {
-                                this.mapData.lootCrates.push({
+                                const newCrate = {
                                     id: generateId(),
                                     x: e.x,
                                     y: e.y,
@@ -709,7 +833,9 @@ export class Game {
                                     tierLabel: 'High Value Crate',
                                     tierColor: '#ffd700',
                                     items: hvItems,
-                                });
+                                };
+                                this.mapData.lootCrates.push(newCrate);
+                                if (this.network) this.network.sendCrateSpawn(newCrate);
                                 this.crateMessage = 'HIGH VALUE CRATE DROPPED!';
                                 this.crateMessageTimer = 2.5;
                             }
@@ -768,6 +894,23 @@ export class Game {
                     break;
                 }
                 if (bulletRemoved) continue;
+
+                // Phase 3: PvP — player bullets check against remote players
+                if (b.owner === 'player' && this.network) {
+                    for (const rp of this.remotePlayers) {
+                        if (!rp.alive) continue;
+                        if (!circleCollision(b.x, b.y, b.radius, rp.x, rp.y, 14)) continue;
+                        const dmg = this._getAttenuatedDamage(b);
+                        this.network.sendPvpHit(rp.username, dmg, b.ammoDefinitionId || '');
+                        this._spawnParticles(b.x, b.y, '#ff5252', 5);
+                        this.audio.playHit();
+                        this._spawnFloatingDamageNumber(rp.x, rp.y, dmg);
+                        this.bullets.splice(i, 1);
+                        bulletRemoved = true;
+                        break;
+                    }
+                    if (bulletRemoved) continue;
+                }
             } else {
                 if (this.player.alive && b.ownerSquadId !== this.player.squadId && circleCollision(b.x, b.y, b.radius, this.player.x, this.player.y, this.player.radius)) {
                     this.player.takeDamage(this._getAttenuatedDamage(b), b);
@@ -833,6 +976,7 @@ export class Game {
 
         // Track operator death for extraction gating
         this.totalOperatorDeaths = (this.totalOperatorDeaths || 0) + 1;
+        if (this.network) this.network.sendOpDeath();
         if (!this.extractionGateOpen && this.totalOperatorDeaths >= Math.ceil(this.totalPlayersInRaid / 2)) {
             this.extractionGateOpen = true;
             this.killFeed.unshift({
@@ -954,6 +1098,7 @@ export class Game {
             const d = dist(this.player.x, this.player.y, hp.x, hp.y);
             if (d < LOOT_PICKUP_RANGE + this.player.radius) {
                 hp.collected = true;
+                if (this.network) this.network.sendHpTake(hp.id);
                 this.player.heal(HEALTHPACK_HEAL);
                 this._spawnParticles(hp.x, hp.y, COLORS.HEALTHPACK, 6);
                 this.audio.playPickup();
@@ -1133,6 +1278,7 @@ export class Game {
         }
 
         crate.items.splice(index, 1);
+        if (this.network) this.network.sendCrateTake(crate.id, itemId);
         this.stats.lootCollected = this.player.loot;
         this._spawnParticles(crate.x, crate.y - 6, getRarityMeta(item.rarity).color, 6);
         this.audio.playPickup();
@@ -1344,6 +1490,21 @@ export class Game {
                 radius: 1 + Math.random() * 3,
                 color
             });
+        }
+    }
+
+    // Phase 4: Apply enemy state received from host
+    _applyRemoteEnemySync(enemies) {
+        if (!this.enemies) return;
+        for (const eState of enemies) {
+            const e = this.enemies.find(en => en.id === eState.id);
+            if (!e) continue;
+            e.x = eState.x;
+            e.y = eState.y;
+            e.angle = eState.angle || 0;
+            e.hp = eState.hp;
+            e.alive = eState.alive;
+            if (eState.state) e.state = eState.state;
         }
     }
 

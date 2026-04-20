@@ -16,7 +16,7 @@ export class NetworkManager {
 
         // Callbacks (set by game.js)
         this.onRaidJoined = null;   // ({ raidId, mapSeed, difficulty, players }) => {}
-        this.onRaidStart = null;    // ({ raidId, mapSeed, difficulty, players }) => {}
+        this.onRaidStart = null;    // ({ raidId, mapSeed, difficulty, players, host }) => {}
         this.onPlayersUpdate = null;  // (playerStates[]) => {}
         this.onPlayerJoined = null;  // ({ username, playerCount }) => {}
         this.onPlayerLeft = null;    // ({ username }) => {}
@@ -25,6 +25,31 @@ export class NetworkManager {
         this.onPlayerExtract = null; // ({ username }) => {}
         this.onDisconnect = null;    // () => {}
 
+        // Phase 2: Shared world callbacks
+        this.onCrateTakeOk = null;    // ({ itemId, crateId }) => {}
+        this.onCrateTakeFail = null;  // ({ itemId, reason }) => {}
+        this.onCrateItemTaken = null; // ({ username, crateId, itemId }) => {}
+        this.onHpTakeOk = null;       // ({ hpId }) => {}
+        this.onHpTakeFail = null;     // ({ hpId }) => {}
+        this.onHpTaken = null;        // ({ username, hpId }) => {}
+        this.onCrateSpawned = null;   // ({ username, crate }) => {}
+        this.onOpDeathCount = null;   // ({ count }) => {}
+
+        // Phase 3: PvP callbacks
+        this.onPvpDamage = null;      // ({ attacker, damage, hp, alive, gunId }) => {}
+        this.onPvpHitVisual = null;   // ({ attacker, target, damage, alive }) => {}
+        this.onPvpKill = null;        // ({ killer, victim }) => {}
+
+        // Phase 4: Shared AI callbacks
+        this.onEnemySync = null;      // ({ enemies }) => {}
+        this.onEnemyHit = null;       // ({ username, enemyId, damage, killed }) => {}
+        this.onEnemyBullet = null;    // ({ data }) => {}
+
+        // Phase 5: Position correction
+        this.onPosCorrect = null;     // ({ x, y }) => {}
+
+        // Host status
+        this.isHost = false;
         // Position send throttle
         this._lastPosSend = 0;
         this._posSendInterval = 1000 / 20; // 20Hz
@@ -132,6 +157,41 @@ export class NetworkManager {
         this.raidId = null;
     }
 
+    // Phase 2: Shared world
+    sendCrateTake(crateId, itemId) {
+        this._send({ type: 'crate_take', crateId, itemId });
+    }
+
+    sendHpTake(hpId) {
+        this._send({ type: 'hp_take', hpId });
+    }
+
+    sendCrateSpawn(crate) {
+        this._send({ type: 'crate_spawn', crate });
+    }
+
+    sendOpDeath() {
+        this._send({ type: 'op_death' });
+    }
+
+    // Phase 3: PvP
+    sendPvpHit(target, damage, gunId) {
+        this._send({ type: 'pvp_hit', target, damage, gunId });
+    }
+
+    // Phase 4: Shared AI (host only)
+    sendEnemySync(enemies) {
+        this._send({ type: 'enemy_sync', enemies });
+    }
+
+    sendEnemyHit(enemyId, damage, killed) {
+        this._send({ type: 'enemy_hit', enemyId, damage, killed });
+    }
+
+    sendEnemyBullet(data) {
+        this._send({ type: 'enemy_bullet', data });
+    }
+
     isInRaid() {
         return this.connected && this.authenticated && this.raidId != null;
     }
@@ -157,6 +217,7 @@ export class NetworkManager {
                 break;
 
             case 'raid_start':
+                this.isHost = (msg.host === this.username);
                 if (this.onRaidStart) this.onRaidStart(msg);
                 break;
 
@@ -182,6 +243,59 @@ export class NetworkManager {
 
             case 'player_extract':
                 if (this.onPlayerExtract) this.onPlayerExtract(msg);
+                break;
+
+            // Phase 2: Shared world
+            case 'crate_take_ok':
+                if (this.onCrateTakeOk) this.onCrateTakeOk(msg);
+                break;
+            case 'crate_take_fail':
+                if (this.onCrateTakeFail) this.onCrateTakeFail(msg);
+                break;
+            case 'crate_item_taken':
+                if (this.onCrateItemTaken) this.onCrateItemTaken(msg);
+                break;
+            case 'hp_take_ok':
+                if (this.onHpTakeOk) this.onHpTakeOk(msg);
+                break;
+            case 'hp_take_fail':
+                if (this.onHpTakeFail) this.onHpTakeFail(msg);
+                break;
+            case 'hp_taken':
+                if (this.onHpTaken) this.onHpTaken(msg);
+                break;
+            case 'crate_spawned':
+                if (this.onCrateSpawned) this.onCrateSpawned(msg);
+                break;
+            case 'op_death_count':
+                if (this.onOpDeathCount) this.onOpDeathCount(msg);
+                break;
+
+            // Phase 3: PvP
+            case 'pvp_damage':
+                if (this.onPvpDamage) this.onPvpDamage(msg);
+                break;
+            case 'pvp_hit_visual':
+                if (this.onPvpHitVisual) this.onPvpHitVisual(msg);
+                break;
+            case 'pvp_kill':
+                if (this.onPvpKill) this.onPvpKill(msg);
+                break;
+
+            // Phase 4: Shared AI
+            case 'enemy_sync':
+                if (this.onEnemySync) this.onEnemySync(msg);
+                break;
+            case 'enemy_hit':
+                if (this.onEnemyHit) this.onEnemyHit(msg);
+                break;
+            case 'enemy_bullet':
+                if (this.onEnemyBullet) this.onEnemyBullet(msg);
+                break;
+
+            // Phase 5: Position correction
+            case 'pos_correct':
+                if (this.onPosCorrect) this.onPosCorrect(msg);
                 break;
         }
     }

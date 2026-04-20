@@ -17,7 +17,18 @@ WS_PORT = 8766
 
 class RaidInstance:
     """A single raid room that players can join."""
-    __slots__ = ('id', 'difficulty', 'map_seed', 'players', 'state', 'created_at', 'started_at', 'max_players')
+    __slots__ = (
+        'id', 'difficulty', 'map_seed', 'players', 'state',
+        'created_at', 'started_at', 'max_players',
+        # Phase 2: shared world state
+        'taken_items', 'taken_healthpacks', 'operator_deaths',
+        # Phase 3: PvP HP tracking
+        'player_hp',
+        # Phase 4: host-based AI
+        'host_username', 'enemy_snapshot',
+        # Phase 5: movement validation
+        'last_positions',
+    )
 
     def __init__(self, raid_id: str, difficulty: str, max_players: int = 20):
         self.id = raid_id
@@ -28,6 +39,17 @@ class RaidInstance:
         self.created_at = time.time()
         self.started_at: float | None = None
         self.max_players = max_players
+        # Phase 2
+        self.taken_items: set[str] = set()         # set of item IDs already taken
+        self.taken_healthpacks: set[str] = set()   # set of healthpack IDs collected
+        self.operator_deaths: int = 0              # shared operator death count
+        # Phase 3
+        self.player_hp: dict[str, dict] = {}       # username -> {hp, maxHp, alive}
+        # Phase 4
+        self.host_username: str | None = None      # first player = AI host
+        self.enemy_snapshot: list = []              # latest enemy state from host
+        # Phase 5
+        self.last_positions: dict[str, dict] = {}  # username -> {x, y, t}
 
     def is_full(self):
         return len(self.players) >= self.max_players
@@ -38,9 +60,14 @@ class RaidInstance:
     def add_player(self, pc: 'PlayerConnection'):
         self.players[pc.username] = pc
         pc.raid = self
+        if self.host_username is None:
+            self.host_username = pc.username
 
     def remove_player(self, username: str):
         self.players.pop(username, None)
+        # Reassign host if the host left
+        if self.host_username == username:
+            self.host_username = next(iter(self.players), None)
 
     async def broadcast(self, msg: dict, exclude: str | None = None):
         data = json.dumps(msg)
@@ -102,6 +129,7 @@ async def _start_raid(raid: RaidInstance):
         'raidId': raid.id,
         'mapSeed': raid.map_seed,
         'difficulty': raid.difficulty,
+        'host': raid.host_username,
         'players': [
             {'username': uname, 'index': i}
             for i, uname in enumerate(raid.players.keys())
@@ -159,10 +187,35 @@ async def _handle_pos(pc: PlayerConnection, msg: dict):
     """Player position update — relay to others in same raid."""
     if not pc.raid or pc.raid.state != 'active':
         return
+    x = msg.get('x', 0)
+    y = msg.get('y', 0)
+    raid = pc.raid
+
+    # Phase 5: speed validation
+    now = time.time()
+    last = raid.last_positions.get(pc.username)
+    if last:
+        dt = now - last['t']
+        if dt > 0.01:  # skip very small intervals
+            dx = x - last['x']
+            dy = y - last['y']
+            speed = (dx * dx + dy * dy) ** 0.5 / dt
+            if speed > MAX_SPEED * 1.5:  # 50% tolerance for network jitter
+                # Reject — snap back to last known valid position
+                try:
+                    await pc.ws.send(json.dumps({
+                        'type': 'pos_correct',
+                        'x': last['x'], 'y': last['y'],
+                    }))
+                except Exception:
+                    pass
+                return
+    raid.last_positions[pc.username] = {'x': x, 'y': y, 't': now}
+
     pc.last_state = {
         'username': pc.username,
-        'x': msg.get('x', 0),
-        'y': msg.get('y', 0),
+        'x': x,
+        'y': y,
         'angle': msg.get('angle', 0),
         'vx': msg.get('vx', 0),
         'vy': msg.get('vy', 0),
@@ -227,6 +280,176 @@ async def _handle_leave(pc: PlayerConnection, msg: dict):
         pc.raid = None
 
 
+# ── Phase 2: Shared world state handlers ──────────────────────
+
+MAX_SPEED = 500  # px/s max expected (with dash) — Phase 5
+
+async def _handle_crate_take(pc: PlayerConnection, msg: dict):
+    """Player takes an item from a crate — first-come-first-served."""
+    if not pc.raid or pc.raid.state != 'active':
+        return
+    item_id = msg.get('itemId', '')
+    crate_id = msg.get('crateId', '')
+    if not item_id:
+        return
+    raid = pc.raid
+    if item_id in raid.taken_items:
+        await pc.ws.send(json.dumps({'type': 'crate_take_fail', 'itemId': item_id, 'reason': 'already_taken'}))
+        return
+    raid.taken_items.add(item_id)
+    await pc.ws.send(json.dumps({'type': 'crate_take_ok', 'itemId': item_id, 'crateId': crate_id}))
+    await raid.broadcast({
+        'type': 'crate_item_taken',
+        'username': pc.username,
+        'crateId': crate_id,
+        'itemId': item_id,
+    }, exclude=pc.username)
+
+
+async def _handle_hp_take(pc: PlayerConnection, msg: dict):
+    """Player picks up a health pack — first-come-first-served."""
+    if not pc.raid or pc.raid.state != 'active':
+        return
+    hp_id = msg.get('hpId', '')
+    if not hp_id:
+        return
+    raid = pc.raid
+    if hp_id in raid.taken_healthpacks:
+        await pc.ws.send(json.dumps({'type': 'hp_take_fail', 'hpId': hp_id}))
+        return
+    raid.taken_healthpacks.add(hp_id)
+    await pc.ws.send(json.dumps({'type': 'hp_take_ok', 'hpId': hp_id}))
+    await raid.broadcast({
+        'type': 'hp_taken',
+        'username': pc.username,
+        'hpId': hp_id,
+    }, exclude=pc.username)
+
+
+async def _handle_crate_spawn(pc: PlayerConnection, msg: dict):
+    """Dynamic crate spawn (e.g., enemy death drop) — broadcast to others."""
+    if not pc.raid or pc.raid.state != 'active':
+        return
+    await pc.raid.broadcast({
+        'type': 'crate_spawned',
+        'username': pc.username,
+        'crate': msg.get('crate', {}),
+    }, exclude=pc.username)
+
+
+async def _handle_op_death(pc: PlayerConnection, msg: dict):
+    """Operator (AI player) died — increment shared counter for extraction gate."""
+    if not pc.raid or pc.raid.state != 'active':
+        return
+    raid = pc.raid
+    raid.operator_deaths += 1
+    await raid.broadcast({
+        'type': 'op_death_count',
+        'count': raid.operator_deaths,
+    })
+
+
+# ── Phase 3: PvP combat handlers ─────────────────────────────
+
+async def _handle_pvp_hit(pc: PlayerConnection, msg: dict):
+    """Shooter reports hitting a remote player. Server validates and applies."""
+    if not pc.raid or pc.raid.state != 'active':
+        return
+    target = msg.get('target', '')
+    damage = min(max(msg.get('damage', 0), 0), 9999)  # clamp
+    if not target or target == pc.username:
+        return
+    raid = pc.raid
+    target_pc = raid.players.get(target)
+    if not target_pc:
+        return
+    # Init HP tracking if needed
+    if target not in raid.player_hp:
+        hp = target_pc.last_state.get('hp', 100) if target_pc.last_state else 100
+        maxHp = target_pc.last_state.get('maxHp', 100) if target_pc.last_state else 100
+        raid.player_hp[target] = {'hp': hp, 'maxHp': maxHp, 'alive': True}
+    t_hp = raid.player_hp[target]
+    if not t_hp['alive']:
+        return
+    t_hp['hp'] = max(0, t_hp['hp'] - damage)
+    alive = t_hp['hp'] > 0
+    t_hp['alive'] = alive
+    # Notify the target they were hit
+    if target_pc.ws:
+        try:
+            await target_pc.ws.send(json.dumps({
+                'type': 'pvp_damage',
+                'attacker': pc.username,
+                'damage': damage,
+                'hp': t_hp['hp'],
+                'alive': alive,
+                'gunId': msg.get('gunId', ''),
+            }))
+        except Exception:
+            pass
+    # Broadcast to others for visual feedback
+    await raid.broadcast({
+        'type': 'pvp_hit_visual',
+        'attacker': pc.username,
+        'target': target,
+        'damage': damage,
+        'alive': alive,
+    }, exclude=target)
+    # If killed, broadcast death
+    if not alive:
+        await raid.broadcast({
+            'type': 'pvp_kill',
+            'killer': pc.username,
+            'victim': target,
+        })
+
+
+# ── Phase 4: Host-based AI handlers ──────────────────────────
+
+async def _handle_enemy_sync(pc: PlayerConnection, msg: dict):
+    """Host sends enemy state update — relay to non-host players."""
+    if not pc.raid or pc.raid.state != 'active':
+        return
+    raid = pc.raid
+    if pc.username != raid.host_username:
+        return  # Only host can send enemy updates
+    enemies = msg.get('enemies', [])
+    raid.enemy_snapshot = enemies
+    # Relay to all non-host players
+    data = json.dumps({'type': 'enemy_sync', 'enemies': enemies})
+    for uname, other_pc in list(raid.players.items()):
+        if uname != pc.username and other_pc.ws:
+            try:
+                await other_pc.ws.send(data)
+            except Exception:
+                pass
+
+
+async def _handle_enemy_hit(pc: PlayerConnection, msg: dict):
+    """Player hit an enemy — broadcast to others for sync."""
+    if not pc.raid or pc.raid.state != 'active':
+        return
+    await pc.raid.broadcast({
+        'type': 'enemy_hit',
+        'username': pc.username,
+        'enemyId': msg.get('enemyId', ''),
+        'damage': msg.get('damage', 0),
+        'killed': msg.get('killed', False),
+    }, exclude=pc.username)
+
+
+async def _handle_enemy_bullet(pc: PlayerConnection, msg: dict):
+    """Enemy fired a bullet (from host) — broadcast to others."""
+    if not pc.raid or pc.raid.state != 'active':
+        return
+    if pc.username != pc.raid.host_username:
+        return
+    await pc.raid.broadcast({
+        'type': 'enemy_bullet',
+        'data': msg.get('data', {}),
+    }, exclude=pc.username)
+
+
 _MSG_HANDLERS = {
     'join': _handle_join,
     'pos': _handle_pos,
@@ -234,6 +457,17 @@ _MSG_HANDLERS = {
     'death': _handle_death,
     'extract': _handle_extract,
     'leave': _handle_leave,
+    # Phase 2
+    'crate_take': _handle_crate_take,
+    'hp_take': _handle_hp_take,
+    'crate_spawn': _handle_crate_spawn,
+    'op_death': _handle_op_death,
+    # Phase 3
+    'pvp_hit': _handle_pvp_hit,
+    # Phase 4
+    'enemy_sync': _handle_enemy_sync,
+    'enemy_hit': _handle_enemy_hit,
+    'enemy_bullet': _handle_enemy_bullet,
 }
 
 
@@ -336,7 +570,8 @@ async def _ws_handler(ws):
 
 async def run_ws_server():
     """Start the WebSocket server (called from main server.py)."""
-    async with websockets.serve(_ws_handler, '0.0.0.0', WS_PORT):
+    async with websockets.serve(_ws_handler, '0.0.0.0', WS_PORT,
+                                ping_interval=None):
         print(f'WebSocket server running on ws://0.0.0.0:{WS_PORT}')
         # Start background tasks
         asyncio.create_task(_broadcast_positions())
