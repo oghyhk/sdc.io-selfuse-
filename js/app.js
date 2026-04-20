@@ -217,8 +217,7 @@ const game = new Game(canvas, {
             }
             // Refund raid chance on successful extraction
             if (result.status === 'extracted' && window._lastRaidDifficulty) {
-                refundRaidChance(window._lastRaidDifficulty);
-                await store.saveCurrentProfile();
+                await refundRaidChance(window._lastRaidDifficulty);
             }
         } catch (e) {
             console.warn('applyRaidOutcome failed:', e);

@@ -178,21 +178,25 @@ function getApiCandidates() {
 export async function apiFetch(path, options = {}) {
     let lastError = null;
     for (const base of getApiCandidates()) {
+        let response;
         try {
-            const response = await fetch(`${base}${path}`, {
+            response = await fetch(`${base}${path}`, {
                 cache: 'no-store',
                 headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
                 ...options
             });
-            const data = await response.json();
-            if (!response.ok || data.ok === false) {
-                throw new Error(data.message || 'Request failed.');
-            }
-            resolvedApiBase = base;
-            return data;
         } catch (error) {
+            // Network error (server unreachable) — try next candidate
             lastError = error;
+            continue;
         }
+        // Server responded — parse and return/throw without retrying other URLs
+        const data = await response.json();
+        if (!response.ok || data.ok === false) {
+            throw new Error(data.message || 'Request failed.');
+        }
+        resolvedApiBase = base;
+        return data;
     }
     throw lastError || new Error('Request failed.');
 }
