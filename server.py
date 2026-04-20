@@ -709,13 +709,20 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 death_loss = int(summary.get('deathCoinLoss', 0) or 0)
                 profile['coins'] = max(0, profile.get('coins', 0) - death_loss)
             # Apply ELO (skip for easy difficulty)
-            current_elo = profile.get('elo', 1000)
+            # Use pre-raid ELO to prevent double-application from concurrent client save
+            active_raid = user.get('activeRaid') or {}
+            current_elo = int(active_raid.get('preRaidElo', profile.get('elo', 1000)))
             if difficulty == 'easy':
                 elo_change = 0
             else:
-                elo_bonus = int(summary.get('eloKillBonus', 0) or 0)
+                ELO_K = {'advanced': 5, 'hell': 12, 'chaos': 30}
+                KILL_MULT = {'advanced': 1, 'hell': 2, 'chaos': 4}
+                K = ELO_K.get(difficulty, 5)
+                diff_mult = KILL_MULT.get(difficulty, 1)
+                per_kill = 8
+                kill_bonus = per_kill * kills * diff_mult
                 is_win = status == 'extracted'
-                flat_per_kill = 8
+                # Gain/loss multipliers based on pre-raid ELO bracket
                 gain_mult = 1
                 loss_mult = 1
                 if current_elo <= 900: gain_mult = 3
@@ -724,10 +731,11 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 elif current_elo >= 2101: loss_mult = 3
                 elif current_elo >= 1801: loss_mult = 2
                 if is_win:
-                    elo_change = (flat_per_kill * gain_mult * kills) + (elo_bonus * gain_mult)
+                    elo_change = round((K + kill_bonus) * gain_mult)
                 else:
                     death_penalty = float(summary.get('deathPenaltyScale', 1.0) or 1.0)
-                    elo_change = -((flat_per_kill * loss_mult * death_penalty) + (elo_bonus * loss_mult))
+                    net_loss = max(0, K - kill_bonus)
+                    elo_change = round(-net_loss * loss_mult * death_penalty)
             profile['elo'] = max(0, int(current_elo + elo_change))
             # Update safebox/backpack
             profile['safeboxItems'] = result.get('safeboxItems') or profile.get('safeboxItems') or []
@@ -777,6 +785,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             user['activeRaid'] = {
                 'difficulty': difficulty,
                 'startedAt': int(time.time() * 1000),
+                'preRaidElo': int(user.get('elo', 1000)),
             }
             users[existing_key] = user
             write_store(store)

@@ -805,13 +805,15 @@ export function computeDeathPenaltyScale(myElo = 1000, killerElo = null) {
 export function computeEloChange(difficulty = 'advanced', extracted = false, eloKillBonus = 0, deathPenaltyScale = 1.0, playerElo = 1000) {
     if (difficulty === 'easy') return 0;
     const K = ELO_DIFFICULTY_K[difficulty] || ELO_DIFFICULTY_K.advanced;
+    const diffMult = ELO_KILL_BONUS_MULT[difficulty] || 1;
+    const scaledBonus = eloKillBonus * diffMult;
     const gainMult = getGainMultiplier(playerElo);
     if (extracted) {
         // K and kill bonus both scaled by gain multiplier
-        return Math.round((K + eloKillBonus) * gainMult);
+        return Math.round((K + scaledBonus) * gainMult);
     }
     // Death: kill bonus offsets the loss first; net loss then scaled by loss multiplier
-    const netLoss = Math.max(0, K - eloKillBonus); // kills offset the loss
+    const netLoss = Math.max(0, K - scaledBonus); // kills offset the loss
     return Math.round(-netLoss * deathPenaltyScale);
 }
 
