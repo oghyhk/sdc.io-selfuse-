@@ -1904,6 +1904,7 @@ function renderAll() {
     renderMarket();
     renderPlaceholderScreen();
     renderVisibility();
+    updateRaidChancesUI();
     fetchMail();
     if (!authModal.classList.contains('hidden')) {
         renderAuthModal();
@@ -1977,12 +1978,10 @@ async function startRaidWithSelectedLoadout() {
     // Deduct raid chance for hell/chaos (server-authoritative)
     const diff = difficultySelect.value;
     if (diff === 'hell' || diff === 'chaos') {
-        await deductRaidChance(diff);
+        const deducted = await deductRaidChance(diff);
         updateRaidChancesUI();
-        // Check if deduction succeeded (server may reject if no chances)
-        const updatedProfile = store.getCurrentProfile();
-        const chanceKey = diff === 'hell' ? 'hellChances' : 'chaosChances';
-        if ((updatedProfile[chanceKey] || 0) < 0) {
+        if (!deducted) {
+            hideRaidLoadingOverlay();
             window.alert('No chances remaining.');
             return;
         }
@@ -1991,6 +1990,15 @@ async function startRaidWithSelectedLoadout() {
 
     await store.applyRaidLoadoutSelection(selectedSlot, { autoBuyMissing: preview.totalCost > 0 });
     showRaidLoadingOverlay();
+    // Mark raid active on server before starting
+    try {
+        await apiFetch('/enter-raid', {
+            method: 'POST',
+            body: JSON.stringify({ username: store.activeUsername, difficulty: difficultySelect.value })
+        });
+    } catch (e) {
+        console.warn('Failed to mark raid active:', e);
+    }
     game.startGame(store.getCurrentProfile(), { difficulty: difficultySelect.value });
     renderVisibility();
     requestAnimationFrame(() => requestAnimationFrame(hideRaidLoadingOverlay));
@@ -2088,8 +2096,8 @@ buyChaosChanceBtn?.addEventListener('click', async () => {
 
 async function deductRaidChance(difficulty) {
     const profile = store.getCurrentProfile();
-    if (!profile || !store.activeUsername) return;
-    if (difficulty !== 'hell' && difficulty !== 'chaos') return;
+    if (!profile || !store.activeUsername) return false;
+    if (difficulty !== 'hell' && difficulty !== 'chaos') return true;
     try {
         const result = await apiFetch('/start-raid', {
             method: 'POST',
@@ -2097,9 +2105,12 @@ async function deductRaidChance(difficulty) {
         });
         if (result.ok && result.profile) {
             store.currentProfile = normalizeProfile(result.profile, store.activeUsername, false);
+            return true;
         }
+        return false;
     } catch (e) {
         console.warn('Failed to deduct raid chance:', e);
+        return false;
     }
 }
 
@@ -2975,6 +2986,55 @@ function uiLoop() {
 window.addEventListener('DOMContentLoaded', async () => {
     await loadRuntimeDevConfig();
     await store.init();
+    // Check for active raid (handles page reload during raid)
+    if (store.isAuthenticated()) {
+        try {
+            const raidCheck = await apiFetch(`/check-active-raid?username=${encodeURIComponent(store.activeUsername)}`);
+            if (raidCheck.active) {
+                if (raidCheck.expired) {
+                    // AFK timeout — apply death outcome
+                    await store.applyRaidOutcome({
+                        status: 'dead',
+                        difficulty: raidCheck.difficulty,
+                        safeboxItems: store.currentProfile.safeboxItems || [],
+                        summary: {
+                            kills: 0, lootValue: 0, deathCoinLoss: 0,
+                            eloKillBonus: 0, deathPenaltyScale: 1.0,
+                            valueExtracted: 0, lostValue: 0, items: [],
+                            deathLosses: [],
+                        },
+                    });
+                    updateStartButtonDifficultyTheme();
+                    renderAll();
+                    uiLoop();
+                    setTimeout(() => { loading.classList.add('hidden'); setTimeout(() => loading.remove(), 300); }, 200);
+                    window.alert('You were AFK too long and died in your raid.');
+                    return;
+                } else {
+                    // Still alive — restart the raid
+                    window._lastRaidDifficulty = raidCheck.difficulty;
+                    updateStartButtonDifficultyTheme();
+                    renderAll();
+                    uiLoop();
+                    setTimeout(() => { loading.classList.add('hidden'); setTimeout(() => loading.remove(), 300); }, 200);
+                    showRaidLoadingOverlay();
+                    // Re-enter raid to refresh the server timer
+                    try {
+                        await apiFetch('/enter-raid', {
+                            method: 'POST',
+                            body: JSON.stringify({ username: store.activeUsername, difficulty: raidCheck.difficulty })
+                        });
+                    } catch (_) {}
+                    game.startGame(store.getCurrentProfile(), { difficulty: raidCheck.difficulty });
+                    renderVisibility();
+                    requestAnimationFrame(() => requestAnimationFrame(hideRaidLoadingOverlay));
+                    return;
+                }
+            }
+        } catch (e) {
+            console.warn('Active raid check failed:', e);
+        }
+    }
     updateStartButtonDifficultyTheme();
     renderAll();
     uiLoop();

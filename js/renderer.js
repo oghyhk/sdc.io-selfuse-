@@ -937,8 +937,8 @@ export class Renderer {
     // ---------- Minimap ----------
     drawMinimap(tiles, player, enemies, aiPlayers, crates, extractionPoints, difficulty = 'advanced') {
         const { ctx, cam } = this;
-        // Scale minimap by difficulty: hell 1.5x, chaos 2.5x
-        const scaleMultiplier = difficulty === 'chaos' ? 2.5 : difficulty === 'hell' ? 1.5 : 1;
+        // Scale minimap by difficulty: hell 1.5x, chaos 2.0x (0.8× of full 2.5)
+        const scaleMultiplier = difficulty === 'chaos' ? 2.0 : difficulty === 'hell' ? 1.5 : 1;
         const mmW = Math.round(160 * scaleMultiplier);
         const mmH = Math.round(120 * scaleMultiplier);
         const mmX = 15;

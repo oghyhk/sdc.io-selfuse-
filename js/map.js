@@ -116,8 +116,11 @@ const EXTRACTION_COUNTS = {
 
 // Generate the map — returns { tiles[][], walls[], lootCrates[], extractionPoints[], enemySpawns[], playerSpawn }
 function _entrancePos(dir, ringDist, centerR, centerC) {
+    // Chebyshev walls normalize by each axis independently; for E/W the
+    // actual wall column is ringDist scaled by cols/rows ratio.
+    const colDist = Math.round(ringDist * MAP_COLS / MAP_ROWS);
     const row = dir === 'N' ? centerR - ringDist : dir === 'S' ? centerR + ringDist : centerR;
-    const col = dir === 'W' ? centerC - ringDist : dir === 'E' ? centerC + ringDist : centerC;
+    const col = dir === 'W' ? centerC - colDist : dir === 'E' ? centerC + colDist : centerC;
     return { x: col * TILE_SIZE + TILE_SIZE / 2, y: row * TILE_SIZE + TILE_SIZE / 2, dir };
 }
 
@@ -711,11 +714,14 @@ function carveEntrance(tiles, rows, cols, ringDist, direction, entranceWidth) {
     const halfCols = Math.floor(cols / 2);
     const half = Math.floor(entranceWidth / 2);
 
+    // Chebyshev wall normalization: E/W walls are scaled by cols/rows ratio
+    const colRingDist = Math.round(ringDist * cols / rows);
+
     // All four wall positions (Chebyshev circle centered on map center)
     const wallRowN = halfRows - ringDist;  // north wall row
     const wallRowS = halfRows + ringDist;  // south wall row
-    const wallColW = halfCols - ringDist;  // west wall col
-    const wallColE = halfCols + ringDist;  // east wall col
+    const wallColW = halfCols - colRingDist;  // west wall col
+    const wallColE = halfCols + colRingDist;  // east wall col
 
     if (direction === 'N') {
         const colStart = halfCols - half;

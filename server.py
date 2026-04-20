@@ -266,6 +266,29 @@ class ApiHandler(SimpleHTTPRequestHandler):
         if parsed.path == '/api/health':
             self._send_json({'ok': True})
             return
+        if parsed.path == '/api/check-active-raid':
+            params = parse_qs(parsed.query)
+            username = (params.get('username') or [''])[0]
+            store = read_store()
+            _, user = get_user_record(store.get('users', {}), username)
+            if not user:
+                self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
+                return
+            raid = user.get('activeRaid')
+            if not raid:
+                self._send_json({'ok': True, 'active': False})
+                return
+            elapsed = int(time.time() * 1000) - raid.get('startedAt', 0)
+            AFK_TIMEOUT_MS = 120_000  # 2 minutes
+            expired = elapsed >= AFK_TIMEOUT_MS
+            self._send_json({
+                'ok': True,
+                'active': True,
+                'expired': expired,
+                'difficulty': raid.get('difficulty', 'advanced'),
+                'elapsed': elapsed,
+            })
+            return
         if parsed.path == '/api/dev-config':
             try:
                 config = json.loads(DEV_CONFIG_FILE.read_text(encoding='utf-8'))
@@ -579,6 +602,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 'coins', 'elo',
                 'hellChances', 'hellChanceMax', 'hellChanceRegenAt',
                 'chaosChances', 'chaosChanceMax', 'chaosChanceRegenAt',
+                'activeRaid',
             }
             # Safe merge: start from server data, overlay client changes
             # This prevents client from wiping fields it doesn't send
@@ -706,6 +730,8 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 'netValue': value_extracted - lost_value if status == 'extracted' else -lost_value,
             })
             profile['raidHistory'] = history[-100:]  # keep last 100
+            # Clear active raid marker
+            profile['activeRaid'] = None
             # Preserve password/username
             profile['password'] = user.get('password', '')
             profile['username'] = user.get('username', username)
@@ -714,6 +740,25 @@ class ApiHandler(SimpleHTTPRequestHandler):
             safe = {k: v for k, v in profile.items() if k != 'password'}
             safe['_clientVersion'] = store.get('_version', 0)
             self._send_json({'ok': True, 'profile': safe})
+            return
+
+        if parsed.path == '/api/enter-raid':
+            # Mark a raid as active (called right before game starts)
+            username = str(body.get('username', '')).strip()
+            difficulty = str(body.get('difficulty', '')).strip()
+            store = read_store()
+            users = store.setdefault('users', {})
+            existing_key, user = get_user_record(users, username)
+            if not user or not existing_key:
+                self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
+                return
+            user['activeRaid'] = {
+                'difficulty': difficulty,
+                'startedAt': int(time.time() * 1000),
+            }
+            users[existing_key] = user
+            write_store(store)
+            self._send_json({'ok': True})
             return
 
         if parsed.path == '/api/start-raid':
@@ -730,13 +775,14 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
                 return
             chance_key = f'{difficulty}Chances'
-            current = user.get(chance_key, 0)
-            if current <= 0:
-                self._send_json({'ok': False, 'message': f'No {difficulty.title()} chances remaining.'}, HTTPStatus.FORBIDDEN)
-                return
             max_key = f'{difficulty}ChanceMax'
             regen_key = f'{difficulty}ChanceRegenAt'
             max_val = user.get(max_key, 12 if difficulty == 'hell' else 3)
+            # Default to max for profiles that predate the chance system
+            current = user.get(chance_key, max_val)
+            if current <= 0:
+                self._send_json({'ok': False, 'message': f'No {difficulty.title()} chances remaining.'}, HTTPStatus.FORBIDDEN)
+                return
             user[chance_key] = current - 1
             if user.get(regen_key, 0) == 0:
                 regen_ms = 5 * 3600 * 1000 if difficulty == 'hell' else 23 * 3600 * 1000
@@ -765,7 +811,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             chance_key = f'{difficulty}Chances'
             max_key = f'{difficulty}ChanceMax'
             max_val = user.get(max_key, 12 if difficulty == 'hell' else 3)
-            user[chance_key] = min(user.get(chance_key, 0) + 1, max_val)
+            user[chance_key] = min(user.get(chance_key, max_val) + 1, max_val)
             if user.get(chance_key, 0) >= max_val:
                 user[f'{difficulty}ChanceRegenAt'] = 0
             users[existing_key] = user
