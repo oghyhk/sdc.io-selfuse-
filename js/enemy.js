@@ -133,8 +133,11 @@ export class Enemy {
         this.damageFlash = Math.max(0, this.damageFlash - dt);
         this.chaosBurstTimer = Math.max(0, this.chaosBurstTimer - dt);
 
-        const dToPlayer = dist(this.x, this.y, player.x, player.y);
-        const canSee = player.alive && dToPlayer < this.sightRange &&
+        const dx0 = this.x - player.x;
+        const dy0 = this.y - player.y;
+        const dSqToPlayer = dx0 * dx0 + dy0 * dy0;
+        const dToPlayer = Math.sqrt(dSqToPlayer);
+        const canSee = player.alive && dSqToPlayer < this.sightRange * this.sightRange &&
             hasLineOfSight(this.x, this.y, player.x, player.y, wallGrid.getNearby(this.x, this.y, this.sightRange));
 
         // State transitions

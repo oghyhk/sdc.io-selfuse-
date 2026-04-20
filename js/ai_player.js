@@ -570,16 +570,18 @@ export class AIPlayer extends Player {
     }
 
     _pickTarget(context) {
-        const candidates = [
-            context.player,
-            ...(context.aiPlayers || []).filter((bot) => bot.id !== this.id),
-            ...(context.enemies || []),
-        ];
-
         let bestTarget = null;
         let bestScore = -Infinity;
 
-        for (const candidate of candidates) {
+        const sources = [context.player];
+        const aiPlayers = context.aiPlayers || [];
+        const enemies = context.enemies || [];
+
+        for (let si = 0; si < 3; si++) {
+            const list = si === 0 ? sources : si === 1 ? aiPlayers : enemies;
+            for (let ci = 0; ci < list.length; ci++) {
+                const candidate = list[ci];
+                if (si === 1 && candidate.id === this.id) continue;
             if (!candidate?.alive) continue;
             if (candidate.isBot && this.isFriendlyWith(candidate)) continue;
             const isOperator = candidate === context.player || candidate.isBot;
@@ -621,6 +623,7 @@ export class AIPlayer extends Player {
                 bestScore = score;
                 bestTarget = candidate;
             }
+        }
         }
 
         if (bestTarget) {

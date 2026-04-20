@@ -497,6 +497,7 @@ export class WallGrid {
         this.cellSize = cellSize;
         this._scratch = [];
         this._nearbyGen = 1;
+        this._keyMult = 100000;
         this.grid = new Map();
         for (const w of walls) {
             w._nearbyId = 0;
@@ -506,7 +507,7 @@ export class WallGrid {
             const maxCY = Math.floor((w.y + w.h) / cellSize);
             for (let cy = minCY; cy <= maxCY; cy++) {
                 for (let cx = minCX; cx <= maxCX; cx++) {
-                    const key = `${cx},${cy}`;
+                    const key = cy * this._keyMult + cx;
                     if (!this.grid.has(key)) this.grid.set(key, []);
                     this.grid.get(key).push(w);
                 }
@@ -525,7 +526,7 @@ export class WallGrid {
         let len = 0;
         for (let cy = minCY; cy <= maxCY; cy++) {
             for (let cx = minCX; cx <= maxCX; cx++) {
-                const key = `${cx},${cy}`;
+                const key = cy * this._keyMult + cx;
                 const cell = this.grid.get(key);
                 if (cell) {
                     for (let i = 0; i < cell.length; i++) {

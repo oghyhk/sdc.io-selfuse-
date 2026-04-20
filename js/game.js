@@ -393,6 +393,7 @@ export class Game {
         };
         this.totalPlayersInRaid = (raidCountByDifficulty[this.activeDifficulty] || raidCountByDifficulty.advanced)();
         this.aiPlayers = this._spawnAiPlayers(this.totalPlayersInRaid - 1);
+        this._aiPlayerById = new Map(this.aiPlayers.map(a => [a.id, a]));
 
         // Boss spawning logic
         if (this.activeDifficulty === 'chaos' && Math.random() < 0.30) {
@@ -852,7 +853,7 @@ export class Game {
                     this.player.takeDamage(this._getAttenuatedDamage(b), b);
                     this._spawnParticles(b.x, b.y, COLORS.PLAYER, 5);
                     if (!this.player.alive && b.owner === 'bot' && b.ownerId) {
-                        const killer = this.aiPlayers.find((a) => a.id === b.ownerId);
+                        const killer = this._aiPlayerById.get(b.ownerId);
                         if (killer) {
                             killer.gameKills = (killer.gameKills || 0) + 1;
                             killer.eloKillBonus = (killer.eloKillBonus || 0) + computePerKillElo(killer.elo || 1000, this.playerElo);
@@ -880,7 +881,7 @@ export class Game {
                             this._registerOperatorKill(bot);
                         } else if (b.owner === 'bot' && b.ownerId) {
                             // Track kill for the AI attacker
-                            const killer = this.aiPlayers.find((a) => a.id === b.ownerId);
+                            const killer = this._aiPlayerById.get(b.ownerId);
                             if (killer) {
                                 killer.gameKills = (killer.gameKills || 0) + 1;
                                 killer.eloKillBonus = (killer.eloKillBonus || 0) + computePerKillElo(killer.elo || 1000, bot.elo || 1000);
@@ -917,7 +918,7 @@ export class Game {
                     this.player.takeDamage(this._getAttenuatedDamage(b), b);
                     this._spawnParticles(b.x, b.y, COLORS.PLAYER, 5);
                     if (!this.player.alive && b.owner === 'bot' && b.ownerId) {
-                        const killer = this.aiPlayers.find((a) => a.id === b.ownerId);
+                        const killer = this._aiPlayerById.get(b.ownerId);
                         if (killer) {
                             killer.gameKills = (killer.gameKills || 0) + 1;
                             killer.eloKillBonus = (killer.eloKillBonus || 0) + computePerKillElo(killer.elo || 1000, this.playerElo);
@@ -952,8 +953,9 @@ export class Game {
             if (!bot.alive || bot.hp >= bot.maxHp) continue;
             for (const hp of this.mapData.healthPacks) {
                 if (hp.collected) continue;
-                const d = dist(bot.x, bot.y, hp.x, hp.y);
-                if (d < LOOT_PICKUP_RANGE + bot.radius) {
+                const dx = bot.x - hp.x, dy = bot.y - hp.y;
+                const threshold = LOOT_PICKUP_RANGE + bot.radius;
+                if (dx * dx + dy * dy < threshold * threshold) {
                     hp.collected = true;
                     bot.heal(HEALTHPACK_HEAL);
                     this._spawnParticles(hp.x, hp.y, COLORS.HEALTHPACK, 5);
@@ -1109,13 +1111,15 @@ export class Game {
 
     _updateCrateState(dt) {
         let nearest = null;
-        let nearestDistance = Infinity;
+        let nearestDSq = Infinity;
+        const crateRangeSq = CRATE_INTERACT_RANGE * CRATE_INTERACT_RANGE;
 
         for (const crate of this.mapData.lootCrates) {
-            const d = dist(this.player.x, this.player.y, crate.x, crate.y);
-            if (d < CRATE_INTERACT_RANGE && d < nearestDistance) {
+            const dx = this.player.x - crate.x, dy = this.player.y - crate.y;
+            const dSq = dx * dx + dy * dy;
+            if (dSq < crateRangeSq && dSq < nearestDSq) {
                 nearest = crate;
-                nearestDistance = d;
+                nearestDSq = dSq;
             }
         }
 

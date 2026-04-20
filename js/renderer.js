@@ -194,11 +194,18 @@ export class Renderer {
 
             // Show highest rarity dot
             if (crate.items.length > 0) {
-                const topRarity = crate.items.reduce((best, item) => {
-                    const order = ['white','green','blue','purple','gold','red'];
-                    return order.indexOf(item.rarity) < order.indexOf(best) ? item.rarity : best;
-                }, 'red');
-                const rarity = getRarityMeta(topRarity);
+                if (crate._cachedTopRarity === undefined || crate._cachedItemCount !== crate.items.length) {
+                    const RARITY_RANK = { white: 0, gray: 0, green: 1, blue: 2, purple: 3, gold: 4, red: 5, legend: 6 };
+                    let best = 0;
+                    for (let ri = 0; ri < crate.items.length; ri++) {
+                        const r = RARITY_RANK[crate.items[ri].rarity] || 0;
+                        if (r > best) best = r;
+                    }
+                    const RANK_TO_NAME = ['white', 'green', 'blue', 'purple', 'gold', 'red', 'legend'];
+                    crate._cachedTopRarity = RANK_TO_NAME[best];
+                    crate._cachedItemCount = crate.items.length;
+                }
+                const rarity = getRarityMeta(crate._cachedTopRarity);
                 ctx.fillStyle = rarity.color;
                 ctx.beginPath();
                 ctx.arc(baseX + CRATE_WIDTH - 6, baseY + 6, 4, 0, Math.PI * 2);
@@ -282,8 +289,9 @@ export class Renderer {
         ctx.arc(eyeX, eyeY, 3, 0, Math.PI * 2);
         ctx.fill();
 
-        const shieldHpP = (player.shieldLayers || []).reduce((s, l) => s + l.hp, 0);
-        const shieldMaxP = (player.shieldLayers || []).reduce((s, l) => s + l.maxHp, 0);
+        let shieldHpP = 0, shieldMaxP = 0;
+        const slP = player.shieldLayers;
+        if (slP) for (let i = 0; i < slP.length; i++) { shieldHpP += slP[i].hp; shieldMaxP += slP[i].maxHp; }
         const totalCapP = Math.max(1, player.maxHp + shieldMaxP);
         const miniBarW = player.radius * 2.2;
         const miniBarH = 4;
@@ -462,8 +470,9 @@ export class Renderer {
             ctx.arc(eyeX, eyeY, 3, 0, Math.PI * 2);
             ctx.fill();
 
-            const shieldHpB = (bot.shieldLayers || []).reduce((s, l) => s + l.hp, 0);
-            const shieldMaxB = (bot.shieldLayers || []).reduce((s, l) => s + l.maxHp, 0);
+            let shieldHpB = 0, shieldMaxB = 0;
+            const slB = bot.shieldLayers;
+            if (slB) for (let j = 0; j < slB.length; j++) { shieldHpB += slB[j].hp; shieldMaxB += slB[j].maxHp; }
             const totalCapB = Math.max(1, bot.maxHp + shieldMaxB);
             const miniBarW = bot.radius * 2.2;
             const miniBarH = 4;
@@ -715,8 +724,9 @@ export class Renderer {
         }
 
         // Health bar (with shield)
-        const hudShieldHp = (player.shieldLayers || []).reduce((s, l) => s + l.hp, 0);
-        const hudShieldMax = (player.shieldLayers || []).reduce((s, l) => s + l.maxHp, 0);
+        let hudShieldHp = 0, hudShieldMax = 0;
+        const slH = player.shieldLayers;
+        if (slH) for (let i = 0; i < slH.length; i++) { hudShieldHp += slH[i].hp; hudShieldMax += slH[i].maxHp; }
         const hudTotalCap = Math.max(1, player.maxHp + hudShieldMax);
         ctx.fillStyle = COLORS.HP_BAR_BG;
         ctx.fillRect(hpX, hpY, hpBarW, hpBarH);

@@ -162,7 +162,8 @@ export class Player {
         const slot = this.activeCombatSlot || this.weaponSlot;
         if (!slot || !GUN_LOADOUT_SLOTS.includes(slot)) return;
         const state = this._ensureGunRuntimeState(slot);
-        state.loadedAmmoQueue = [...this.loadedAmmoQueue];
+        // Share reference directly — only copy when switching guns
+        state.loadedAmmoQueue = this.loadedAmmoQueue;
         state.shootCooldown = Math.max(0, Number(this.shootCooldown) || 0);
         state.reloadTimer = Math.max(0, Number(this.reloadTimer) || 0);
         state.isReloading = Boolean(this.isReloading);
@@ -179,9 +180,11 @@ export class Player {
             return;
         }
         const state = this._ensureGunRuntimeState(slot);
-        const cappedQueue = [...(state.loadedAmmoQueue || [])].slice(0, Math.max(0, this.ammoCapacity));
-        state.loadedAmmoQueue = cappedQueue;
-        this.loadedAmmoQueue = [...cappedQueue];
+        // Only cap if queue exceeds capacity
+        if (state.loadedAmmoQueue.length > this.ammoCapacity) {
+            state.loadedAmmoQueue.length = this.ammoCapacity;
+        }
+        this.loadedAmmoQueue = state.loadedAmmoQueue;
         this.currentAmmo = this.loadedAmmoQueue.length;
         this.shootCooldown = Math.max(0, Number(state.shootCooldown) || 0);
         this.reloadTimer = Math.max(0, Number(state.reloadTimer) || 0);
