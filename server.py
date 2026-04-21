@@ -732,6 +732,10 @@ class ApiHandler(SimpleHTTPRequestHandler):
             # Use pre-raid ELO to prevent double-application from concurrent client save
             active_raid = user.get('activeRaid') or {}
             current_elo = int(active_raid.get('preRaidElo', profile.get('elo', 1000)))
+            # ELO kill bonus is awarded ONLY for operator (player-like AI) kills,
+            # not for regular AI enemy mobs. This must match the client formula
+            # in computeEloChange() exactly to avoid client/server mismatch.
+            operator_kills = int(summary.get('operatorKills', 0) or 0)
             if difficulty == 'easy':
                 elo_change = 0
             else:
@@ -740,7 +744,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 K = ELO_K.get(difficulty, 5)
                 diff_mult = KILL_MULT.get(difficulty, 1)
                 per_kill = 8
-                kill_bonus = per_kill * kills * diff_mult
+                kill_bonus = per_kill * operator_kills * diff_mult
                 is_win = status == 'extracted'
                 # Gain/loss multipliers based on pre-raid ELO bracket
                 gain_mult = 1
