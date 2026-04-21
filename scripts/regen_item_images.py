@@ -15,7 +15,7 @@ MINIMAX_KEY = os.environ.get("MINIMAX_API_KEY", "")
 CF_URL = "https://hermesimggen.oghyhk.workers.dev"
 CF_AUTH = "Bearer 2598"
 CONFIG_PATH = "/opt/sdc.io-selfuse-/data/dev-config.json"
-OUTPUT_DIR = "/opt/sdc.io-selfuse-/assets/items"
+OUTPUT_DIR = "/opt/sdc.io-selfuse-/client/assets/items"
 WEBPAGE_PATH = "/opt/sdc.io-selfuse-/scripts/approve.html"
 STATE_PATH = "/opt/sdc.io-selfuse-/scripts/regen_state.json"
 

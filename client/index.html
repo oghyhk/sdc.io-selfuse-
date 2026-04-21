@@ -1,0 +1,1689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDC.IO — Extraction Game</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%; height: 100%; overflow: hidden;
+            background: #0a0a1a; font-family: Inter, Arial, sans-serif;
+        }
+        body.playing canvas { cursor: none; }
+        canvas { display: block; width: 100%; height: 100%; }
+        button {
+            border: 0; border-radius: 14px; padding: 14px 20px; font-weight: 700; cursor: pointer;
+            transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+        }
+        button:hover:not(.loadout-slot-card) { transform: translateY(-1px); }
+        .primary-button { background: linear-gradient(135deg, #00e676, #00b86b); color: #03140d; }
+        .primary-button[data-difficulty="easy"] { background: linear-gradient(135deg, #00e676, #00b86b); color: #03140d; }
+        .primary-button[data-difficulty="advanced"] { background: linear-gradient(135deg, #ffd54f, #ffb300); color: #2b1a00; }
+        .primary-button[data-difficulty="hell"] { background: linear-gradient(135deg, #ff6b6b, #d50000); color: #2a0000; }
+        .primary-button[data-difficulty="chaos"] {
+            background: linear-gradient(135deg, #d500f9, #ff1744);
+            color: #ffd27a;
+            border: 1px solid rgba(255, 102, 102, 0.9);
+            box-shadow: 0 0 22px rgba(213, 0, 249, 0.28), 0 0 38px rgba(255, 23, 68, 0.2);
+            text-shadow: 0 0 4px rgba(255, 159, 26, 0.5), 0 0 10px rgba(255, 77, 77, 0.25);
+            letter-spacing: 0.04em;
+            animation: ap-frame-pulse 1.8s ease-in-out infinite, legend-text-shimmer 1.8s ease-in-out infinite;
+        }
+        .secondary-button { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.08); }
+        .secondary-button:disabled, .primary-button:disabled { opacity: 0.35; cursor: not-allowed; }
+        .hidden { display: none !important; }
+        #loading {
+            position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+            background: #1a1a2e; color: #9effc1; font-family: monospace; font-size: 18px; z-index: 20;
+            transition: opacity 0.3s;
+        }
+        #loading.hidden { opacity: 0; pointer-events: none; }
+        .loading-shell {
+            display: grid;
+            justify-items: center;
+            gap: 16px;
+        }
+        #uiRoot { position: fixed; inset: 0; pointer-events: none; }
+        #topBar {
+            position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between;
+            align-items: center; padding: 20px 24px; pointer-events: none; z-index: 20;
+        }
+        .topbar-left { display: flex; align-items: flex-start; gap: 12px; pointer-events: none; }
+        .topbar-brand-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 220px;
+        }
+        .topbar-account {
+            position: relative; display: flex; flex-direction: column; align-items: flex-end; pointer-events: none;
+        }
+        .brand { color: #fff; letter-spacing: 0.3em; font-size: 12px; text-transform: uppercase; }
+        #redeemButton,
+        #authButton,
+        #authDropdown {
+            pointer-events: auto;
+        }
+        .topbar-level-box {
+            border: 1px solid rgba(100, 181, 246, 0.32);
+            background: linear-gradient(180deg, rgba(13, 26, 51, 0.92), rgba(8, 16, 34, 0.92));
+            border-radius: 14px;
+            padding: 10px 12px;
+            min-width: 220px;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25), inset 0 0 0 1px rgba(255,255,255,0.03);
+        }
+        .topbar-level-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 10px;
+            color: #fff;
+        }
+        .topbar-level-title {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.68);
+        }
+        .topbar-level-value {
+            font-size: 16px;
+            font-weight: 900;
+            color: #dff1ff;
+        }
+        .topbar-level-meta {
+            margin-top: 5px;
+            font-size: 11px;
+            color: rgba(255,255,255,0.7);
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .topbar-level-bar {
+            margin-top: 8px;
+            height: 8px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(255,255,255,0.08);
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+        }
+        .topbar-level-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #1e88e5, #42a5f5 55%, #7cc8ff);
+            box-shadow: 0 0 14px rgba(66, 165, 245, 0.45);
+        }
+        .topbar-leaderboard-box {
+            border: 1px solid rgba(255, 193, 7, 0.28);
+            background: linear-gradient(180deg, rgba(30, 24, 8, 0.92), rgba(12, 10, 4, 0.92));
+            border-radius: 14px;
+            padding: 10px 12px;
+            min-width: 220px;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: border-color 0.18s, box-shadow 0.18s;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25), inset 0 0 0 1px rgba(255,255,255,0.03);
+        }
+        .topbar-leaderboard-box:hover {
+            border-color: rgba(255, 193, 7, 0.52);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25), 0 0 18px rgba(255, 193, 7, 0.12), inset 0 0 0 1px rgba(255,255,255,0.05);
+        }
+        .topbar-lb-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 10px;
+            color: #fff;
+        }
+        .topbar-lb-title {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: rgba(255, 193, 7, 0.72);
+        }
+        .topbar-lb-elo {
+            font-size: 16px;
+            font-weight: 900;
+            color: #ffe082;
+        }
+        .topbar-lb-meta {
+            margin-top: 5px;
+            font-size: 11px;
+            color: rgba(255,255,255,0.58);
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .topbar-lb-rank {
+            color: rgba(255, 193, 7, 0.85);
+            font-weight: 700;
+        }
+
+        /* ── Leaderboard Page Table ── */
+        .leaderboard-shell { padding: 0; max-height: 60vh; overflow-y: auto; border-radius: 10px; }
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .leaderboard-table thead th {
+            position: sticky; top: 0;
+            background: rgba(10,13,28,0.98);
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 700;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: rgba(255,255,255,0.55);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .leaderboard-table tbody td {
+            padding: 9px 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            color: rgba(255,255,255,0.82);
+        }
+        .lb-col-rank { width: 52px; text-align: center; font-weight: 800; }
+        .lb-col-name { min-width: 120px; font-weight: 600; }
+        .lb-col-elo  { width: 70px; font-weight: 900; color: #ffe082; }
+        .lb-col-stat { width: 80px; text-align: center; color: rgba(255,255,255,0.6); }
+        .lb-row:hover { background: rgba(255,255,255,0.04); }
+        .lb-row-you {
+            background: rgba(255,193,7,0.08) !important;
+            border-left: 3px solid #ffc107;
+        }
+        .lb-row-you td { color: #fff; font-weight: 700; }
+        .lb-you-tag { font-size: 10px; color: #ffc107; font-weight: 800; margin-left: 4px; }
+        .lb-rank-1 .lb-col-rank { color: #ffd700; }
+        .lb-rank-2 .lb-col-rank { color: #c0c0c0; }
+        .lb-rank-3 .lb-col-rank { color: #cd7f32; }
+        .lb-your-row-footer {
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px dashed rgba(255,193,7,0.25);
+        }
+        .lb-footer-table { margin-top: 0; }
+        .lb-ai-tag {
+            font-size: 9px; font-weight: 800; color: #81d4fa; background: rgba(129,212,250,0.12);
+            padding: 1px 5px; border-radius: 4px; margin-left: 5px; vertical-align: middle;
+            letter-spacing: 0.04em;
+        }
+        .lb-boss-tag {
+            color: #ff6644; background: rgba(255,102,68,0.15);
+        }
+        .lb-row-ai .lb-col-name { color: rgba(255,255,255,0.6); }
+
+        .auth-status-button {
+            display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 180px;
+            text-align: right; line-height: 1.15;
+        }
+        .auth-status-name { font-size: 13px; font-weight: 800; color: #fff; }
+        .auth-status-meta { font-size: 11px; color: rgba(255,255,255,0.72); }
+        .auth-status-value { font-size: 13px; font-weight: 900; color: #ffca28; }
+        .auth-dropdown {
+            position: absolute; top: calc(100% + 10px); right: 0; min-width: 220px; padding: 10px;
+            border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); background: rgba(10,13,28,0.96);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.35); display: grid; gap: 8px;
+        }
+        .auth-dropdown-button {
+            width: 100%; text-align: left; background: rgba(255,255,255,0.04); color: #fff;
+            border: 1px solid rgba(255,255,255,0.08); padding: 12px 14px; border-radius: 12px;
+        }
+        .auth-dropdown-button.active {
+            background: rgba(0,230,118,0.12); border-color: rgba(0,230,118,0.45); color: #d7ffe8;
+        }
+        .auth-dropdown-separator {
+            height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0;
+        }
+        .auth-dropdown-logout {
+            color: #ff6b6b; border-color: rgba(255,107,107,0.2); background: rgba(255,107,107,0.06);
+        }
+        .auth-dropdown-logout:hover {
+            background: rgba(255,107,107,0.15); border-color: rgba(255,107,107,0.4);
+        }
+        #raidLoadingOverlay {
+            position: fixed; inset: 0; z-index: 9999;
+            background: rgba(0,0,0,0.7);
+            display: flex; align-items: center; justify-content: center;
+            flex-direction: column; gap: 16px; pointer-events: none; opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+        #raidLoadingOverlay.visible {
+            pointer-events: auto; opacity: 1;
+        }
+        #offlineOverlay {
+            position: fixed;
+            inset: 0;
+            z-index: 10001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(3, 8, 20, 0.82);
+            pointer-events: auto;
+        }
+        .offline-overlay-panel {
+            width: min(360px, calc(100% - 32px));
+            padding: 28px;
+            display: grid;
+            gap: 14px;
+            text-align: center;
+            border: 1px solid rgba(129, 212, 250, 0.18);
+            background:
+                radial-gradient(circle at top, rgba(30, 136, 229, 0.2), transparent 55%),
+                rgba(8, 14, 30, 0.96);
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+        }
+        .rose-loader {
+            --loader-size: 54px;
+            width: var(--loader-size);
+            height: var(--loader-size);
+            display: block;
+            color: #86ffb7;
+            filter: drop-shadow(0 0 10px rgba(134, 255, 183, 0.24));
+        }
+        .rose-loader svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+        .rose-loader-path {
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            opacity: 0.12;
+        }
+        .rose-loader-particle {
+            fill: currentColor;
+        }
+        .offline-overlay-panel .rose-loader {
+            margin: 0 auto;
+            color: #8fd0ff;
+            filter: drop-shadow(0 0 10px rgba(143, 208, 255, 0.24));
+        }
+        .offline-overlay-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: #eef6ff;
+            letter-spacing: 0.04em;
+        }
+        .offline-overlay-copy {
+            color: rgba(255,255,255,0.72);
+            line-height: 1.65;
+            font-size: 14px;
+        }
+        .raid-loading-spinner {
+            --loader-size: 54px;
+        }
+        .raid-loading-text {
+            color: rgba(255,255,255,0.7); font-size: 14px; font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .coin-inline {
+            display: inline-flex; align-items: center; gap: 0.35em; white-space: nowrap;
+        }
+        .coin-inline-icon {
+            width: 1em; height: 1em; object-fit: contain; flex: 0 0 auto;
+        }
+        .screen {
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            padding: 40px; pointer-events: auto; z-index: 10;
+        }
+        #placeholderScreen {
+            z-index: 30;
+            overflow-y: auto;
+            align-items: flex-start;
+        }
+        .panel {
+            width: min(1180px, 100%); border: 1px solid rgba(255,255,255,0.08); background: rgba(10,13,28,0.84);
+            box-shadow: 0 20px 80px rgba(0,0,0,0.35); backdrop-filter: blur(10px); border-radius: 20px; color: #fff;
+        }
+        .hero-panel { max-width: 940px; padding: 40px; text-align: center; }
+        .hero-panel h1 { font-size: 56px; margin-bottom: 10px; letter-spacing: 0.08em; }
+        .hero-panel p, .section-subtitle, .muted, .item-card p { color: rgba(255,255,255,0.68); line-height: 1.6; }
+        .menu-actions { display: flex; justify-content: center; gap: 16px; margin: 28px 0 32px; flex-wrap: wrap; }
+        .menu-difficulty-inline {
+            display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 14px;
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+        }
+        .menu-difficulty-inline label {
+            font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.65);
+            white-space: nowrap;
+        }
+        .menu-difficulty-inline select {
+            min-width: 150px; border: 0; outline: none; padding: 12px 0;
+            background: transparent; color: #fff; font-weight: 700;
+        }
+        .menu-difficulty-inline select option { color: #111; }
+        .menu-loadout-space {
+            margin: -8px auto 24px; max-width: 760px; display: grid; gap: 14px;
+        }
+        .menu-loadout-buttons {
+            display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px;
+        }
+        .menu-loadout-button {
+            background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.08);
+            padding: 8px 10px; font-size: 12px; min-height: 40px;
+        }
+        .menu-loadout-button.active {
+            background: rgba(0,230,118,0.14); border-color: rgba(0,230,118,0.6); color: #d7ffe8;
+            box-shadow: inset 0 0 0 1px rgba(0,230,118,0.18);
+        }
+        .menu-loadout-button:disabled {
+            opacity: 0.45; cursor: not-allowed;
+        }
+        .menu-loadout-preview {
+            text-align: left; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04);
+            border-radius: 14px; padding: 16px;
+        }
+        .menu-loadout-preview-grid {
+            display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px;
+        }
+        .placeholder-panel { max-width: 860px; padding: 32px; text-align: left; }
+        .placeholder-header {
+            display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px;
+        }
+        .placeholder-actions {
+            display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px;
+        }
+        /* Account page */
+        .account-layout { display: flex; gap: 28px; margin-top: 20px; }
+        .account-sidebar { flex: 0 0 200px; text-align: center; }
+        .account-main { flex: 1; min-width: 0; }
+        .account-pfp-wrap {
+            position: relative; width: 160px; height: 160px; margin: 0 auto 14px;
+            border-radius: 50%; overflow: hidden; border: 3px solid rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.05); cursor: pointer;
+        }
+        .account-pfp-wrap:hover { border-color: rgba(255,255,255,0.35); }
+        .account-pfp-wrap img { width: 100%; height: 100%; object-fit: cover; }
+        .account-pfp-placeholder {
+            width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+            font-size: 48px; color: rgba(255,255,255,0.3);
+        }
+        .account-pfp-overlay {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.55); display: flex;
+            align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s;
+            font-size: 13px; font-weight: 600; letter-spacing: 0.04em;
+        }
+        .account-pfp-wrap:hover .account-pfp-overlay { opacity: 1; }
+        .account-username-display {
+            font-size: 20px; font-weight: 700; letter-spacing: 0.03em; margin-bottom: 4px;
+        }
+        .account-elo-display { font-size: 13px; color: rgba(255,255,255,0.55); }
+        .account-section { margin-bottom: 22px; }
+        .account-section h3 {
+            font-size: 14px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+            color: rgba(255,255,255,0.5); margin-bottom: 12px; padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .account-section-toggle:hover { color: rgba(255,255,255,0.8); }
+        .toggle-arrow { font-size: 12px; transition: transform 0.2s; }
+        .account-field { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 12px; }
+        .account-field label { font-size: 14px; color: rgba(255,255,255,0.7); flex: 0 0 auto; }
+        .account-field-value { font-size: 14px; font-weight: 600; }
+        .account-field input[type="password"], .account-field input[type="text"] {
+            background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 14px;
+            width: 220px; outline: none;
+        }
+        .account-field input:focus { border-color: rgba(255,255,255,0.3); }
+        .account-btn {
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px; padding: 8px 16px; color: #fff; font-size: 13px;
+            font-weight: 600; cursor: pointer; transition: background 0.15s;
+        }
+        .account-btn:hover { background: rgba(255,255,255,0.14); }
+        .account-btn.danger { border-color: rgba(220,50,50,0.3); color: #f66; }
+        .account-btn.danger:hover { background: rgba(220,50,50,0.15); }
+        .account-msg { font-size: 13px; margin-top: 6px; }
+        .account-msg.success { color: #6f6; }
+        .account-msg.error { color: #f66; }
+        .account-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        /* Achievements */
+        .achievements-grid { display: flex; flex-wrap: wrap; gap: 14px; }
+        .achievement-badge {
+            position: relative; width: 72px; height: 72px; cursor: pointer;
+            border-radius: 50%; overflow: visible;
+        }
+        .achievement-badge img {
+            width: 72px; height: 72px; border-radius: 50%; object-fit: cover;
+            background: rgba(255,255,255,0.04); border: 2px solid rgba(255,255,255,0.1);
+            transition: border-color 0.2s, transform 0.2s;
+        }
+        .achievement-badge:hover img {
+            border-color: rgba(255,215,0,0.6); transform: scale(1.08);
+        }
+        .achievement-badge-placeholder {
+            width: 72px; height: 72px; border-radius: 50%;
+            background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.1);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; color: rgba(255,255,255,0.25);
+        }
+        .achievement-tooltip {
+            display: none; position: absolute; bottom: calc(100% + 10px); left: 50%;
+            transform: translateX(-50%); background: rgba(10,13,28,0.96);
+            border: 1px solid rgba(255,215,0,0.25); border-radius: 12px;
+            padding: 14px; min-width: 200px; max-width: 260px; z-index: 100;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5); text-align: center;
+            pointer-events: none;
+        }
+        .achievement-badge:hover .achievement-tooltip { display: block; }
+        .achievement-tooltip img {
+            width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 10px;
+            border: 2px solid rgba(255,215,0,0.3);
+        }
+        .achievement-tooltip-name {
+            font-size: 15px; font-weight: 700; color: #ffd700; margin-bottom: 6px;
+        }
+        .achievement-tooltip-desc {
+            font-size: 12px; color: rgba(255,255,255,0.65); line-height: 1.5;
+        }
+        .achievement-tooltip-pin-hint {
+            font-size: 11px; color: rgba(255,215,0,0.55); margin-top: 8px;
+            letter-spacing: 0.03em;
+        }
+        .achievement-pinned img {
+            border-color: rgba(255,215,0,0.6) !important;
+            box-shadow: 0 0 10px rgba(255,215,0,0.2);
+        }
+        .achievement-pin-icon {
+            position: absolute; top: -4px; right: -4px;
+            font-size: 16px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+            pointer-events: none;
+        }
+        .pinned-achievements-section {
+            margin-top: 18px; padding-top: 14px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        .pinned-achievements-label {
+            font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+            text-transform: uppercase; color: rgba(255,255,255,0.4);
+            margin-bottom: 10px; text-align: center;
+        }
+        .pinned-achievements-list {
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+        }
+        .pinned-achievement-item {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            cursor: default;
+        }
+        .pinned-achievement-item img {
+            width: 52px; height: 52px; border-radius: 50%;
+            border: 2px solid rgba(255,215,0,0.45); object-fit: cover;
+            background: rgba(255,255,255,0.04);
+            box-shadow: 0 0 8px rgba(255,215,0,0.15);
+        }
+        .pinned-achievement-placeholder {
+            width: 52px; height: 52px; border-radius: 50%;
+            background: rgba(255,255,255,0.06); border: 2px solid rgba(255,215,0,0.3);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; color: rgba(255,255,255,0.2);
+        }
+        .pinned-achievement-name {
+            font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.55);
+            text-align: center; max-width: 120px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .pinned-achievements-empty {
+            font-size: 11px; color: rgba(255,255,255,0.25); text-align: center;
+            padding: 6px 0;
+        }
+        .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; text-align: left; }
+        .summary-tile {
+            border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04);
+            border-radius: 14px; padding: 14px; min-height: 82px;
+        }
+        .summary-tiles-inline {
+            display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; text-align: left;
+        }
+        .summary-wide { grid-column: span 4; }
+        .raid-history-shell {
+            display: block;
+            max-height: 420px;
+            overflow: auto;
+        }
+        .raid-history-list {
+            display: grid;
+            gap: 12px;
+        }
+        .raid-history-card {
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.035);
+            border-radius: 16px;
+            padding: 14px;
+            display: grid;
+            gap: 12px;
+        }
+        .raid-history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .raid-history-date {
+            font-size: 15px;
+            font-weight: 800;
+            color: #fff;
+        }
+        .raid-history-meta {
+            margin-top: 4px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+            letter-spacing: 0.08em;
+        }
+        .difficulty-text {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3px 9px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            border: 1px solid transparent;
+            margin-left: 2px;
+        }
+        .difficulty-easy {
+            background: linear-gradient(135deg, #00e676, #00b86b);
+            color: #03140d;
+            box-shadow: 0 0 12px rgba(0, 230, 118, 0.18);
+        }
+        .difficulty-advanced {
+            background: linear-gradient(135deg, #ffd54f, #ffb300);
+            color: #2b1a00;
+            box-shadow: 0 0 12px rgba(255, 179, 0, 0.2);
+        }
+        .difficulty-hell {
+            background: linear-gradient(135deg, #ff6b6b, #d50000);
+            color: #2a0000;
+            box-shadow: 0 0 14px rgba(213, 0, 0, 0.24);
+        }
+        .difficulty-chaos {
+            background: linear-gradient(135deg, #d500f9, #ff1744);
+            color: #ffd27a;
+            border: 1px solid rgba(255, 102, 102, 0.9);
+            box-shadow: 0 0 16px rgba(213, 0, 249, 0.28), 0 0 24px rgba(255, 23, 68, 0.2);
+            text-shadow: 0 0 4px rgba(255, 159, 26, 0.5), 0 0 10px rgba(255, 77, 77, 0.25);
+            animation: ap-frame-pulse 1.8s ease-in-out infinite, legend-text-shimmer 1.8s ease-in-out infinite;
+        }
+        .stats-shell {
+            display: block;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .stats-card {
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.035);
+            border-radius: 16px;
+            padding: 16px;
+            display: grid;
+            gap: 14px;
+        }
+        .stats-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        .stats-card-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .stats-card-metric {
+            border-radius: 12px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+            padding: 12px;
+            display: grid;
+            gap: 6px;
+        }
+        .stats-card-metric span {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(255,255,255,0.55);
+        }
+        .stats-card-metric strong {
+            font-size: 18px;
+            color: #fff;
+        }
+        .stats-card-metric.kd-tier-white strong {
+            color: #eceff1;
+        }
+        .stats-card-metric.kd-tier-green strong {
+            color: #81c784;
+            text-shadow: 0 0 10px rgba(129, 199, 132, 0.18);
+        }
+        .stats-card-metric.kd-tier-blue strong {
+            color: #64b5f6;
+            text-shadow: 0 0 12px rgba(100, 181, 246, 0.22);
+        }
+        .stats-card-metric.kd-tier-purple strong {
+            color: #b388ff;
+            text-shadow: 0 0 14px rgba(179, 136, 255, 0.26);
+        }
+        .stats-card-metric.kd-tier-gold strong {
+            color: #ffca28;
+            text-shadow: 0 0 14px rgba(255, 202, 40, 0.28);
+        }
+        .stats-card-metric.kd-tier-red strong {
+            color: #ff4d4d;
+            text-shadow: 0 0 16px rgba(255, 77, 77, 0.34);
+        }
+        .stats-card-metric.kd-tier-legend strong {
+            color: #ff9f1a;
+            text-shadow: 0 0 6px rgba(255, 159, 26, 0.4), 0 0 16px rgba(255, 77, 77, 0.28);
+            animation: ap-frame-pulse 1.8s ease-in-out infinite, legend-text-shimmer 1.8s ease-in-out infinite;
+        }
+        .player-level-shell {
+            display: block;
+        }
+        .player-level-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .player-level-card {
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.035);
+            border-radius: 16px;
+            padding: 18px;
+            display: grid;
+            gap: 8px;
+        }
+        .player-level-card strong {
+            font-size: 22px;
+            color: #fff;
+        }
+        .player-level-card span {
+            color: rgba(255,255,255,0.68);
+            line-height: 1.55;
+            font-size: 13px;
+        }
+        .player-level-hero {
+            grid-column: span 2;
+            background:
+                radial-gradient(circle at top right, rgba(0, 230, 118, 0.14), transparent 42%),
+                rgba(255,255,255,0.035);
+        }
+        .player-level-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: fit-content;
+            min-width: 132px;
+            padding: 12px 20px;
+            border-radius: 999px;
+            font-size: 28px;
+            font-weight: 900;
+            color: #d7ffe8;
+            background: linear-gradient(135deg, rgba(0,230,118,0.18), rgba(0,184,107,0.14));
+            border: 1px solid rgba(0,230,118,0.35);
+            box-shadow: 0 0 22px rgba(0,230,118,0.12);
+        }
+        .player-level-progress-copy {
+            display: grid;
+            gap: 6px;
+        }
+        .player-level-progress-bar {
+            width: 100%;
+            height: 16px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: inset 0 1px 8px rgba(0,0,0,0.28);
+        }
+        .player-level-progress-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(135deg, #00e676, #00b86b);
+            box-shadow: 0 0 18px rgba(0,230,118,0.28);
+        }
+        .player-level-reward-card {
+            background:
+                radial-gradient(circle at top right, rgba(30, 136, 229, 0.18), transparent 42%),
+                rgba(255,255,255,0.035);
+        }
+        .player-level-reward-value {
+            font-size: 24px;
+            font-weight: 900;
+            color: #8fd0ff;
+        }
+        .player-level-reward-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+        }
+        .player-level-claim-button {
+            margin-top: 4px;
+            width: 100%;
+            justify-content: center;
+            background: linear-gradient(135deg, #1e88e5, #42a5f5);
+            color: #eef8ff;
+            box-shadow: 0 10px 24px rgba(30, 136, 229, 0.26);
+        }
+        .player-level-claim-button:hover:not(:disabled) {
+            background: linear-gradient(135deg, #2196f3, #64b5f6);
+        }
+        .player-level-claim-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+            box-shadow: none;
+        }
+        .player-level-rules strong {
+            font-size: 18px;
+        }
+        .raid-history-status {
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            white-space: nowrap;
+        }
+        .raid-history-status.success {
+            background: rgba(0,230,118,0.14);
+            color: #9effc1;
+            border: 1px solid rgba(0,230,118,0.35);
+        }
+        .raid-history-status.failure {
+            background: rgba(255,82,82,0.14);
+            color: #ff9a9a;
+            border: 1px solid rgba(255,82,82,0.35);
+        }
+        .raid-history-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .raid-history-metric {
+            border-radius: 12px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+            padding: 12px;
+            display: grid;
+            gap: 6px;
+        }
+        .raid-history-metric span {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(255,255,255,0.55);
+        }
+        .raid-history-metric strong {
+            font-size: 15px;
+            color: #fff;
+        }
+        .raid-history-metric.positive strong {
+            color: #9effc1;
+        }
+        .raid-history-metric.negative strong {
+            color: #ff9a9a;
+        }
+        .summary-label {
+            display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
+            color: rgba(255,255,255,0.55); margin-bottom: 8px;
+        }
+        .inventory-layout {
+            display: grid; grid-template-columns: 1fr 1.05fr; grid-template-rows: auto minmax(0, 1fr); gap: 18px; padding: 24px;
+            max-height: calc(100vh - 120px); overflow: hidden;
+        }
+        .inventory-shell {
+            grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center;
+            gap: 16px; padding-bottom: 4px; margin-bottom: -2px;
+        }
+        .inventory-section {
+            border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.035);
+            border-radius: 16px; padding: 18px; min-height: 0; overflow: auto;
+        }
+        .loadout-panel { overflow: hidden; display: flex; flex-direction: column; }
+        .stash-panel { overflow-y: auto; overflow-x: hidden; }
+        .inventory-header, .item-card-header, .run-card-row {
+            display: flex; justify-content: space-between; align-items: center; gap: 12px;
+        }
+        .header-actions {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        }
+        .item-list, .run-history, #loadoutSections { display: grid; gap: 12px; }
+        #loadoutSections { flex: 1; min-height: 0; }
+        .loadout-visual {
+            height: 100%; min-height: 420px; display: flex; align-items: center; justify-content: center;
+        }
+        .preset-save-grid {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px;
+        }
+        .preset-save-option {
+            width: 100%; text-align: left; border-radius: 16px; padding: 16px;
+            background: rgba(255,255,255,0.04); color: #fff; border: 1px solid rgba(255,255,255,0.08);
+            display: grid; gap: 8px;
+        }
+        .preset-save-option.empty {
+            border-style: dashed;
+        }
+        .preset-save-option strong {
+            font-size: 18px;
+        }
+        .preset-save-option .section-subtitle {
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .operator-layout {
+            position: relative; width: min(100%, 300px); height: min(100%, 430px); margin: 0 auto;
+        }
+        .operator-silhouette {
+            position: absolute; inset: 12% 24% 12%; pointer-events: none;
+        }
+        .operator-head, .operator-body, .operator-leg {
+            position: absolute; left: 50%; transform: translateX(-50%);
+            background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.05));
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .operator-head {
+            top: 0; width: 62px; height: 62px; border-radius: 50%;
+        }
+        .operator-body {
+            top: 70px; width: 116px; height: 136px; border-radius: 28px;
+        }
+        .operator-leg {
+            top: 218px; width: 40px; height: 118px; border-radius: 24px;
+        }
+        .operator-leg.left { left: calc(50% - 28px); }
+        .operator-leg.right { left: calc(50% + 28px); }
+        .loadout-slot-card {
+            position: absolute; width: 86px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+            text-align: center; padding: 0; background: transparent; border: 0;
+        }
+        .loadout-slot-icon {
+            width: 64px; height: 64px; border-radius: 16px; object-fit: contain; background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.08); padding: 6px;
+            box-shadow: 0 12px 24px rgba(0,0,0,0.2); transition: transform 0.15s ease;
+        }
+        .loadout-slot-type,
+        .loadout-slot-name {
+            font-size: 11px; font-weight: 800; line-height: 1.15;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.4);
+        }
+        .loadout-slot-label {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.6);
+        }
+        .slot-helmet { top: 0; left: 50%; transform: translateX(-50%); }
+        .slot-armor { top: 118px; left: 50%; transform: translateX(-50%); }
+        .slot-shoes { bottom: 0; left: 50%; transform: translateX(-50%); }
+        .slot-backpack { top: 110px; left: 0; }
+        .slot-gun-primary { top: 82px; right: 0; }
+        .slot-gun-secondary { top: 208px; right: 0; }
+        .item-card, .crate-item-card {
+            width: 100%; text-align: left; padding: 16px; background: rgba(255,255,255,0.04); color: #fff;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .item-card-body { display: flex; gap: 14px; align-items: flex-start; }
+        .item-card-img {
+            width: 64px; height: 64px; border-radius: 10px; object-fit: cover;
+            background: rgba(255,255,255,0.06); flex-shrink: 0;
+        }
+        @keyframes ap-frame-pulse {
+            0% {
+                box-shadow:
+                    0 0 0 1px rgba(255, 76, 76, 0.75),
+                    0 0 10px rgba(255, 76, 76, 0.5),
+                    0 0 24px rgba(255, 196, 0, 0.15);
+                filter: drop-shadow(0 0 6px rgba(255, 76, 76, 0.45));
+            }
+            50% {
+                box-shadow:
+                    0 0 0 1px rgba(255, 210, 64, 0.95),
+                    0 0 16px rgba(255, 76, 76, 0.8),
+                    0 0 30px rgba(255, 210, 64, 0.32);
+                filter: drop-shadow(0 0 12px rgba(255, 210, 64, 0.6));
+            }
+            100% {
+                box-shadow:
+                    0 0 0 1px rgba(255, 76, 76, 0.75),
+                    0 0 10px rgba(255, 76, 76, 0.5),
+                    0 0 24px rgba(255, 196, 0, 0.15);
+                filter: drop-shadow(0 0 6px rgba(255, 76, 76, 0.45));
+            }
+        }
+        @keyframes legend-text-shimmer {
+            0% { text-shadow: 0 0 4px rgba(255, 159, 26, 0.5), 0 0 10px rgba(255, 77, 77, 0.25); }
+            50% { text-shadow: 0 0 10px rgba(255, 220, 120, 0.95), 0 0 18px rgba(255, 77, 77, 0.45); }
+            100% { text-shadow: 0 0 4px rgba(255, 159, 26, 0.5), 0 0 10px rgba(255, 77, 77, 0.25); }
+        }
+        .legend-frame {
+            border: 1px solid rgba(255, 102, 102, 0.9) !important;
+            background:
+                linear-gradient(135deg, rgba(255, 90, 90, 0.18), rgba(255, 196, 0, 0.12)),
+                rgba(12, 14, 24, 0.92) !important;
+            animation: ap-frame-pulse 1.8s ease-in-out infinite;
+        }
+        .legend-text {
+            color: #ffd27a !important;
+            animation: legend-text-shimmer 1.8s ease-in-out infinite;
+            letter-spacing: 0.04em;
+        }
+        .item-card-info { flex: 1; min-width: 0; }
+        .market-card .item-card-img,
+        .crate-item-card .item-card-img {
+            width: min(100%, 120px); aspect-ratio: 1 / 1; height: auto; border-radius: 10px; object-fit: contain;
+            background: rgba(255,255,255,0.06); margin-bottom: 10px;
+        }
+        .market-card .item-card-img {
+            display: block; margin-left: auto; margin-right: auto;
+        }
+        .market-card {
+            padding: 16px; background: rgba(255,255,255,0.04); color: #fff; border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 14px;
+        }
+        .item-card.active {
+            border-color: rgba(0,230,118,0.75); box-shadow: inset 0 0 0 1px rgba(0,230,118,0.25); background: rgba(0,230,118,0.08);
+        }
+        .item-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: rgba(255,255,255,0.72); }
+        .market-actions { display: flex; gap: 10px; margin-top: 14px; }
+        .market-actions button { flex: 1; }
+        .run-history { max-height: 430px; overflow: auto; }
+        .market-layout {
+            display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 18px; min-height: 0;
+        }
+        .market-type-nav {
+            display: flex; flex-direction: column; gap: 10px; padding-right: 8px; overflow-y: auto;
+        }
+        .market-type-button {
+            width: 100%; text-align: left; padding: 12px 14px; border-radius: 12px;
+            background: rgba(255,255,255,0.045); color: #fff; border: 1px solid rgba(255,255,255,0.08);
+        }
+        .market-sections {
+            display: grid; gap: 18px; max-height: 68vh; overflow-y: auto; padding-right: 4px;
+        }
+        .market-section {
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 16px; background: rgba(255,255,255,0.025);
+        }
+        .market-section h3 { margin-bottom: 12px; }
+        .market-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .run-card {
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px; background: rgba(255,255,255,0.04);
+        }
+        .collection-section { margin-top: 18px; }
+        .collection-section h3 { margin-bottom: 10px; }
+        .collection-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 12px;
+        }
+        .collection-icon-card {
+            display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 4px 6px;
+            border-radius: 12px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.05);
+        }
+        .collection-icon-card.equipable { cursor: pointer; }
+        .collection-icon-card.equipped {
+            border-color: rgba(0,230,118,0.75); box-shadow: inset 0 0 0 1px rgba(0,230,118,0.22); background: rgba(0,230,118,0.08);
+        }
+        .collection-icon {
+            width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: rgba(255,255,255,0.05);
+            padding: 4px; transition: transform 0.15s ease;
+        }
+        .collection-icon-card.unowned .collection-icon {
+            filter: grayscale(1) brightness(0.25);
+            opacity: 0.75;
+        }
+        .collection-count {
+            min-height: 16px; font-size: 12px; font-weight: 800; letter-spacing: 0.03em;
+        }
+        .loadout-slot-card:hover .loadout-slot-icon,
+        .collection-icon-card:hover .collection-icon {
+            transform: scale(1.08);
+        }
+        .empty-state {
+            padding: 24px; border-radius: 14px; background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.55); text-align: center;
+        }
+        .modal {
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.45); pointer-events: auto; z-index: 30;
+        }
+        .modal-panel { width: min(420px, calc(100% - 32px)); padding: 24px; }
+        .auth-mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
+        .auth-mode-toggle button.active { background: rgba(68,138,255,0.25); color: #cfe1ff; }
+        .auth-form { display: grid; gap: 12px; margin-top: 12px; }
+        .auth-form input {
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; background: rgba(255,255,255,0.05); color: #fff;
+        }
+        .auth-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+        .detail-modal-panel { width: min(460px, calc(100% - 32px)); padding: 24px; }
+        .detail-media {
+            width: min(100%, 220px); aspect-ratio: 1 / 1; height: auto; object-fit: contain; border-radius: 16px; margin: 16px auto;
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+            display: block;
+        }
+        .detail-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+        .detail-actions button { flex: 1 1 140px; }
+        .detail-message { margin-top: 12px; min-height: 18px; }
+        .trade-form { display: grid; gap: 14px; margin-top: 18px; }
+        .trade-form input {
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; background: rgba(255,255,255,0.05); color: #fff;
+        }
+        .trade-slider-wrap {
+            display: grid; gap: 8px;
+        }
+        .trade-slider {
+            width: 100%; accent-color: #00e676;
+        }
+        .trade-slider-labels {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 12px; color: rgba(255,255,255,0.7); font-weight: 700;
+        }
+        #cratePanel {
+            position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+            width: min(420px, calc(100% - 40px)); max-height: min(520px, calc(100% - 80px));
+            overflow: hidden; pointer-events: auto; z-index: 5;
+        }
+        .crate-panel-header { padding: 16px 16px 6px; }
+        .crate-items { display: grid; gap: 10px; padding: 0 16px 16px; max-height: 420px; overflow: auto; }
+        #crateMessage { padding: 0 16px 12px; color: #fff59d; font-size: 13px; }
+        .raid-side-panel {
+            position: absolute; top: 50%; transform: translateY(-50%); width: min(280px, calc(50vw - 260px));
+            max-height: min(560px, calc(100% - 80px)); overflow: hidden; pointer-events: auto; z-index: 6;
+        }
+        #raidLoadoutPanel { left: 24px; }
+        #raidBackpackPanel { right: 24px; }
+        .raid-side-header { padding: 16px 16px 8px; }
+        .raid-side-items {
+            display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 0 16px 16px; overflow: auto;
+            max-height: 440px;
+        }
+        .raid-side-section { padding-bottom: 12px; }
+        .raid-side-section h4 {
+            padding: 0 16px 10px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.6);
+        }
+        .raid-icon-button {
+            display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px; background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08); color: #fff; text-align: center;
+        }
+        .raid-icon-button img {
+            width: 62px; height: 62px; object-fit: contain; border-radius: 12px; background: rgba(255,255,255,0.05); padding: 4px;
+            transition: transform 0.15s ease;
+        }
+        .raid-icon-button:hover img { transform: scale(1.08); }
+        .raid-icon-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: rgba(255,255,255,0.58); }
+        .raid-icon-name { font-size: 11px; font-weight: 700; line-height: 1.2; }
+        .raid-detail-meta { margin-top: 14px; }
+        @media (max-width: 1000px) {
+            .summary-grid, .inventory-layout, .market-grid, .market-layout { grid-template-columns: 1fr; }
+            .summary-wide { grid-column: span 1; }
+            .player-level-grid { grid-template-columns: 1fr; }
+            .player-level-hero { grid-column: span 1; }
+            .menu-loadout-buttons, .menu-loadout-preview-grid, .preset-save-grid { grid-template-columns: 1fr; }
+            #cratePanel { width: min(420px, calc(100% - 24px)); }
+            .loadout-visual { min-height: 420px; }
+            .raid-side-panel {
+                width: min(240px, calc(50vw - 40px));
+            }
+            .market-type-nav { flex-direction: row; flex-wrap: wrap; padding-right: 0; }
+        }
+        /* Mail button */
+        .mail-button {
+            pointer-events: auto;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            padding: 6px 10px;
+            cursor: pointer;
+            color: #fff;
+            font-size: 16px;
+            position: relative;
+            transition: background 0.15s;
+        }
+        .mail-button:hover { background: rgba(255,255,255,0.12); }
+        .mail-icon { display: inline-block; }
+        .mail-badge {
+            position: absolute;
+            top: -5px; right: -5px;
+            background: #e53935;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+        }
+        /* Mail list */
+        .mail-list { display: grid; gap: 10px; margin-top: 14px; max-height: 520px; overflow-y: auto; }
+        .mail-card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 12px 14px;
+            cursor: pointer;
+            transition: background 0.12s;
+        }
+        .mail-card:hover { background: rgba(255,255,255,0.07); }
+        .mail-card.claimed { border-color: rgba(255,215,0,0.15); }
+        .mail-card.expired { border-color: rgba(255,60,60,0.2); }
+        .mail-card-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+        .mail-card-preview { font-size: 12px; color: rgba(255,255,255,0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mail-card-meta { display: flex; gap: 10px; align-items: center; margin-top: 8px; font-size: 11px; color: rgba(255,255,255,0.4); }
+        .mail-card-meta .mail-reward-tag { color: #ffd700; }
+        .mail-card-meta .mail-expired-tag { color: #e53935; }
+        .mail-card-meta .mail-claimed-tag { color: rgba(255,255,255,0.3); }
+        .mail-card-meta .mail-timer-tag { color: #64b5f6; }
+        /* Mail detail */
+        .mail-detail { margin-top: 14px; }
+        .mail-detail-title { font-size: 20px; font-weight: 700; margin-bottom: 10px; }
+        .mail-detail-content { font-size: 14px; color: rgba(255,255,255,0.75); line-height: 1.7; margin-bottom: 18px; white-space: pre-wrap; }
+        .mail-rewards-section { margin-bottom: 16px; }
+        .mail-rewards-label { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.45); margin-bottom: 10px; }
+        .mail-rewards-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+        .mail-reward-item {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+            min-width: 64px;
+        }
+        .mail-reward-item img { width: 48px; height: 48px; object-fit: contain; }
+        .mail-reward-item .mail-reward-name { font-size: 11px; color: rgba(255,255,255,0.65); margin-top: 4px; }
+        .mail-reward-item .mail-reward-qty { font-size: 11px; color: #ffd700; font-weight: 700; }
+        .mail-claim-btn {
+            background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,165,0,0.08));
+            border: 1px solid rgba(255,215,0,0.3);
+            color: #ffd700;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.15s;
+        }
+        .mail-claim-btn:hover { background: linear-gradient(135deg, rgba(255,215,0,0.25), rgba(255,165,0,0.18)); }
+        .mail-claim-btn:disabled { opacity: 0.4; cursor: default; }
+        .mail-claimed-label { font-size: 13px; color: rgba(255,255,255,0.35); font-style: italic; }
+        .mail-expired-label { font-size: 13px; color: rgba(229,57,53,0.7); font-style: italic; }
+        .mail-countdown { font-size: 12px; color: #64b5f6; margin-top: 8px; }
+        @media (max-width: 720px) {
+            .hero-panel h1 { font-size: 42px; }
+            .screen { padding: 18px; }
+            .hero-panel { padding: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="loading-shell">
+            <div class="rose-loader" data-rose-loader aria-hidden="true">
+                <svg viewBox="0 0 100 100" fill="none" aria-hidden="true">
+                    <g class="rose-loader-group">
+                        <path class="rose-loader-path"></path>
+                    </g>
+                </svg>
+            </div>
+            <div>Loading SDC.IO...</div>
+        </div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="uiRoot">
+        <header id="topBar" class="hidden">
+            <div class="topbar-left">
+                <div class="topbar-brand-stack">
+                    <div class="brand">Operator Control</div>
+                    <div id="topbarLevelBox" class="topbar-level-box"></div>
+                    <div id="topbarLeaderboardBox" class="topbar-leaderboard-box"></div>
+                </div>
+                <button id="redeemButton" class="secondary-button">Redeem</button>
+            </div>
+            <div id="authMenuWrap" class="topbar-account">
+                <div style="display:flex;gap:8px;align-items:center;pointer-events:auto">
+                    <!-- Raid chances -->
+                    <div id="raidChances" class="hidden" style="display:flex;gap:10px;align-items:center;font-size:11px;font-family:monospace">
+                        <div style="text-align:center">
+                            <div style="color:#b388ff;white-space:nowrap">Hell <span id="hellChances">12/12</span> <button id="buyHellChance" class="secondary-button" style="font-size:10px;padding:1px 5px;vertical-align:middle" title="Buy 1 chance (150k)">+</button></div>
+                            <div id="hellTimer" style="color:#666;font-size:10px"></div>
+                        </div>
+                        <div style="text-align:center">
+                            <div style="color:#ff4d4d;white-space:nowrap">Chaos <span id="chaosChances">3/3</span> <button id="buyChaosChance" class="secondary-button" style="font-size:10px;padding:1px 5px;vertical-align:middle" title="Buy 1 chance (1.28M)">+</button></div>
+                            <div id="chaosTimer" style="color:#666;font-size:10px"></div>
+                        </div>
+                    </div>
+                    <button id="mailButton" class="mail-button hidden" title="Mail">
+                        <span class="mail-icon">✉</span>
+                        <span id="mailBadge" class="mail-badge hidden">0</span>
+                    </button>
+                </div>
+                <button id="authButton" class="secondary-button">Login / Sign Up</button>
+                <div id="authDropdown" class="auth-dropdown hidden"></div>
+            </div>
+        </header>
+
+        <section id="menuScreen" class="screen hidden">
+            <div class="panel hero-panel">
+                <h1>SDC.IO</h1>
+                <p>
+                    Configure a six-slot raid kit, inspect loot crates in the field with <strong>F</strong>,
+                    click items to grab them, and extract alive to bank equipment into your stash before trading it for coins in the market.
+                </p>
+                <div class="menu-actions">
+                    <div class="menu-difficulty-inline">
+                        <label for="difficultySelect">Difficulty</label>
+                        <select id="difficultySelect">
+                            <option value="easy" selected>Easy</option>
+                            <option value="advanced">Advanced</option>
+                            <option value="hell">Hell</option>
+                            <option value="chaos">Chaos</option>
+                        </select>
+                    </div>
+                    <button id="startButton" class="primary-button">Start Game</button>
+                    <button id="inventoryButton" class="secondary-button">Inventory</button>
+                    <button id="marketButton" class="secondary-button">Market</button>
+                </div>
+                <div class="menu-loadout-space">
+                    <div class="section-subtitle">Raid Loadout Selection</div>
+                    <div id="menuLoadoutButtons" class="menu-loadout-buttons"></div>
+                    <div id="menuLoadoutPreview" class="menu-loadout-preview"></div>
+                </div>
+                <div id="menuSummary" class="summary-grid"></div>
+            </div>
+        </section>
+
+        <section id="inventoryScreen" class="screen hidden">
+            <div class="panel inventory-layout">
+                <div class="inventory-shell">
+                    <div>
+                        <h2>Inventory</h2>
+                        <div class="section-subtitle">Manage your loadout and browse everything in your stash.</div>
+                    </div>
+                    <button id="backButton" class="secondary-button">Back</button>
+                </div>
+                <div class="inventory-section loadout-panel">
+                    <div class="inventory-header" style="margin-bottom:16px;">
+                        <div>
+                            <h2>Loadout</h2>
+                            <div class="section-subtitle">Equipped gear is shown on the operator. Equip items from the right-side equipment grid.</div>
+                        </div>
+                        <div class="header-actions">
+                            <button id="openPresetSaveButton" class="secondary-button">Save as presets</button>
+                        </div>
+                    </div>
+                    <div id="loadoutSections"></div>
+                </div>
+
+                <div class="inventory-section stash-panel">
+                    <div class="inventory-header" style="margin-bottom:16px;">
+                        <div>
+                            <h2>Stash</h2>
+                            <div id="inventoryStats" class="section-subtitle"></div>
+                        </div>
+                        <div id="inventoryCoins" style="font-size: 28px; font-weight: 800; color: #00e676;"></div>
+                    </div>
+                    <div id="stashSummary" class="summary-grid" style="margin-bottom: 18px;"></div>
+                    <section class="collection-section">
+                        <div class="inventory-header" style="margin-bottom:10px;">
+                            <h3>Backpack Contents</h3>
+                            <div id="prepBackpackStats" class="section-subtitle"></div>
+                        </div>
+                        <div id="prepBackpackCollection" class="collection-grid"></div>
+                    </section>
+                    <section class="collection-section">
+                        <div class="inventory-header" style="margin-bottom:10px;">
+                            <h3>Safebox</h3>
+                            <div id="safeboxStats" class="section-subtitle"></div>
+                        </div>
+                        <div id="safeboxCollection" class="collection-grid"></div>
+                    </section>
+                    <section class="collection-section">
+                        <h3>Loot</h3>
+                        <div id="itemCollection" class="collection-grid"></div>
+                    </section>
+                    <section class="collection-section">
+                        <h3>Guns</h3>
+                        <div id="gunCollection" class="collection-grid"></div>
+                    </section>
+                    <section class="collection-section">
+                        <h3>Equipments</h3>
+                        <div id="equipmentCollection" class="collection-grid"></div>
+                    </section>
+                </div>
+            </div>
+        </section>
+
+        <section id="marketScreen" class="screen hidden">
+            <div class="panel inventory-layout">
+                <div class="inventory-section" style="grid-column: 1 / -1;">
+                    <div class="inventory-header" style="margin-bottom:16px;">
+                        <div>
+                            <h2>Market</h2>
+                            <div class="section-subtitle">Trade any existing item for coins. Extraction gives items only; coins come from selling.</div>
+                        </div>
+                        <div class="inventory-header">
+                            <div id="marketCoins" style="font-size: 24px; font-weight: 800; color: #00e676; margin-right: 12px;"></div>
+                            <button id="marketBackButton" class="secondary-button">Back</button>
+                        </div>
+                    </div>
+                    <div id="marketMessage" class="section-subtitle"></div>
+                    <div class="market-layout">
+                        <aside id="marketTypeNav" class="market-type-nav"></aside>
+                        <div id="marketSections" class="market-sections"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="placeholderScreen" class="screen hidden">
+            <div class="panel placeholder-panel">
+                <div class="placeholder-header">
+                    <div>
+                        <h2 id="placeholderTitle">Raid History</h2>
+                        <div id="placeholderSubtitle" class="section-subtitle">This page will be implemented later.</div>
+                    </div>
+                    <button id="placeholderBackButton" type="button" class="secondary-button">Back</button>
+                </div>
+                <div id="placeholderSummary" class="summary-grid"></div>
+                <div id="placeholderContent" class="placeholder-content"></div>
+                <div class="placeholder-actions">
+                    <button class="secondary-button" disabled>Content coming soon</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Mail Screen -->
+        <section id="mailScreen" class="screen hidden">
+            <div class="panel placeholder-panel">
+                <div class="placeholder-header">
+                    <div>
+                        <h2>Mail</h2>
+                        <div id="mailSubtitle" class="section-subtitle">Unread messages and rewards.</div>
+                    </div>
+                    <button id="mailBackButton" type="button" class="secondary-button">Back</button>
+                </div>
+                <div id="mailList" class="mail-list"></div>
+            </div>
+        </section>
+
+        <aside id="cratePanel" class="panel hidden">
+            <div class="crate-panel-header">
+                <h3>Crate Inventory</h3>
+                <div id="cratePrompt" class="section-subtitle"></div>
+            </div>
+            <div id="crateMessage"></div>
+            <div id="crateItems" class="crate-items"></div>
+        </aside>
+
+        <aside id="raidLoadoutPanel" class="panel raid-side-panel hidden">
+            <div class="raid-side-header">
+                <h3>Loadout</h3>
+                <div class="section-subtitle">Click equipped items to unequip or abandon them.</div>
+            </div>
+            <div id="raidLoadoutItems" class="raid-side-items"></div>
+        </aside>
+
+        <aside id="raidBackpackPanel" class="panel raid-side-panel hidden">
+            <div class="raid-side-header">
+                <h3>Backpack & Safebox</h3>
+                <div id="raidBackpackStats" class="section-subtitle"></div>
+            </div>
+            <div class="raid-side-section">
+                <h4>Backpack</h4>
+                <div id="raidBackpackItems" class="raid-side-items"></div>
+            </div>
+            <div class="raid-side-section">
+                <h4 id="raidSafeboxStats">Safebox</h4>
+                <div id="raidSafeboxItems" class="raid-side-items"></div>
+            </div>
+        </aside>
+
+        <div id="offlineOverlay" class="hidden" aria-hidden="true">
+            <div class="panel offline-overlay-panel">
+                <div class="rose-loader" data-rose-loader aria-hidden="true">
+                    <svg viewBox="0 0 100 100" fill="none" aria-hidden="true">
+                        <g class="rose-loader-group">
+                            <path class="rose-loader-path"></path>
+                        </g>
+                    </svg>
+                </div>
+                <h2 class="offline-overlay-title">Reconnecting...</h2>
+                <p id="offlineStatusText" class="offline-overlay-copy">Connection lost. Gameplay and menu actions are paused until the connection returns.</p>
+            </div>
+        </div>
+
+        <div id="authModal" class="modal hidden">
+            <div class="panel modal-panel">
+                <div class="inventory-header">
+                    <h2 id="authTitle">Login</h2>
+                    <button id="authClose" class="secondary-button">Close</button>
+                </div>
+                <p id="authMessage" class="section-subtitle"></p>
+                <div class="auth-mode-toggle">
+                    <button id="loginModeButton" class="secondary-button active">Login</button>
+                    <button id="signupModeButton" class="secondary-button">Sign Up</button>
+                </div>
+                <form id="authForm" class="auth-form">
+                    <input id="authUsername" type="text" placeholder="Username" autocomplete="username" required>
+                    <input id="authPassword" type="password" placeholder="Password" autocomplete="current-password" required>
+                    <button id="authSubmit" type="submit" class="primary-button">Login</button>
+                </form>
+                <div id="accountActions" class="auth-actions hidden">
+                    <button id="logoutButton" class="secondary-button">Logout</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="equipmentDetailModal" class="modal hidden">
+            <div class="panel detail-modal-panel">
+                <div class="inventory-header">
+                    <div>
+                        <div id="detailType" class="section-subtitle"></div>
+                        <h2 id="detailName">Item</h2>
+                    </div>
+                    <button id="detailClose" class="secondary-button">Close</button>
+                </div>
+                <img id="detailImage" class="detail-media" alt="Equipment preview">
+                <p id="detailDescription" class="section-subtitle"></p>
+                <div id="detailMeta" class="item-stats" style="margin-top:14px;"></div>
+                <div id="detailActions" class="detail-actions"></div>
+                <div id="detailMessage" class="detail-message section-subtitle"></div>
+            </div>
+        </div>
+
+        <div id="raidDetailModal" class="modal hidden">
+            <div class="panel detail-modal-panel">
+                <div class="inventory-header">
+                    <div>
+                        <div id="raidDetailType" class="section-subtitle"></div>
+                        <h2 id="raidDetailName">Item</h2>
+                    </div>
+                    <button id="raidDetailClose" class="secondary-button">Close</button>
+                </div>
+                <img id="raidDetailImage" class="detail-media" alt="Raid item preview">
+                <p id="raidDetailDescription" class="section-subtitle"></p>
+                <div id="raidDetailMeta" class="item-stats raid-detail-meta"></div>
+                <div id="raidDetailActions" class="detail-actions"></div>
+                <div id="raidDetailMessage" class="detail-message section-subtitle"></div>
+            </div>
+        </div>
+
+        <div id="tradeModal" class="modal hidden">
+            <div class="panel modal-panel">
+                <div class="inventory-header">
+                    <div>
+                        <h2 id="tradeTitle">Trade</h2>
+                        <div id="tradeSubtitle" class="section-subtitle"></div>
+                    </div>
+                    <button id="tradeClose" class="secondary-button">Close</button>
+                </div>
+                <form id="tradeForm" class="trade-form">
+                    <input id="tradeQuantity" type="number" min="1" step="1" required>
+                    <div class="trade-slider-wrap">
+                        <input id="tradeQuantitySlider" class="trade-slider" type="range" min="1" max="1" step="1" value="1">
+                        <div class="trade-slider-labels">
+                            <span id="tradeMinLabel">Min 1</span>
+                            <span id="tradeMaxLabel">Max 1</span>
+                        </div>
+                    </div>
+                    <div id="tradeHint" class="section-subtitle"></div>
+                    <button id="tradeSubmit" type="submit" class="primary-button">Confirm</button>
+                </form>
+                <div id="tradeMessage" class="detail-message section-subtitle"></div>
+            </div>
+        </div>
+
+        <div id="presetSaveModal" class="modal hidden">
+            <div class="panel modal-panel">
+                <div class="inventory-header">
+                    <div>
+                        <h2>Save Current Loadout</h2>
+                        <div class="section-subtitle">Choose which preset slot should be overwritten by your currently equipped loadout, backpack, and safebox setup.</div>
+                    </div>
+                    <button id="presetSaveClose" class="secondary-button">Close</button>
+                </div>
+                <div id="presetSaveOptions" class="preset-save-grid"></div>
+            </div>
+        </div>
+
+        <div id="raidLoadingOverlay">
+        <div class="rose-loader raid-loading-spinner" data-rose-loader aria-hidden="true">
+            <svg viewBox="0 0 100 100" fill="none" aria-hidden="true">
+                <g class="rose-loader-group">
+                    <path class="rose-loader-path"></path>
+                </g>
+            </svg>
+        </div>
+        <div class="raid-loading-text">Loading raid…</div>
+    </div>
+    <div id="chaosStartModal" class="modal hidden">
+            <div class="panel modal-panel">
+                <div class="inventory-header">
+                    <div>
+                        <h2 class="legend-text">Chaos Warning</h2>
+                        <div class="section-subtitle">High-risk raid confirmation</div>
+                    </div>
+                    <button id="chaosStartClose" class="secondary-button">Back</button>
+                </div>
+                <p class="section-subtitle" style="margin-top:16px; line-height:1.8;">
+                    Chaos is the most difficult game mode, even a random AI enemy in this mode can kill you easily if you don't have good enough equipments! Also you have chances to lose items even if they are in your SAFEBOX. You may choose to proceed or fallback to safety now:
+                </p>
+                <div class="detail-actions" style="margin-top:22px;">
+                    <button id="chaosStartBack" class="secondary-button">Back</button>
+                    <button id="chaosStartContinue" class="primary-button" data-difficulty="chaos">Continue</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (() => {
+            const SVG_NS = 'http://www.w3.org/2000/svg';
+            const config = {
+                rotate: true,
+                particleCount: 78,
+                trailSpan: 0.32,
+                durationMs: 5400,
+                rotationDurationMs: 28000,
+                pulseDurationMs: 4500,
+                strokeWidth: 4.6,
+                roseA: 9.2,
+                roseABoost: 0.6,
+                roseBreathBase: 0.72,
+                roseBreathBoost: 0.28,
+                roseScale: 3.25,
+                point(progress, detailScale) {
+                    const t = progress * Math.PI * 2;
+                    const a = this.roseA + detailScale * this.roseABoost;
+                    const r = a * (this.roseBreathBase + detailScale * this.roseBreathBoost) * Math.cos(4 * t);
+                    return {
+                        x: 50 + Math.cos(t) * r * this.roseScale,
+                        y: 50 + Math.sin(t) * r * this.roseScale,
+                    };
+                },
+            };
+
+            const loaders = Array.from(document.querySelectorAll('[data-rose-loader]')).map((root) => {
+                const group = root.querySelector('.rose-loader-group');
+                const path = root.querySelector('.rose-loader-path');
+                if (!group || !path) return null;
+                path.setAttribute('stroke-width', String(config.strokeWidth));
+                const particles = Array.from({ length: config.particleCount }, () => {
+                    const circle = document.createElementNS(SVG_NS, 'circle');
+                    circle.setAttribute('class', 'rose-loader-particle');
+                    group.appendChild(circle);
+                    return circle;
+                });
+                return { group, path, particles };
+            }).filter(Boolean);
+
+            function normalizeProgress(progress) {
+                return ((progress % 1) + 1) % 1;
+            }
+
+            function getDetailScale(time) {
+                const pulseProgress = (time % config.pulseDurationMs) / config.pulseDurationMs;
+                const pulseAngle = pulseProgress * Math.PI * 2;
+                return 0.52 + ((Math.sin(pulseAngle + 0.55) + 1) / 2) * 0.48;
+            }
+
+            function getRotation(time) {
+                if (!config.rotate) return 0;
+                return -((time % config.rotationDurationMs) / config.rotationDurationMs) * 360;
+            }
+
+            function buildPath(detailScale, steps = 480) {
+                return Array.from({ length: steps + 1 }, (_, index) => {
+                    const point = config.point(index / steps, detailScale);
+                    return `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
+                }).join(' ');
+            }
+
+            function getParticle(index, progress, detailScale) {
+                const tailOffset = index / (config.particleCount - 1);
+                const point = config.point(normalizeProgress(progress - tailOffset * config.trailSpan), detailScale);
+                const fade = Math.pow(1 - tailOffset, 0.56);
+                return {
+                    x: point.x,
+                    y: point.y,
+                    radius: 0.9 + fade * 2.7,
+                    opacity: 0.04 + fade * 0.96,
+                };
+            }
+
+            const startedAt = performance.now();
+            function render(now) {
+                const time = now - startedAt;
+                const progress = (time % config.durationMs) / config.durationMs;
+                const detailScale = getDetailScale(time);
+                const pathData = buildPath(detailScale);
+                const rotation = getRotation(time);
+
+                loaders.forEach(({ group, path, particles }) => {
+                    group.setAttribute('transform', `rotate(${rotation} 50 50)`);
+                    path.setAttribute('d', pathData);
+                    particles.forEach((node, index) => {
+                        const particle = getParticle(index, progress, detailScale);
+                        node.setAttribute('cx', particle.x.toFixed(2));
+                        node.setAttribute('cy', particle.y.toFixed(2));
+                        node.setAttribute('r', particle.radius.toFixed(2));
+                        node.setAttribute('opacity', particle.opacity.toFixed(3));
+                    });
+                });
+
+                requestAnimationFrame(render);
+            }
+
+            if (loaders.length) {
+                requestAnimationFrame(render);
+            }
+        })();
+    </script>
+    <script type="module" src="./js/app.js"></script>
+</body>
+</html>

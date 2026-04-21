@@ -13,6 +13,8 @@ from threading import RLock
 from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parent
+CLIENT_ROOT = ROOT / 'client'
+CLIENT_ASSETS_DIR = CLIENT_ROOT / 'assets'
 DATA_FILE = ROOT / 'data' / 'users.json'
 DATA_FILE_BACKUP = ROOT / 'data' / 'users.json.runtime.bak'
 DEV_CONFIG_FILE = ROOT / 'data' / 'dev-config.json'
@@ -115,7 +117,7 @@ def read_store() -> dict:
             )
 
 
-def write_store(store: dict) -> None:
+def write_store(store: dict, bump_version: bool = True) -> None:
     if not isinstance(store, dict):
         raise ValueError('store must be a dict')
     if 'users' not in store:
@@ -124,7 +126,11 @@ def write_store(store: dict) -> None:
     if not isinstance(store.get('users'), dict):
         raise ValueError('store.users must be a dict')
     with STORE_LOCK:
-        store['_version'] = store.get('_version', 0) + 1
+        # Only bump version when a human user's profile was modified.
+        # AI roster updates and internal cleanups skip the bump so they
+        # don't invalidate active clients' optimistic-concurrency tokens.
+        if bump_version:
+            store['_version'] = store.get('_version', 0) + 1
         _atomic_write_json(DATA_FILE, store)
         _atomic_write_json(DATA_FILE_BACKUP, store)
 
@@ -165,6 +171,30 @@ def apply_chance_regen(user: dict) -> bool:
         user[chance_key] = current
         user[regen_key] = 0 if current >= max_val else regen_at
     return changed
+
+
+def get_loss_multiplier(elo: int | float) -> float:
+    elo = int(elo or 0)
+    if elo <= 900:
+        return 1 / 3
+    if elo <= 1200:
+        return 1 / 2
+    if elo <= 1800:
+        return 1.0
+    if elo <= 2100:
+        return 2.0
+    if elo <= 2400:
+        return 3.0
+    return 5.0
+
+
+def get_gain_multiplier(elo: int | float) -> float:
+    elo = int(elo or 0)
+    if elo <= 900:
+        return 3.0
+    if elo <= 1200:
+        return 2.0
+    return 1.0
 
 
 def is_valid_username(username: str) -> bool:
@@ -630,7 +660,7 @@ def _get_exp_reward_for_run_summary(summary: dict | None = None) -> int:
 
 class ApiHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=str(ROOT), **kwargs)
+        super().__init__(*args, directory=str(CLIENT_ROOT), **kwargs)
 
     def end_headers(self):
         if self.path.startswith('/api/'):
@@ -703,10 +733,10 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 entry_ts = entry.get('timestamp', 0)
                 # If a history entry was recorded after the raid started, it's already completed
                 if entry_ts and entry_ts >= raid_started:
-                    # Clear stale activeRaid marker
+                    # Clear stale activeRaid marker (internal cleanup; no version bump)
                     user['activeRaid'] = None
                     users[existing_key] = user
-                    write_store(store)
+                    write_store(store, bump_version=False)
                     self._send_json({'ok': True, 'active': False})
                     return
             elapsed = int(time.time() * 1000) - raid_started
@@ -791,7 +821,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                     migrated += 1
                 store['users'] = users
                 store['aiRoster'] = {}
-                write_store(store)
+                write_store(store, bump_version=False)
             ai_users = get_ai_users(users)
             self._send_json({'ok': True, 'roster': ai_users, 'migrated': migrated})
             return
@@ -834,7 +864,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                         migrated += 1
                     store['users'] = users
                     store['aiRoster'] = {}
-                    write_store(store)
+                    write_store(store, bump_version=False)
                 ai_users = get_ai_users(users)
                 self._send_json({'ok': True, 'roster': ai_users, 'migrated': migrated})
                 return
@@ -845,7 +875,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 for k in ai_keys:
                     del users[k]
                 store['users'] = users
-                write_store(store)
+                write_store(store, bump_version=False)
                 self._send_json({'ok': True, 'cleared': len(ai_keys)})
                 return
             roster_entries = body.get('entries')
@@ -883,7 +913,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 users[user_key]['isBoss'] = bool(entry.get('isBoss', False))
                 saved += 1
             store['users'] = users
-            write_store(store)
+            write_store(store, bump_version=False)
             self._send_json({'ok': True, 'saved': saved})
             return
 
@@ -920,7 +950,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 users[user_key] = entry
                 saved += 1
             store['users'] = users
-            write_store(store)
+            write_store(store, bump_version=False)
             self._send_json({'ok': True, 'saved': saved})
             return
 
@@ -1333,10 +1363,9 @@ class ApiHandler(SimpleHTTPRequestHandler):
             # Use pre-raid ELO to prevent double-application from concurrent client save
             active_raid = user.get('activeRaid') or {}
             current_elo = int(active_raid.get('preRaidElo', profile.get('elo', 1000)))
-            # ELO kill bonus is awarded ONLY for operator (player-like AI) kills,
-            # not for regular AI enemy mobs. This must match the client formula
-            # in computeEloChange() exactly to avoid client/server mismatch.
-            operator_kills = int(summary.get('operatorKills', 0) or 0)
+            # This must match client/js/profile.js computeEloChange() exactly.
+            # summary.eloKillBonus already contains the per-kill base bonus.
+            elo_kill_bonus = int(summary.get('eloKillBonus', 0) or 0)
             if difficulty == 'easy':
                 elo_change = 0
             else:
@@ -1344,23 +1373,15 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 KILL_MULT = {'advanced': 1, 'hell': 2, 'chaos': 4}
                 K = ELO_K.get(difficulty, 5)
                 diff_mult = KILL_MULT.get(difficulty, 1)
-                per_kill = 8
-                kill_bonus = per_kill * operator_kills * diff_mult
+                scaled_bonus = elo_kill_bonus * diff_mult
                 is_win = status == 'extracted'
-                # Gain/loss multipliers based on pre-raid ELO bracket
-                gain_mult = 1
-                loss_mult = 1
-                if current_elo <= 900: gain_mult = 3
-                elif current_elo <= 1200: gain_mult = 2
-                if current_elo >= 2401: loss_mult = 5
-                elif current_elo >= 2101: loss_mult = 3
-                elif current_elo >= 1801: loss_mult = 2
+                gain_mult = get_gain_multiplier(current_elo)
+                loss_mult = get_loss_multiplier(current_elo)
                 if is_win:
-                    elo_change = round((K + kill_bonus) * gain_mult)
+                    elo_change = round((K + scaled_bonus) * gain_mult)
                 else:
-                    death_penalty = float(summary.get('deathPenaltyScale', 1.0) or 1.0)
-                    net_loss = max(0, K - kill_bonus)
-                    elo_change = round(-net_loss * loss_mult * death_penalty)
+                    net_loss = max(0, K - scaled_bonus)
+                    elo_change = round(-net_loss * loss_mult)
             profile['elo'] = max(0, int(current_elo + elo_change))
             # Update safebox/backpack
             profile['safeboxItems'] = result.get('safeboxItems') or profile.get('safeboxItems') or []
@@ -1421,7 +1442,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 'preRaidElo': int(user.get('elo', 1000)),
             }
             users[existing_key] = user
-            write_store(store)
+            write_store(store, bump_version=False)
             self._send_json({'ok': True})
             return
 
@@ -1631,11 +1652,11 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 )
                 with urllib.request.urlopen(img_req, timeout=60) as resp:
                     img_data = resp.read()
-                # Save to assets/dev/
+                # Save to client/assets/dev/
                 import base64, os
                 item_id = str(body.get('itemId', 'unknown'))
                 safe_id = re.sub(r'[^a-zA-Z0-9_]', '_', item_id)
-                out_dir = ROOT / 'assets' / 'dev'
+                out_dir = CLIENT_ASSETS_DIR / 'dev'
                 out_dir.mkdir(parents=True, exist_ok=True)
                 out_path = out_dir / f'{safe_id}.jpg'
                 out_path.write_bytes(img_data)
@@ -1645,7 +1666,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             return
 
         if parsed.path == '/api/upload-image':
-            # Accept base64-encoded image data and save to assets/dev/
+            # Accept base64-encoded image data and save to client/assets/dev/
             import base64, os
             image_data = str(body.get('data', '')).strip()
             filename = str(body.get('filename', 'upload.png')).strip()
@@ -1662,7 +1683,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 ext = os.path.splitext(filename)[1] or '.png'
                 if ext.lower() not in ('.png', '.jpg', '.jpeg', '.gif', '.webp'):
                     ext = '.png'
-                out_dir = ROOT / 'assets' / 'dev'
+                out_dir = CLIENT_ASSETS_DIR / 'dev'
                 out_dir.mkdir(parents=True, exist_ok=True)
                 out_path = out_dir / f'{safe_id}{ext}'
                 out_path.write_bytes(img_bytes)
@@ -1808,7 +1829,7 @@ if __name__ == '__main__':
     print(f'WebSocket server started on ws://{HOST}:{WS_PORT}')
 
     server = ThreadingHTTPServer((HOST, PORT), ApiHandler)
-    print(f'Serving SDC.IO at http://{HOST}:{PORT}')
+    print(f'Serving SDC.IO at http://{HOST}:{PORT} from {CLIENT_ROOT}')
     try:
         server.serve_forever()
     except KeyboardInterrupt:

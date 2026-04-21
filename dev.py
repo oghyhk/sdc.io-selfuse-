@@ -28,6 +28,7 @@ import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+CLIENT_ROOT = ROOT / 'client'
 CONFIG_FILE = ROOT / 'data' / 'dev-config.json'
 
 RARITY_ORDER = ['gray', 'white', 'green', 'blue', 'purple', 'gold', 'red']
@@ -425,7 +426,7 @@ def cmd_generate_image(args):
         with urllib.request.urlopen(req, timeout=60) as resp:
             img_data = resp.read()
 
-        out_dir = ROOT / 'assets' / 'dev'
+        out_dir = CLIENT_ROOT / 'assets' / 'dev'
         out_dir.mkdir(parents=True, exist_ok=True)
         safe_id = re.sub(r'[^a-zA-Z0-9_]', '_', args.id)
         out_path = out_dir / f'{safe_id}.jpg'
@@ -457,7 +458,7 @@ def cmd_upload_image(args):
         print(f"❌ File not found: {src}", file=sys.stderr)
         sys.exit(1)
 
-    out_dir = ROOT / 'assets' / 'dev'
+    out_dir = CLIENT_ROOT / 'assets' / 'dev'
     out_dir.mkdir(parents=True, exist_ok=True)
     safe_id = re.sub(r'[^a-zA-Z0-9_]', '_', args.id)
     ext = src.suffix.lower()
