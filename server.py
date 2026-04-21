@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import math
 import re
 import time
 import uuid
@@ -244,6 +245,387 @@ def build_profile(username: str, password: str, source_profile: dict | None = No
         },
         'password': password,
     }
+
+
+LEGACY_AMMO_AMOUNTS = {
+    'ammo_white': 1,
+    'ammo_green': 2,
+    'ammo_blue': 5,
+    'ammo_purple': 10,
+    'ammo_gold': 100,
+    'ammo_red': 25000,
+}
+
+MIN_TRADE_TOTAL = 10
+AMMO_PACK_LIMIT = 999
+SAFEBOX_CAPACITY = 4
+BASE_PLAYER_LEVEL_UP_EXP = 10
+MAX_PLAYER_LEVEL = 9999
+PLAYER_LEVEL_REWARD_INTERVAL = 10
+LOADOUT_SLOTS = ('gunPrimary', 'gunSecondary', 'armor', 'helmet', 'shoes', 'backpack')
+GUN_LOADOUT_SLOTS = ('gunPrimary', 'gunSecondary')
+LOADOUT_SLOT_CATEGORIES = {
+    'gunPrimary': 'gun',
+    'gunSecondary': 'gun',
+    'armor': 'armor',
+    'helmet': 'helmet',
+    'shoes': 'shoes',
+    'backpack': 'backpack',
+}
+PLAYER_LEVEL_REQUIREMENTS = [BASE_PLAYER_LEVEL_UP_EXP]
+PLAYER_LEVEL_TOTAL_EXP = [0]
+
+
+def _safe_profile(profile: dict, store: dict) -> dict:
+    safe = {k: v for k, v in profile.items() if k != 'password'}
+    safe['_clientVersion'] = store.get('_version', 0)
+    return safe
+
+
+def _get_item_defs() -> dict:
+    config = _load_dev_config_cached()
+    items = config.get('items', {})
+    return items if isinstance(items, dict) else {}
+
+
+def _get_player_level_reward_overrides() -> dict:
+    config = _load_dev_config_cached()
+    rewards = config.get('player_level_rewards', {})
+    return rewards if isinstance(rewards, dict) else {}
+
+
+def _get_item_def(definition_id: str) -> dict | None:
+    return _get_item_defs().get(definition_id)
+
+
+def _get_loadout_slot_category(slot: str) -> str | None:
+    return LOADOUT_SLOT_CATEGORIES.get(slot)
+
+
+def _is_ammo_definition(definition_id: str) -> bool:
+    item_def = _get_item_def(definition_id)
+    return definition_id in LEGACY_AMMO_AMOUNTS or bool(item_def and item_def.get('lootType') == 'ammo')
+
+
+def _is_consumable_definition(definition_id: str) -> bool:
+    item_def = _get_item_def(definition_id)
+    return bool(item_def and item_def.get('category') == 'consumable')
+
+
+def _is_stackable_definition(definition_id: str) -> bool:
+    return _is_ammo_definition(definition_id) or _is_consumable_definition(definition_id)
+
+
+def _is_free_fallback_ammo(definition_id: str) -> bool:
+    return definition_id == 'ammo_white'
+
+
+def _is_market_locked_ammo(definition_id: str) -> bool:
+    return definition_id == 'ammo_white'
+
+
+def _get_item_value(definition_id: str) -> int:
+    item_def = _get_item_def(definition_id) or {}
+    return max(0, int(item_def.get('sellValue', 0) or 0))
+
+
+def _get_buy_trade_total(definition_id: str, quantity: int = 1) -> int:
+    item_def = _get_item_def(definition_id) or {}
+    amount = max(1, int(quantity or 1))
+    buy_tax_percent = min(1000, max(1, int(item_def.get('buyMarketTaxPercent', 10) or 10)))
+    return math.ceil(_get_item_value(definition_id) * amount * (1 + (buy_tax_percent / 100)))
+
+
+def _get_sell_trade_total(definition_id: str, quantity: int = 1) -> int:
+    item_def = _get_item_def(definition_id) or {}
+    amount = max(1, int(quantity or 1))
+    sell_tax_percent = min(99, max(1, int(item_def.get('sellMarketTaxPercent', 10) or 10)))
+    return math.floor(_get_item_value(definition_id) * amount * (1 - (sell_tax_percent / 100)))
+
+
+def _get_entry_space_used(entry: dict | str | None) -> int:
+    definition_id = entry.get('definitionId') if isinstance(entry, dict) else entry
+    item_def = _get_item_def(definition_id) or {}
+    return max(1, int(item_def.get('size', 1) or 1))
+
+
+def _get_entries_space_used(entries: list[dict] | None) -> int:
+    return sum(_get_entry_space_used(entry) for entry in (entries or []))
+
+
+def _get_backpack_capacity(profile: dict) -> int:
+    loadout = profile.get('loadout') or {}
+    capacity = 10
+    for slot in LOADOUT_SLOTS:
+        definition_id = loadout.get(slot)
+        item_def = _get_item_def(definition_id) or {}
+        modifiers = item_def.get('modifiers') or {}
+        capacity += max(0, int(modifiers.get('carrySlots', 0) or 0))
+    return capacity
+
+
+def _get_entry_amount(entry: dict, definition_id: str) -> int:
+    if _is_ammo_definition(definition_id):
+        base = LEGACY_AMMO_AMOUNTS.get(definition_id) or (_get_item_def(definition_id) or {}).get('ammoAmount') or 1
+        return max(1, int(entry.get('quantity', base) or base))
+    if _is_consumable_definition(definition_id):
+        return max(1, int(entry.get('quantity', 1) or 1))
+    return 1
+
+
+def _pack_stackable_amount(definition_id: str, amount: int) -> list[dict]:
+    if not _is_stackable_definition(definition_id):
+        return [{'definitionId': definition_id}] if amount > 0 else []
+    remaining = max(0, int(amount or 0))
+    packed = []
+    while remaining > 0:
+        quantity = min(AMMO_PACK_LIMIT, remaining)
+        packed.append({'definitionId': definition_id, 'quantity': quantity})
+        remaining -= quantity
+    return packed
+
+
+def _get_stash_items(profile: dict) -> list[dict]:
+    stash_items = profile.get('stashItems') or []
+    if not isinstance(stash_items, list):
+        stash_items = []
+    profile['stashItems'] = stash_items
+    return stash_items
+
+
+def _get_stash_ammo(profile: dict) -> dict:
+    stash_ammo = profile.get('stashAmmo') or {}
+    if not isinstance(stash_ammo, dict):
+        stash_ammo = {}
+    profile['stashAmmo'] = stash_ammo
+    return stash_ammo
+
+
+def _get_container(profile: dict, key: str) -> list[dict]:
+    entries = profile.get(key) or []
+    if not isinstance(entries, list):
+        entries = []
+    profile[key] = entries
+    return entries
+
+
+def _get_ammo_count(profile: dict, definition_id: str) -> int:
+    if _is_free_fallback_ammo(definition_id):
+        return 0
+    stash_ammo = _get_stash_ammo(profile)
+    return max(0, int(stash_ammo.get(definition_id, 0) or 0))
+
+
+def _add_ammo_to_profile(profile: dict, definition_id: str, amount: int) -> None:
+    if not _is_ammo_definition(definition_id) or _is_free_fallback_ammo(definition_id):
+        return
+    stash_ammo = _get_stash_ammo(profile)
+    next_amount = _get_ammo_count(profile, definition_id) + max(0, int(amount or 0))
+    if next_amount > 0:
+        stash_ammo[definition_id] = next_amount
+    else:
+        stash_ammo.pop(definition_id, None)
+
+
+def _remove_ammo_from_profile(profile: dict, definition_id: str, amount: int) -> None:
+    if not _is_ammo_definition(definition_id) or _is_free_fallback_ammo(definition_id):
+        return
+    current = _get_ammo_count(profile, definition_id)
+    removal = max(0, int(amount or 0))
+    if removal > current:
+        raise ValueError('Not enough ammo.')
+    stash_ammo = _get_stash_ammo(profile)
+    remaining = current - removal
+    if remaining > 0:
+        stash_ammo[definition_id] = remaining
+    else:
+        stash_ammo.pop(definition_id, None)
+
+
+def _add_item_to_stash(profile: dict, definition_id: str, amount: int = 1) -> None:
+    quantity = max(1, int(amount or 1))
+    if not _get_item_def(definition_id):
+        raise ValueError('Item not found.')
+    if _is_ammo_definition(definition_id):
+        _add_ammo_to_profile(profile, definition_id, quantity)
+        return
+    stash_items = _get_stash_items(profile)
+    for _ in range(quantity):
+        stash_items.append({'definitionId': definition_id})
+
+
+def _remove_single_stash_copy(profile: dict, definition_id: str) -> None:
+    stash_items = _get_stash_items(profile)
+    for index, entry in enumerate(stash_items):
+        if entry.get('definitionId') == definition_id:
+            stash_items.pop(index)
+            return
+    raise ValueError('Item not found in inventory.')
+
+
+def _get_owned_stash_count(profile: dict, definition_id: str) -> int:
+    stash_items = _get_stash_items(profile)
+    return sum(1 for entry in stash_items if entry.get('definitionId') == definition_id)
+
+
+def _get_equipped_count(profile: dict, definition_id: str) -> int:
+    loadout = profile.get('loadout') or {}
+    return sum(1 for slot in LOADOUT_SLOTS if loadout.get(slot) == definition_id)
+
+
+def _ensure_profile_stats(profile: dict) -> dict:
+    stats = profile.get('stats') or {}
+    if not isinstance(stats, dict):
+        stats = {}
+    profile['stats'] = stats
+    stats.setdefault('totalRuns', 0)
+    stats.setdefault('totalExtractions', 0)
+    stats.setdefault('totalKills', 0)
+    stats.setdefault('totalDeaths', 0)
+    stats.setdefault('totalCoinsEarned', 0)
+    stats.setdefault('totalMarketTrades', 0)
+    return stats
+
+
+def _resolve_gun_slot(profile: dict) -> str:
+    loadout = profile.get('loadout') or {}
+    for gun_slot in GUN_LOADOUT_SLOTS:
+        if not loadout.get(gun_slot):
+            return gun_slot
+    def item_value(slot: str) -> int:
+        return _get_item_value(loadout.get(slot))
+    return min(GUN_LOADOUT_SLOTS, key=item_value)
+
+
+def _normalize_positive_int(value, default: int = 1) -> int:
+    return max(1, int(value or default))
+
+
+def _normalize_non_negative_int(value, default: int = 0) -> int:
+    return max(0, int(value or default))
+
+
+def _normalize_player_exp(total_exp: int = 0) -> int:
+    return max(0, int(total_exp or 0))
+
+
+def _ensure_player_level_curve() -> None:
+    if len(PLAYER_LEVEL_TOTAL_EXP) > MAX_PLAYER_LEVEL:
+        return
+    last_requirement = PLAYER_LEVEL_REQUIREMENTS[0]
+    for level in range(len(PLAYER_LEVEL_TOTAL_EXP), MAX_PLAYER_LEVEL + 1):
+        previous_level = level - 1
+        if previous_level > 0:
+            scaled_requirement = math.ceil(last_requirement * 1.03)
+            last_requirement = max(last_requirement + 1, scaled_requirement)
+            if previous_level >= len(PLAYER_LEVEL_REQUIREMENTS):
+                PLAYER_LEVEL_REQUIREMENTS.extend([0] * (previous_level - len(PLAYER_LEVEL_REQUIREMENTS) + 1))
+            PLAYER_LEVEL_REQUIREMENTS[previous_level] = last_requirement
+        previous_total = PLAYER_LEVEL_TOTAL_EXP[level - 1] if level - 1 < len(PLAYER_LEVEL_TOTAL_EXP) else 0
+        previous_requirement = PLAYER_LEVEL_REQUIREMENTS[level - 1] if level - 1 < len(PLAYER_LEVEL_REQUIREMENTS) else 0
+        PLAYER_LEVEL_TOTAL_EXP.append(previous_total + previous_requirement)
+
+
+def _get_player_level(progress_exp: int = 0) -> int:
+    _ensure_player_level_curve()
+    normalized_exp = _normalize_player_exp(progress_exp)
+    low = 0
+    high = MAX_PLAYER_LEVEL
+    while low < high:
+        mid = math.ceil((low + high) / 2)
+        if (PLAYER_LEVEL_TOTAL_EXP[mid] if mid < len(PLAYER_LEVEL_TOTAL_EXP) else 0) <= normalized_exp:
+            low = mid
+        else:
+            high = mid - 1
+    return min(MAX_PLAYER_LEVEL, low)
+
+
+def _is_valid_player_level_reward_level(level: int, *, require_interval: bool = True) -> bool:
+    normalized_level = int(level or 0)
+    if normalized_level <= 0 or normalized_level > MAX_PLAYER_LEVEL:
+        return False
+    if not require_interval:
+        return True
+    return normalized_level % PLAYER_LEVEL_REWARD_INTERVAL == 0
+
+
+def _normalize_player_level_reward_claims(claims) -> list[int]:
+    unique_claims = set()
+    for level in claims if isinstance(claims, list) else []:
+        normalized_level = int(level or 0)
+        if _is_valid_player_level_reward_level(normalized_level, require_interval=False):
+            unique_claims.add(normalized_level)
+    return sorted(unique_claims)
+
+
+def _create_default_player_level_reward(level: int) -> dict | None:
+    normalized_level = int(level or 0)
+    if not _is_valid_player_level_reward_level(normalized_level):
+        return None
+    coins = max(1000, normalized_level * 250)
+    return {
+        'level': normalized_level,
+        'type': 'coins',
+        'coins': coins,
+        'itemId': '',
+        'itemName': '',
+        'quantity': 0,
+    }
+
+
+def _get_player_level_reward(level: int) -> dict | None:
+    normalized_level = int(level or 0)
+    if not _is_valid_player_level_reward_level(normalized_level, require_interval=False):
+        return None
+    overrides = _get_player_level_reward_overrides()
+    override = overrides.get(str(normalized_level)) or overrides.get(normalized_level)
+    if isinstance(override, dict) and override.get('enabled') is False:
+        return None
+    fallback_reward = _create_default_player_level_reward(normalized_level)
+    if not fallback_reward and not isinstance(override, dict):
+        return None
+    item_id = str((override or {}).get('itemId', '') or '').strip() if isinstance(override, dict) else ''
+    has_valid_item_reward = bool(item_id and _get_item_def(item_id))
+    reward_type = 'item' if isinstance(override, dict) and override.get('type') == 'item' and has_valid_item_reward else 'coins'
+    quantity = max(1, int((override or {}).get('quantity', 1) or 1)) if reward_type == 'item' else 0
+    coins = max(0, int((override or {}).get('coins', 0) or 0)) if reward_type == 'coins' and isinstance(override, dict) else 0
+    if reward_type == 'coins' and coins <= 0:
+        coins = fallback_reward['coins'] if fallback_reward else 0
+    return {
+        'level': normalized_level,
+        'type': reward_type,
+        'coins': coins if reward_type == 'coins' else 0,
+        'itemId': item_id if reward_type == 'item' else '',
+        'itemName': (_get_item_def(item_id) or {}).get('name', item_id) if reward_type == 'item' else '',
+        'quantity': quantity,
+    }
+
+
+def _get_all_player_level_reward_levels() -> list[int]:
+    levels = set(range(PLAYER_LEVEL_REWARD_INTERVAL, MAX_PLAYER_LEVEL + 1, PLAYER_LEVEL_REWARD_INTERVAL))
+    for level_key in _get_player_level_reward_overrides().keys():
+        normalized_level = int(level_key or 0)
+        if _is_valid_player_level_reward_level(normalized_level, require_interval=False):
+            levels.add(normalized_level)
+    return sorted(levels)
+
+
+def _get_next_claimable_player_level_reward(profile: dict) -> dict | None:
+    current_level = _get_player_level(profile.get('playerExp', 0))
+    claimed = set(_normalize_player_level_reward_claims(profile.get('claimedPlayerLevelRewards')))
+    for level in _get_all_player_level_reward_levels():
+        if level > current_level:
+            break
+        if level in claimed:
+            continue
+        reward = _get_player_level_reward(level)
+        if reward:
+            return reward
+    return None
+
+
+def _get_exp_reward_for_run_summary(summary: dict | None = None) -> int:
+    return max(0, int((summary or {}).get('kills', 0) or 0))
 
 
 class ApiHandler(SimpleHTTPRequestHandler):
@@ -608,9 +990,229 @@ class ApiHandler(SimpleHTTPRequestHandler):
             if apply_chance_regen(user) and existing_key:
                 users_dict[existing_key] = user
                 write_store(store)
-            safe_user = {k: v for k, v in user.items() if k != 'password'}
-            safe_user['_clientVersion'] = store.get('_version', 0)
-            self._send_json({'ok': True, 'profile': safe_user})
+            self._send_json({'ok': True, 'profile': _safe_profile(user, store)})
+            return
+
+        if parsed.path == '/api/profile-action':
+            username = str(body.get('username', '')).strip()
+            action = str(body.get('action', '')).strip()
+            client_version = body.get('_clientVersion')
+            store = read_store()
+            users = store.setdefault('users', {})
+            existing_key, user = get_user_record(users, username)
+            if not user or not existing_key:
+                self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
+                return
+            apply_chance_regen(user)
+            if client_version is not None and store.get('_version', 0) != client_version:
+                self._send_json({
+                    'ok': False,
+                    'message': 'Conflict: profile was modified by another session. Please reload and try again.',
+                    '_conflictVersion': store.get('_version', 0),
+                }, HTTPStatus.CONFLICT)
+                return
+
+            profile = dict(user)
+            extra_payload = {}
+
+            try:
+                if action == 'update-loadout':
+                    slot = str(body.get('slot', '')).strip()
+                    target_slot = _resolve_gun_slot(profile) if slot == 'gun' else slot
+                    if target_slot not in LOADOUT_SLOTS:
+                        raise ValueError('Invalid loadout slot.')
+                    definition_id = body.get('definitionId')
+                    loadout = profile.get('loadout') or {}
+                    profile['loadout'] = loadout
+                    if definition_id is None:
+                        loadout[target_slot] = None
+                    else:
+                        definition_id = str(definition_id).strip()
+                        item_def = _get_item_def(definition_id)
+                        if not item_def:
+                            raise ValueError('Item not found.')
+                        if item_def.get('category') != _get_loadout_slot_category(target_slot):
+                            raise ValueError('Item cannot be equipped in that slot.')
+                        if _get_owned_stash_count(profile, definition_id) <= 0:
+                            raise ValueError('You do not own this item.')
+                        loadout[target_slot] = definition_id
+
+                elif action == 'claim-player-level-reward':
+                    reward = _get_next_claimable_player_level_reward(profile)
+                    if not reward:
+                        raise ValueError('No player level reward is available to claim.')
+                    claimed_levels = set(_normalize_player_level_reward_claims(profile.get('claimedPlayerLevelRewards')))
+                    claimed_levels.add(reward['level'])
+                    profile['claimedPlayerLevelRewards'] = sorted(claimed_levels)
+                    stats = _ensure_profile_stats(profile)
+                    if reward['type'] == 'item' and reward['itemId']:
+                        _add_item_to_stash(profile, reward['itemId'], reward['quantity'])
+                    else:
+                        profile['coins'] = _normalize_non_negative_int(profile.get('coins', 0)) + reward['coins']
+                        stats['totalCoinsEarned'] = _normalize_non_negative_int(stats.get('totalCoinsEarned', 0)) + reward['coins']
+                    extra_payload['reward'] = reward
+
+                elif action == 'move-item-to-safebox':
+                    definition_id = str(body.get('definitionId', '')).strip()
+                    amount = _normalize_positive_int(body.get('quantity'), 1)
+                    if not _get_item_def(definition_id):
+                        raise ValueError('Item not found.')
+                    safebox = _get_container(profile, 'safeboxItems')
+                    current_used_space = _get_entries_space_used(safebox)
+                    if _is_consumable_definition(definition_id):
+                        raise ValueError('Consumables cannot be stored in the safebox.')
+                    if _is_ammo_definition(definition_id):
+                        if _is_free_fallback_ammo(definition_id):
+                            raise ValueError('Gray ammo is free and unlimited, so it cannot be stored.')
+                        available_ammo = _get_ammo_count(profile, definition_id)
+                        if amount > available_ammo:
+                            raise ValueError(f'You only have {available_ammo} {_get_item_def(definition_id).get("name", definition_id)}.')
+                        required_slots = math.ceil(amount / AMMO_PACK_LIMIT)
+                        required_space = required_slots * _get_entry_space_used(definition_id)
+                        if current_used_space + required_space > SAFEBOX_CAPACITY:
+                            raise ValueError('Safebox does not have enough space for that ammo.')
+                        _remove_ammo_from_profile(profile, definition_id, amount)
+                        safebox.extend(_pack_stackable_amount(definition_id, amount))
+                    else:
+                        if current_used_space + _get_entry_space_used(definition_id) > SAFEBOX_CAPACITY:
+                            raise ValueError('Safebox is full.')
+                        owned_count = _get_owned_stash_count(profile, definition_id)
+                        movable_count = max(0, owned_count - _get_equipped_count(profile, definition_id))
+                        if movable_count <= 0:
+                            raise ValueError('No movable copy available.')
+                        _remove_single_stash_copy(profile, definition_id)
+                        safebox.append({'definitionId': definition_id})
+
+                elif action == 'move-item-to-backpack':
+                    definition_id = str(body.get('definitionId', '')).strip()
+                    amount = _normalize_positive_int(body.get('quantity'), 1)
+                    if not _get_item_def(definition_id):
+                        raise ValueError('Item not found.')
+                    backpack = _get_container(profile, 'backpackItems')
+                    current_used_space = _get_entries_space_used(backpack)
+                    capacity = _get_backpack_capacity(profile)
+                    if _is_consumable_definition(definition_id):
+                        owned_count = _get_owned_stash_count(profile, definition_id)
+                        if amount > owned_count:
+                            raise ValueError(f'You only have {owned_count} {_get_item_def(definition_id).get("name", definition_id)}.')
+                        required_slots = math.ceil(amount / AMMO_PACK_LIMIT)
+                        required_space = required_slots * _get_entry_space_used(definition_id)
+                        if current_used_space + required_space > capacity:
+                            raise ValueError('Backpack does not have enough space for those consumables.')
+                        for _ in range(amount):
+                            _remove_single_stash_copy(profile, definition_id)
+                        backpack.extend(_pack_stackable_amount(definition_id, amount))
+                    elif _is_ammo_definition(definition_id):
+                        if _is_free_fallback_ammo(definition_id):
+                            raise ValueError('Gray ammo is free and unlimited, so it cannot be stored.')
+                        available_ammo = _get_ammo_count(profile, definition_id)
+                        if amount > available_ammo:
+                            raise ValueError(f'You only have {available_ammo} {_get_item_def(definition_id).get("name", definition_id)}.')
+                        required_slots = math.ceil(amount / AMMO_PACK_LIMIT)
+                        required_space = required_slots * _get_entry_space_used(definition_id)
+                        if current_used_space + required_space > capacity:
+                            raise ValueError('Backpack does not have enough space for that ammo.')
+                        _remove_ammo_from_profile(profile, definition_id, amount)
+                        backpack.extend(_pack_stackable_amount(definition_id, amount))
+                    else:
+                        if current_used_space + _get_entry_space_used(definition_id) > capacity:
+                            raise ValueError('Backpack is full.')
+                        owned_count = _get_owned_stash_count(profile, definition_id)
+                        movable_count = max(0, owned_count - _get_equipped_count(profile, definition_id))
+                        if movable_count <= 0:
+                            raise ValueError('No movable copy available.')
+                        _remove_single_stash_copy(profile, definition_id)
+                        backpack.append({'definitionId': definition_id})
+
+                elif action in ('move-backpack-item-to-stash', 'move-safebox-item-to-stash'):
+                    container_key = 'backpackItems' if action == 'move-backpack-item-to-stash' else 'safeboxItems'
+                    definition_id = str(body.get('definitionId', '')).strip()
+                    container = _get_container(profile, container_key)
+                    entry_index = body.get('entryIndex')
+                    if entry_index is None:
+                        resolved_index = next((index for index, entry in enumerate(container) if entry.get('definitionId') == definition_id), -1)
+                    else:
+                        resolved_index = int(entry_index)
+                    if resolved_index < 0 or resolved_index >= len(container):
+                        raise ValueError(f'Item not found in {"backpack" if container_key == "backpackItems" else "safebox"}.')
+                    entry = container.pop(resolved_index)
+                    definition_id = entry.get('definitionId')
+                    if not _get_item_def(definition_id):
+                        raise ValueError('Item not found.')
+                    _add_item_to_stash(profile, definition_id, _get_entry_amount(entry, definition_id))
+
+                elif action == 'buy-item':
+                    definition_id = str(body.get('definitionId', '')).strip()
+                    amount = _normalize_positive_int(body.get('quantity'), 1)
+                    if not _get_item_def(definition_id):
+                        raise ValueError('Item not found.')
+                    if _is_market_locked_ammo(definition_id):
+                        raise ValueError('Gray ammo cannot be traded in the market.')
+                    total_cost = _get_buy_trade_total(definition_id, amount)
+                    if total_cost < MIN_TRADE_TOTAL:
+                        raise ValueError(f'Trades must be at least {MIN_TRADE_TOTAL} coins.')
+                    coins = _normalize_non_negative_int(profile.get('coins', 0))
+                    if coins < total_cost:
+                        raise ValueError('Not enough coins.')
+                    profile['coins'] = coins - total_cost
+                    _add_item_to_stash(profile, definition_id, amount)
+                    stats = _ensure_profile_stats(profile)
+                    stats['totalMarketTrades'] = _normalize_non_negative_int(stats.get('totalMarketTrades', 0)) + amount
+
+                elif action == 'sell-item':
+                    definition_id = str(body.get('definitionId', '')).strip()
+                    amount = _normalize_positive_int(body.get('quantity'), 1)
+                    if not _get_item_def(definition_id):
+                        raise ValueError('Item not found.')
+                    if _is_market_locked_ammo(definition_id):
+                        raise ValueError('Gray ammo cannot be traded in the market.')
+                    owned_count = _get_ammo_count(profile, definition_id) if _is_ammo_definition(definition_id) else _get_owned_stash_count(profile, definition_id)
+                    equipped_count = _get_equipped_count(profile, definition_id)
+                    if owned_count <= 0:
+                        raise ValueError('You do not own this item.')
+                    sellable_count = owned_count if _is_ammo_definition(definition_id) else max(0, owned_count - equipped_count)
+                    if sellable_count <= 0:
+                        raise ValueError('Equip another item first.')
+                    if amount > sellable_count:
+                        raise ValueError(f'You can sell at most {sellable_count}.')
+                    total_value = _get_sell_trade_total(definition_id, amount)
+                    if total_value < MIN_TRADE_TOTAL:
+                        raise ValueError(f'Trades must be at least {MIN_TRADE_TOTAL} coins.')
+                    if _is_ammo_definition(definition_id):
+                        _remove_ammo_from_profile(profile, definition_id, amount)
+                    else:
+                        for _ in range(amount):
+                            _remove_single_stash_copy(profile, definition_id)
+                    profile['coins'] = _normalize_non_negative_int(profile.get('coins', 0)) + total_value
+                    stats = _ensure_profile_stats(profile)
+                    stats['totalCoinsEarned'] = _normalize_non_negative_int(stats.get('totalCoinsEarned', 0)) + total_value
+                    stats['totalMarketTrades'] = _normalize_non_negative_int(stats.get('totalMarketTrades', 0)) + amount
+
+                elif action == 'redeem-code':
+                    code = str(body.get('code', '')).strip()
+                    granted = 0
+                    if code == 'oghyhk':
+                        granted = 10000
+                    elif code == '2598':
+                        granted = _normalize_non_negative_int(body.get('amount'), 0)
+                    else:
+                        raise ValueError('Invalid redeem code.')
+                    profile['coins'] = _normalize_non_negative_int(profile.get('coins', 0)) + granted
+                    stats = _ensure_profile_stats(profile)
+                    stats['totalCoinsEarned'] = _normalize_non_negative_int(stats.get('totalCoinsEarned', 0)) + granted
+                    extra_payload['coinsGranted'] = granted
+
+                else:
+                    self._send_json({'ok': False, 'message': 'Invalid profile action.'}, HTTPStatus.BAD_REQUEST)
+                    return
+
+            except ValueError as error:
+                self._send_json({'ok': False, 'message': str(error)}, HTTPStatus.BAD_REQUEST)
+                return
+
+            users[existing_key] = profile
+            write_store(store)
+            self._send_json({'ok': True, 'profile': _safe_profile(profile, store), **extra_payload})
             return
 
         if parsed.path == '/api/save-profile':
@@ -633,9 +1235,13 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 return
             # Protect server-authoritative fields from client manipulation
             SERVER_FIELDS = {
-                'coins', 'elo',
+                'coins', 'elo', 'playerExp',
                 'hellChances', 'hellChanceMax', 'hellChanceRegenAt',
                 'chaosChances', 'chaosChanceMax', 'chaosChanceRegenAt',
+                'loadout',
+                'stashItems', 'stashAmmo', 'backpackItems', 'safeboxItems',
+                'claimedPlayerLevelRewards',
+                'extractedRuns', 'raidHistory', 'stats',
                 'activeRaid',
             }
             # Safe merge: start from server data, overlay client changes
@@ -651,14 +1257,6 @@ class ApiHandler(SimpleHTTPRequestHandler):
                     if val or not user.get('hasCompletedTutorial'):
                         merged[key] = val
                     continue
-                if key == 'stats':
-                    # Merge incrementally — client can add but not reset
-                    server_stats = user.get('stats') or {}
-                    client_stats = val or {}
-                    for sk, sv in client_stats.items():
-                        if isinstance(sv, (int, float)) and sv > server_stats.get(sk, 0):
-                            merged.setdefault('stats', {})[sk] = sv
-                    continue
                 # For list fields, keep the larger list (server has full data, client may have partial)
                 if key in ('stashItems', 'backpackItems', 'safeboxItems', 'savedLoadouts',
                            'extractedRuns', 'raidHistory', 'pinnedAchievements', 'unlockedAchievements',
@@ -668,11 +1266,6 @@ class ApiHandler(SimpleHTTPRequestHandler):
                     if len(client_list) >= len(server_list):
                         merged[key] = client_list
                     # else: keep server's larger list
-                    continue
-                # For dict fields (loadout), only accept if client sent non-empty
-                if key == 'loadout':
-                    if isinstance(val, dict) and any(v for v in val.values() if v):
-                        merged[key] = val
                     continue
                 # Other fields: accept client value
                 merged[key] = val
@@ -710,15 +1303,22 @@ class ApiHandler(SimpleHTTPRequestHandler):
             stats['totalRuns'] = stats.get('totalRuns', 0) + 1
             kills = int(summary.get('kills', 0) or 0)
             stats['totalKills'] = stats.get('totalKills', 0) + kills
+            profile['playerExp'] = _normalize_player_exp(profile.get('playerExp', 0)) + _get_exp_reward_for_run_summary(summary)
             if status == 'extracted':
                 stats['totalExtractions'] = stats.get('totalExtractions', 0) + 1
                 # Add extracted items
                 extracted_items = summary.get('items') or []
-                stash = list(profile.get('stashItems') or [])
                 for item in extracted_items:
                     if item and item.get('definitionId'):
-                        stash.append({'definitionId': item['definitionId'], 'quantity': item.get('quantity')})
-                profile['stashItems'] = stash
+                        definition_id = item['definitionId']
+                        _add_item_to_stash(profile, definition_id, _get_entry_amount(item, definition_id))
+                extracted_runs = list(profile.get('extractedRuns') or [])
+                extracted_runs.insert(0, {
+                    'id': f'{int(time.time() * 1000)}-{uuid.uuid4().hex[:4]}',
+                    'createdAt': summary.get('createdAt') or datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z'),
+                    **summary,
+                })
+                profile['extractedRuns'] = extracted_runs[:20]
                 # Add coins from extraction
                 loot_value = int(summary.get('lootValue', 0) or 0)
                 profile['coins'] = profile.get('coins', 0) + loot_value
@@ -728,6 +1328,13 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 # Apply death coin loss
                 death_loss = int(summary.get('deathCoinLoss', 0) or 0)
                 profile['coins'] = max(0, profile.get('coins', 0) - death_loss)
+                for definition_id in summary.get('deathLosses') or []:
+                    if not _get_item_def(definition_id):
+                        continue
+                    try:
+                        _remove_single_stash_copy(profile, definition_id)
+                    except ValueError:
+                        continue
             # Apply ELO (skip for easy difficulty)
             # Use pre-raid ELO to prevent double-application from concurrent client save
             active_raid = user.get('activeRaid') or {}
@@ -801,9 +1408,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             profile['username'] = user.get('username', username)
             users[existing_key] = profile
             write_store(store)
-            safe = {k: v for k, v in profile.items() if k != 'password'}
-            safe['_clientVersion'] = store.get('_version', 0)
-            self._send_json({'ok': True, 'profile': safe})
+            self._send_json({'ok': True, 'profile': _safe_profile(profile, store)})
             return
 
         if parsed.path == '/api/enter-raid':

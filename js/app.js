@@ -2490,7 +2490,7 @@ redeemButton.addEventListener('click', async () => {
 
     const normalized = String(code).trim();
     if (normalized === 'oghyhk') {
-        await store.addCoins(10000);
+        await store.redeemCode(normalized);
         renderAll();
         window.alert('Redeemed 10000 coins.');
         return;
@@ -2504,7 +2504,7 @@ redeemButton.addEventListener('click', async () => {
             window.alert('Enter a whole number with no decimal places.');
             return;
         }
-        await store.addCoins(amount);
+        await store.redeemCode(normalized, amount);
         renderAll();
         window.alert(`Redeemed ${amount} coins.`);
         return;

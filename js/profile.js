@@ -1755,17 +1755,46 @@ export class ProfileStore {
         return this.getCurrentProfile();
     }
 
+    async _runServerProfileAction(action, payload = {}) {
+        if (!this.activeUsername) return null;
+        const result = await apiFetch('/profile-action', {
+            method: 'POST',
+            body: JSON.stringify({
+                username: this.activeUsername,
+                action,
+                _clientVersion: this.currentProfile?._clientVersion,
+                ...payload,
+            })
+        });
+        if (result?.ok && result.profile) {
+            this.currentProfile = normalizeProfile(result.profile, this.activeUsername, false);
+        }
+        return result;
+    }
+
     async saveCurrentProfile() {
         if (!this.activeUsername) return this.getCurrentProfile();
+        const profile = {
+            avatarDataUrl: this.currentProfile?.avatarDataUrl || '',
+            pinnedAchievements: Array.isArray(this.currentProfile?.pinnedAchievements) ? this.currentProfile.pinnedAchievements : [],
+            unlockedAchievements: Array.isArray(this.currentProfile?.unlockedAchievements) ? this.currentProfile.unlockedAchievements : [],
+            hasCompletedTutorial: Boolean(this.currentProfile?.hasCompletedTutorial),
+            savedLoadouts: Array.isArray(this.currentProfile?.savedLoadouts) ? this.currentProfile.savedLoadouts : [],
+        };
         const result = await apiFetch('/save-profile', {
             method: 'POST',
-            body: JSON.stringify({ username: this.activeUsername, profile: this.currentProfile })
+            body: JSON.stringify({ username: this.activeUsername, _clientVersion: this.currentProfile?._clientVersion, profile })
         });
         this.currentProfile = normalizeProfile(result.profile, this.activeUsername, false);
         return this.getCurrentProfile();
     }
 
     async claimNextPlayerLevelReward() {
+        if (this.activeUsername) {
+            const result = await this._runServerProfileAction('claim-player-level-reward');
+            return { profile: this.getCurrentProfile(), reward: result?.reward || null };
+        }
+
         const reward = getNextClaimablePlayerLevelReward(this.currentProfile);
         if (!reward) {
             throw new Error('No player level reward is available to claim.');
@@ -1788,6 +1817,11 @@ export class ProfileStore {
     async updateLoadout(slot, definitionId) {
         const isGunCategoryRequest = slot === 'gun';
         if (!LOADOUT_SLOTS.includes(slot) && !isGunCategoryRequest) return this.getCurrentProfile();
+
+        if (this.activeUsername) {
+            await this._runServerProfileAction('update-loadout', { slot, definitionId });
+            return this.getCurrentProfile();
+        }
 
         const resolveGunSlot = () => {
             const emptySlot = GUN_LOADOUT_SLOTS.find((gunSlot) => !this.currentProfile.loadout?.[gunSlot]);
@@ -1856,6 +1890,17 @@ export class ProfileStore {
     }
 
     async applyRaidOutcome(result) {
+        if (this.activeUsername) {
+            const serverResult = await apiFetch('/raid-outcome', {
+                method: 'POST',
+                body: JSON.stringify({ username: this.activeUsername, result, _clientVersion: this.currentProfile?._clientVersion })
+            });
+            if (serverResult.ok && serverResult.profile) {
+                this.currentProfile = normalizeProfile(serverResult.profile, this.activeUsername, false);
+            }
+            return this.getCurrentProfile();
+        }
+
         const difficulty = result?.difficulty || 'advanced';
 
         // Apply client-side first (for immediate UI feedback)
@@ -1879,27 +1924,15 @@ export class ProfileStore {
                 items: Array.isArray(result?.summary?.items) ? result.summary.items : []
             }, 'dead');
         }
-
-        // Sync with server (server-authoritative)
-        if (this.activeUsername) {
-            try {
-                const serverResult = await apiFetch('/raid-outcome', {
-                    method: 'POST',
-                    body: JSON.stringify({ username: this.activeUsername, result })
-                });
-                if (serverResult.ok && serverResult.profile) {
-                    this.currentProfile = normalizeProfile(serverResult.profile, this.activeUsername, false);
-                }
-            } catch (e) {
-                console.warn('Server raid-outcome sync failed, saving locally:', e);
-                await this.saveCurrentProfile();
-            }
-        }
         return this.getCurrentProfile();
     }
 
     async moveItemToSafebox(definitionId, quantity = 1) {
         const amount = Math.max(1, Math.floor(Number(quantity) || 1));
+        if (this.activeUsername) {
+            await this._runServerProfileAction('move-item-to-safebox', { definitionId, quantity: amount });
+            return this.getCurrentProfile();
+        }
         const currentUsedSpace = getEntriesSpaceUsed(this.currentProfile.safeboxItems || []);
 
         if (isConsumableDefinition(definitionId)) {
@@ -1948,6 +1981,10 @@ export class ProfileStore {
 
     async moveItemToBackpack(definitionId, capacity, quantity = 1) {
         const amount = Math.max(1, Math.floor(Number(quantity) || 1));
+        if (this.activeUsername) {
+            await this._runServerProfileAction('move-item-to-backpack', { definitionId, quantity: amount });
+            return this.getCurrentProfile();
+        }
         const currentUsedSpace = getEntriesSpaceUsed(this.currentProfile.backpackItems || []);
 
         if (isConsumableDefinition(definitionId)) {
@@ -2011,6 +2048,10 @@ export class ProfileStore {
     }
 
     async moveBackpackItemToStash(definitionId, entryIndex = null) {
+        if (this.activeUsername) {
+            await this._runServerProfileAction('move-backpack-item-to-stash', { definitionId, entryIndex });
+            return this.getCurrentProfile();
+        }
         const backpack = this.currentProfile.backpackItems || [];
         const resolvedIndex = entryIndex == null
             ? backpack.findIndex((item) => item.definitionId === definitionId)
@@ -2034,6 +2075,10 @@ export class ProfileStore {
     }
 
     async moveSafeboxItemToStash(definitionId, entryIndex = null) {
+        if (this.activeUsername) {
+            await this._runServerProfileAction('move-safebox-item-to-stash', { definitionId, entryIndex });
+            return this.getCurrentProfile();
+        }
         const safebox = this.currentProfile.safeboxItems || [];
         const resolvedIndex = entryIndex == null
             ? safebox.findIndex((item) => item.definitionId === definitionId)
@@ -2057,6 +2102,10 @@ export class ProfileStore {
     }
 
     async buyItem(definitionId, quantity = 1) {
+        if (this.activeUsername) {
+            await this._runServerProfileAction('buy-item', { definitionId, quantity });
+            return this.getCurrentProfile();
+        }
         const definition = ITEM_DEFS[definitionId];
         if (!definition) throw new Error('Item not found.');
         if (isMarketLockedAmmo(definitionId)) throw new Error('Gray ammo cannot be traded in the market.');
@@ -2077,6 +2126,10 @@ export class ProfileStore {
     }
 
     async sellItem(definitionId, quantity = 1) {
+        if (this.activeUsername) {
+            await this._runServerProfileAction('sell-item', { definitionId, quantity });
+            return this.getCurrentProfile();
+        }
         const definition = ITEM_DEFS[definitionId];
         if (!definition) throw new Error('Item not found.');
         if (isMarketLockedAmmo(definitionId)) throw new Error('Gray ammo cannot be traded in the market.');
@@ -2107,7 +2160,27 @@ export class ProfileStore {
         return this.saveCurrentProfile();
     }
 
+    async redeemCode(code, amount = 0) {
+        if (this.activeUsername) {
+            return this._runServerProfileAction('redeem-code', { code, amount });
+        }
+        const normalized = String(code || '').trim();
+        if (normalized === 'oghyhk') {
+            this.currentProfile.coins += 10000;
+            return this.saveCurrentProfile();
+        }
+        if (normalized === '2598') {
+            const coins = Math.max(0, Math.floor(Number(amount) || 0));
+            this.currentProfile.coins += coins;
+            return this.saveCurrentProfile();
+        }
+        throw new Error('Invalid redeem code.');
+    }
+
     async addCoins(amount = 0) {
+        if (this.activeUsername) {
+            throw new Error('Use redeemCode for authenticated coin grants.');
+        }
         const coins = Math.max(0, Math.floor(Number(amount) || 0));
         this.currentProfile.coins += coins;
         return this.saveCurrentProfile();
