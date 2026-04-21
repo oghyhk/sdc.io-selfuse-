@@ -2043,28 +2043,17 @@ const CHAOS_COST = 1280000;
 let _chanceTimerInterval = null;
 
 function _processChanceRegen(profile, now) {
+    // Server is authoritative for chance values. Client only seeds missing regen
+    // timers for display (server will overwrite on next sync). Never mutate the
+    // chance counts locally — that desyncs the UI from the server.
     let changed = false;
-    // Hell regen
-    if ((profile.hellChances || 0) < (profile.hellChanceMax || 12)) {
-        if (!profile.hellChanceRegenAt) {
-            profile.hellChanceRegenAt = now + HELL_REGEN_MS;
-            changed = true;
-        } else if (now >= profile.hellChanceRegenAt) {
-            profile.hellChances = Math.min((profile.hellChances || 0) + 1, profile.hellChanceMax || 12);
-            profile.hellChanceRegenAt = (profile.hellChances || 0) < (profile.hellChanceMax || 12) ? now + HELL_REGEN_MS : 0;
-            changed = true;
-        }
+    if ((profile.hellChances || 0) < (profile.hellChanceMax || 12) && !profile.hellChanceRegenAt) {
+        profile.hellChanceRegenAt = now + HELL_REGEN_MS;
+        changed = true;
     }
-    // Chaos regen
-    if ((profile.chaosChances || 0) < (profile.chaosChanceMax || 3)) {
-        if (!profile.chaosChanceRegenAt) {
-            profile.chaosChanceRegenAt = now + CHAOS_REGEN_MS;
-            changed = true;
-        } else if (now >= profile.chaosChanceRegenAt) {
-            profile.chaosChances = Math.min((profile.chaosChances || 0) + 1, profile.chaosChanceMax || 3);
-            profile.chaosChanceRegenAt = (profile.chaosChances || 0) < (profile.chaosChanceMax || 3) ? now + CHAOS_REGEN_MS : 0;
-            changed = true;
-        }
+    if ((profile.chaosChances || 0) < (profile.chaosChanceMax || 3) && !profile.chaosChanceRegenAt) {
+        profile.chaosChanceRegenAt = now + CHAOS_REGEN_MS;
+        changed = true;
     }
     return changed;
 }
@@ -2085,7 +2074,14 @@ function updateRaidChancesUI() {
     raidChancesEl?.classList.remove('hidden');
     const now = Date.now();
     const regened = _processChanceRegen(profile, now);
-    if (regened) store.saveCurrentProfile();
+    // Sync with server when regen interval elapses (server is authoritative for chance counts)
+    const hellRegenElapsed = (profile.hellChances || 0) < (profile.hellChanceMax || 12) && profile.hellChanceRegenAt && now >= profile.hellChanceRegenAt;
+    const chaosRegenElapsed = (profile.chaosChances || 0) < (profile.chaosChanceMax || 3) && profile.chaosChanceRegenAt && now >= profile.chaosChanceRegenAt;
+    if (regened || hellRegenElapsed || chaosRegenElapsed) {
+        store.saveCurrentProfile().then(() => {
+            if (hellRegenElapsed || chaosRegenElapsed) updateRaidChancesUI();
+        }).catch(() => {});
+    }
 
     const hc = profile.hellChances || 0;
     const cc = profile.chaosChances || 0;

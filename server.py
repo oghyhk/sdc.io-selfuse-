@@ -132,6 +132,40 @@ def normalize_username_key(username: str) -> str:
     return username.casefold()
 
 
+HELL_REGEN_MS = 5 * 3600 * 1000   # 5 hours
+CHAOS_REGEN_MS = 23 * 3600 * 1000  # 23 hours
+
+
+def apply_chance_regen(user: dict) -> bool:
+    """Process time-based chance regen on the server. Returns True if anything changed."""
+    now_ms = int(time.time() * 1000)
+    changed = False
+    for diff, regen_ms, default_max in (('hell', HELL_REGEN_MS, 12), ('chaos', CHAOS_REGEN_MS, 3)):
+        chance_key = f'{diff}Chances'
+        max_key = f'{diff}ChanceMax'
+        regen_key = f'{diff}ChanceRegenAt'
+        max_val = user.get(max_key, default_max)
+        current = user.get(chance_key, max_val)
+        if current >= max_val:
+            if user.get(regen_key, 0) != 0:
+                user[regen_key] = 0
+                changed = True
+            continue
+        regen_at = user.get(regen_key, 0) or 0
+        if regen_at == 0:
+            user[regen_key] = now_ms + regen_ms
+            changed = True
+            continue
+        # Process every full regen interval that has elapsed
+        while now_ms >= regen_at and current < max_val:
+            current += 1
+            regen_at += regen_ms
+            changed = True
+        user[chance_key] = current
+        user[regen_key] = 0 if current >= max_val else regen_at
+    return changed
+
+
 def is_valid_username(username: str) -> bool:
     return bool(USERNAME_PATTERN.fullmatch(username))
 
@@ -566,10 +600,14 @@ class ApiHandler(SimpleHTTPRequestHandler):
             username = str(body.get('username', '')).strip()
             password = str(body.get('password', ''))
             store = read_store()
-            _, user = get_user_record(store.get('users', {}), username)
+            users_dict = store.get('users', {})
+            existing_key, user = get_user_record(users_dict, username)
             if not user or user.get('password') != password:
                 self._send_json({'ok': False, 'message': 'Invalid username or password.'}, HTTPStatus.UNAUTHORIZED)
                 return
+            if apply_chance_regen(user) and existing_key:
+                users_dict[existing_key] = user
+                write_store(store)
             safe_user = {k: v for k, v in user.items() if k != 'password'}
             safe_user['_clientVersion'] = store.get('_version', 0)
             self._send_json({'ok': True, 'profile': safe_user})
@@ -585,6 +623,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             if not user or not existing_key:
                 self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
                 return
+            apply_chance_regen(user)
             if client_version is not None and store.get('_version', 0) != client_version:
                 self._send_json({
                     'ok': False,
@@ -796,6 +835,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             if not user or not existing_key:
                 self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
                 return
+            apply_chance_regen(user)
             chance_key = f'{difficulty}Chances'
             max_key = f'{difficulty}ChanceMax'
             regen_key = f'{difficulty}ChanceRegenAt'
@@ -830,6 +870,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             if not user or not existing_key:
                 self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
                 return
+            apply_chance_regen(user)
             chance_key = f'{difficulty}Chances'
             max_key = f'{difficulty}ChanceMax'
             max_val = user.get(max_key, 12 if difficulty == 'hell' else 3)
@@ -857,6 +898,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             if not user or not existing_key:
                 self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
                 return
+            apply_chance_regen(user)
             chance_key = f'{difficulty}Chances'
             max_key = f'{difficulty}ChanceMax'
             max_val = user.get(max_key, 12 if difficulty == 'hell' else 3)
