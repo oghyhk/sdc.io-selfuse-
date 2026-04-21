@@ -941,17 +941,13 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 if user.get('password') != password:
                     self._send_json({'ok': False, 'message': 'Invalid password.'}, HTTPStatus.UNAUTHORIZED)
                     return
-                safe_user = {k: v for k, v in user.items() if k != 'password'}
-                safe_user['_clientVersion'] = store.get('_version', 0)
-                self._send_json({'ok': True, 'created': False, 'profile': safe_user})
+                self._send_json({'ok': True, 'created': False, 'profile': _safe_profile(user, store)})
                 return
 
-            profile = build_profile(username, password, body.get('profile'))
+            profile = build_profile(username, password)
             users[canonical_key] = profile
             write_store(store)
-            safe_user = {k: v for k, v in profile.items() if k != 'password'}
-            safe_user['_clientVersion'] = store.get('_version', 0)
-            self._send_json({'ok': True, 'created': True, 'profile': safe_user}, HTTPStatus.CREATED)
+            self._send_json({'ok': True, 'created': True, 'profile': _safe_profile(profile, store)}, HTTPStatus.CREATED)
             return
 
         if parsed.path == '/api/signup':
@@ -970,12 +966,10 @@ class ApiHandler(SimpleHTTPRequestHandler):
             if existing_user:
                 self._send_json({'ok': False, 'message': 'Username already exists.'}, HTTPStatus.CONFLICT)
                 return
-            profile = build_profile(username, password, body.get('profile'))
+            profile = build_profile(username, password)
             users[canonical_key] = profile
             write_store(store)
-            safe_user = {k: v for k, v in profile.items() if k != 'password'}
-            safe_user['_clientVersion'] = store.get('_version', 0)
-            self._send_json({'ok': True, 'profile': safe_user})
+            self._send_json({'ok': True, 'profile': _safe_profile(profile, store)})
             return
 
         if parsed.path == '/api/login':
