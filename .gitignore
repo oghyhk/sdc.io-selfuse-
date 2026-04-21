@@ -2,3 +2,5 @@ __pycache__/
 cron-state/
 *.log
 nohup.out
+
+.git_disabled/
