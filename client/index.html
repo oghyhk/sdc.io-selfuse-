@@ -1090,14 +1090,13 @@
         #crateMessage { padding: 0 16px 12px; color: #fff59d; font-size: 13px; }
         .raid-side-panel {
             position: absolute; top: 50%; transform: translateY(-50%); width: min(280px, calc(50vw - 260px));
-            max-height: min(560px, calc(100% - 80px)); overflow: hidden; pointer-events: auto; z-index: 6;
+            max-height: min(560px, calc(100% - 80px)); overflow-y: auto; overflow-x: hidden; pointer-events: auto; z-index: 6;
         }
         #raidLoadoutPanel { left: 24px; }
         #raidBackpackPanel { right: 24px; }
         .raid-side-header { padding: 16px 16px 8px; }
         .raid-side-items {
-            display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 0 16px 16px; overflow: auto;
-            max-height: 440px;
+            display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 0 16px 16px;
         }
         .raid-side-section { padding-bottom: 12px; }
         .raid-side-section h4 {
@@ -1576,6 +1575,22 @@
                 <div class="detail-actions" style="margin-top:22px;">
                     <button id="chaosStartBack" class="secondary-button">Back</button>
                     <button id="chaosStartContinue" class="primary-button" data-difficulty="chaos">Continue</button>
+                </div>
+            </div>
+        </div>
+        <div id="buyChanceModal" class="modal hidden">
+            <div class="panel modal-panel">
+                <div class="inventory-header">
+                    <div>
+                        <h2 id="buyChanceTitle">Buy Chance</h2>
+                        <div id="buyChanceSubtitle" class="section-subtitle">Confirm purchase</div>
+                    </div>
+                    <button id="buyChanceClose" class="secondary-button">Back</button>
+                </div>
+                <p id="buyChanceMessage" class="section-subtitle" style="margin-top:16px; line-height:1.8;"></p>
+                <div class="detail-actions" style="margin-top:22px;">
+                    <button id="buyChanceCancel" class="secondary-button">Cancel</button>
+                    <button id="buyChanceConfirm" class="primary-button">Buy</button>
                 </div>
             </div>
         </div>

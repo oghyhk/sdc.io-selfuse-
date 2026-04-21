@@ -1456,13 +1456,11 @@ export class Game {
     }
 
     /**
-     * Apply ELO changes for all AI operators after the raid ends.
+     * AI ELO is no longer tracked — kept as a no-op so existing call sites
+     * (death/extraction handlers) don't need to change.
      */
     _applyAiRosterElo() {
-        const outcomes = this._collectAiOutcomes();
-        if (outcomes.length) {
-            applyRosterEloChanges(outcomes, this.activeDifficulty, computeEloChange);
-        }
+        // intentionally empty
     }
 
     // ==================== PARTICLES ====================

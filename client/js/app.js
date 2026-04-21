@@ -174,6 +174,13 @@ const chaosStartModal = document.getElementById('chaosStartModal');
 const chaosStartClose = document.getElementById('chaosStartClose');
 const chaosStartBack = document.getElementById('chaosStartBack');
 const chaosStartContinue = document.getElementById('chaosStartContinue');
+const buyChanceModal = document.getElementById('buyChanceModal');
+const buyChanceTitle = document.getElementById('buyChanceTitle');
+const buyChanceSubtitle = document.getElementById('buyChanceSubtitle');
+const buyChanceMessage = document.getElementById('buyChanceMessage');
+const buyChanceClose = document.getElementById('buyChanceClose');
+const buyChanceCancel = document.getElementById('buyChanceCancel');
+const buyChanceConfirm = document.getElementById('buyChanceConfirm');
 
 let currentView = 'menu';
 let authMode = 'login';
@@ -185,6 +192,7 @@ let activeRaidDetail = null;
 let activeTradeRequest = null;
 let selectedMenuLoadoutSlot = 0;
 let pendingChaosStartResolver = null;
+let pendingBuyChanceResolver = null;
 let authDropdownOpen = false;
 let currentPlaceholderPage = 'raid-history';
 let runtimeConfigRefreshPromise = null;
@@ -218,20 +226,20 @@ const game = new Game(canvas, {
             // Mark tutorial complete after first successful extraction
             if (result.status === 'extracted' && game.isTutorial) {
                 store.currentProfile.hasCompletedTutorial = true;
-                store.saveCurrentProfile().catch((e) => {
+                try {
+                    await store.saveCurrentProfile();
+                } catch (e) {
                     console.warn('Tutorial completion save failed:', e);
-                });
+                }
             }
-            // Refund raid chance on successful extraction
+            // Refund raid chance on successful extraction (await to keep
+            // currentProfile/_clientVersion in sync before the next user action).
             if (result.status === 'extracted' && window._lastRaidDifficulty) {
-                refundRaidChance(window._lastRaidDifficulty)
-                    .then(() => {
-                        renderAll();
-                        refreshLeaderboardRank();
-                    })
-                    .catch((e) => {
-                        console.warn('Refund raid chance failed:', e);
-                    });
+                try {
+                    await refundRaidChance(window._lastRaidDifficulty);
+                } catch (e) {
+                    console.warn('Refund raid chance failed:', e);
+                }
             }
         } catch (e) {
             console.warn('applyRaidOutcome failed:', e);
@@ -1053,6 +1061,39 @@ function confirmChaosStart() {
     openChaosStartModal();
     return new Promise((resolve) => {
         pendingChaosStartResolver = resolve;
+    });
+}
+
+function resolveBuyChance(shouldBuy) {
+    const resolver = pendingBuyChanceResolver;
+    pendingBuyChanceResolver = null;
+    buyChanceModal.classList.add('hidden');
+    if (resolver) resolver(Boolean(shouldBuy));
+}
+
+function confirmBuyChance(difficulty) {
+    if (pendingBuyChanceResolver) {
+        pendingBuyChanceResolver(false);
+    }
+    const profile = store.getCurrentProfile();
+    const isHell = difficulty === 'hell';
+    const cost = isHell ? 150000 : 1280000;
+    const label = isHell ? 'Hell' : 'Chaos';
+    const coins = profile?.coins || 0;
+    const canAfford = coins >= cost;
+    buyChanceTitle.textContent = `Buy ${label} Chance`;
+    buyChanceSubtitle.textContent = `Confirm purchase`;
+    const costMarkup = formatCoinAmountMarkup(cost);
+    const balanceMarkup = formatCoinAmountMarkup(coins);
+    const insufficientNote = canAfford
+        ? ''
+        : `<br><span style="color:#ff6b6b;">You don't have enough coins.</span>`;
+    buyChanceMessage.innerHTML = `Buy 1 ${label} chance for ${costMarkup}?<br>Current balance: ${balanceMarkup}.${insufficientNote}`;
+    buyChanceConfirm.disabled = !canAfford;
+    buyChanceConfirm.textContent = canAfford ? `Buy for ${formatCompactValue(cost)}` : 'Not enough coins';
+    buyChanceModal.classList.remove('hidden');
+    return new Promise((resolve) => {
+        pendingBuyChanceResolver = resolve;
     });
 }
 
@@ -2201,6 +2242,8 @@ function stopChanceTimer() {
 }
 
 buyHellChanceBtn?.addEventListener('click', async () => {
+    const proceed = await confirmBuyChance('hell');
+    if (!proceed) return;
     const result = await buyRaidChance('hell');
     if (!result?.ok) { window.alert(result?.message || 'Failed to buy chance.'); return; }
     updateRaidChancesUI();
@@ -2208,6 +2251,8 @@ buyHellChanceBtn?.addEventListener('click', async () => {
 });
 
 buyChaosChanceBtn?.addEventListener('click', async () => {
+    const proceed = await confirmBuyChance('chaos');
+    if (!proceed) return;
     const result = await buyRaidChance('chaos');
     if (!result?.ok) { window.alert(result?.message || 'Failed to buy chance.'); return; }
     updateRaidChancesUI();
@@ -2703,6 +2748,16 @@ chaosStartBack.addEventListener('click', () => resolveChaosStart(false));
 chaosStartContinue.addEventListener('click', () => resolveChaosStart(true));
 chaosStartModal.addEventListener('click', (event) => {
     if (event.target === chaosStartModal) resolveChaosStart(false);
+});
+
+buyChanceClose.addEventListener('click', () => resolveBuyChance(false));
+buyChanceCancel.addEventListener('click', () => resolveBuyChance(false));
+buyChanceConfirm.addEventListener('click', () => {
+    if (buyChanceConfirm.disabled) return;
+    resolveBuyChance(true);
+});
+buyChanceModal.addEventListener('click', (event) => {
+    if (event.target === buyChanceModal) resolveBuyChance(false);
 });
 
 presetSaveOptions.addEventListener('click', async (event) => {

@@ -1682,6 +1682,34 @@ export class ProfileStore {
             throw new Error('Missing items required for this loadout.');
         }
 
+        // Authenticated profiles persist loadout/inventory only via server actions;
+        // mutating locally and calling saveCurrentProfile would lose the change
+        // because save-profile only stores cosmetic/snapshot fields.
+        if (this.activeUsername) {
+            // "Current" preset: loadout is already what the player wants — no
+            // server mutation needed. Skip the roundtrip to avoid an unnecessary
+            // version bump that can race with post-raid writes.
+            if (slotIndex == null || slotIndex < 0) {
+                return {
+                    profile: this.getCurrentProfile(),
+                    snapshot: clone(preview.snapshot),
+                    missingEntries: clone(preview.missingEntries),
+                    totalCost: preview.totalCost,
+                };
+            }
+            await this._runServerProfileAction('apply-saved-loadout', {
+                slotIndex,
+                autoBuyMissing: Boolean(autoBuyMissing),
+            });
+            return {
+                profile: this.getCurrentProfile(),
+                snapshot: clone(preview.snapshot),
+                missingEntries: clone(preview.missingEntries),
+                totalCost: preview.totalCost,
+            };
+        }
+
+        // Guest fallback: keep the original local mutation path.
         this._restorePreparedEntriesToInventory(this.currentProfile.backpackItems || []);
         this._restorePreparedEntriesToInventory(this.currentProfile.safeboxItems || []);
         this.currentProfile.backpackItems = [];
@@ -1702,7 +1730,6 @@ export class ProfileStore {
             this._consumePreparedEntryFromInventory(entry);
         }
 
-        await this.saveCurrentProfile();
         return {
             profile: this.getCurrentProfile(),
             snapshot: clone(preview.snapshot),

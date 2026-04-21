@@ -23,6 +23,12 @@ PORT = 8765
 USERNAME_PATTERN = re.compile(r'^(?:[A-Za-z0-9]|❤(?:️)?)+$')
 STORE_LOCK = RLock()
 
+# Throttle the secondary backup write — primary write is already atomic
+# (tmp file + os.replace), so the backup is for catastrophic recovery only.
+# Writing 15+ MB twice on every profile-action is the dominant latency source.
+BACKUP_INTERVAL_SEC = 30.0
+_LAST_BACKUP_AT = 0.0
+
 # Cached dev-config — loaded lazily, refreshed on conflict
 _cached_dev_config: dict | None = None
 _cached_dev_config_mtime: float = 0.0
@@ -132,7 +138,13 @@ def write_store(store: dict, bump_version: bool = True) -> None:
         if bump_version:
             store['_version'] = store.get('_version', 0) + 1
         _atomic_write_json(DATA_FILE, store)
-        _atomic_write_json(DATA_FILE_BACKUP, store)
+        # Backup is throttled — primary is atomic and safe on its own.
+        # Doing both on every action doubles disk I/O for a 15+ MB store.
+        global _LAST_BACKUP_AT
+        now = time.time()
+        if now - _LAST_BACKUP_AT >= BACKUP_INTERVAL_SEC:
+            _atomic_write_json(DATA_FILE_BACKUP, store)
+            _LAST_BACKUP_AT = now
 
 
 def normalize_username_key(username: str) -> str:
@@ -307,7 +319,7 @@ PLAYER_LEVEL_TOTAL_EXP = [0]
 
 
 def _safe_profile(profile: dict, store: dict) -> dict:
-    safe = {k: v for k, v in profile.items() if k != 'password'}
+    safe = {k: v for k, v in profile.items() if k != 'password' and not k.startswith('_')}
     safe['_clientVersion'] = store.get('_version', 0)
     return safe
 
@@ -420,7 +432,43 @@ def _get_stash_items(profile: dict) -> list[dict]:
     if not isinstance(stash_items, list):
         stash_items = []
     profile['stashItems'] = stash_items
+    _drain_legacy_ammo_entries(profile, stash_items)
     return stash_items
+
+
+def _drain_legacy_ammo_entries(profile: dict, stash_items: list[dict]) -> None:
+    """Move ammo entries that are still living in stashItems into stashAmmo.
+
+    Older versions of the game stored ammo as one entry per round inside
+    stashItems. The client merges these into its displayed count via
+    normalizeStashAmmo, but the server only reads stashAmmo, which causes
+    UI/server desync (UI shows more ammo than server thinks the player has).
+    This is a one-shot per profile per process — guarded by a flag so it is
+    cheap on subsequent calls.
+    """
+    if profile.get('_legacyAmmoDrained'):
+        return
+    legacy_counts: dict[str, int] = {}
+    kept: list[dict] = []
+    for entry in stash_items:
+        if not isinstance(entry, dict):
+            kept.append(entry)
+            continue
+        defn_id = entry.get('definitionId')
+        if isinstance(defn_id, str) and _is_ammo_definition(defn_id) and not _is_free_fallback_ammo(defn_id):
+            legacy_counts[defn_id] = legacy_counts.get(defn_id, 0) + 1
+        else:
+            kept.append(entry)
+    profile['_legacyAmmoDrained'] = True
+    if not legacy_counts:
+        return
+    stash_ammo = profile.get('stashAmmo') or {}
+    if not isinstance(stash_ammo, dict):
+        stash_ammo = {}
+    for defn_id, count in legacy_counts.items():
+        stash_ammo[defn_id] = max(0, int(stash_ammo.get(defn_id, 0) or 0)) + count
+    profile['stashAmmo'] = stash_ammo
+    stash_items[:] = kept
 
 
 def _get_stash_ammo(profile: dict) -> dict:
@@ -501,6 +549,131 @@ def _get_owned_stash_count(profile: dict, definition_id: str) -> int:
 def _get_equipped_count(profile: dict, definition_id: str) -> int:
     loadout = profile.get('loadout') or {}
     return sum(1 for slot in LOADOUT_SLOTS if loadout.get(slot) == definition_id)
+
+
+def _apply_saved_loadout_to_profile(profile: dict, snapshot: dict, *, auto_buy: bool) -> None:
+    """Mirror the client's applyRaidLoadoutSelection logic on the server.
+
+    Restores the current backpack/safebox into the stash, then sets the
+    profile's loadout/backpack/safebox from the supplied snapshot. If items
+    are missing and auto_buy is True, purchases them with coins. Raises
+    ValueError on failure.
+    """
+    # 1) Restore current backpack & safebox to stash so they're available for use.
+    for entry in list(profile.get('backpackItems') or []):
+        defn_id = entry.get('definitionId') if isinstance(entry, dict) else None
+        if not defn_id or not _get_item_def(defn_id):
+            continue
+        _add_item_to_stash(profile, defn_id, _get_entry_amount(entry, defn_id))
+    for entry in list(profile.get('safeboxItems') or []):
+        defn_id = entry.get('definitionId') if isinstance(entry, dict) else None
+        if not defn_id or not _get_item_def(defn_id):
+            continue
+        _add_item_to_stash(profile, defn_id, _get_entry_amount(entry, defn_id))
+    profile['backpackItems'] = []
+    profile['safeboxItems'] = []
+
+    # 2) Tally what the snapshot needs.
+    snap_loadout = snapshot.get('loadout') or {}
+    required_equip: dict[str, int] = {}
+    for slot in LOADOUT_SLOTS:
+        defn_id = snap_loadout.get(slot)
+        if defn_id and _get_item_def(defn_id):
+            required_equip[defn_id] = required_equip.get(defn_id, 0) + 1
+
+    required_ammo: dict[str, int] = {}
+    required_consumables: dict[str, int] = {}
+    snap_entries = list(snapshot.get('backpackItems') or []) + list(snapshot.get('safeboxItems') or [])
+    for entry in snap_entries:
+        if not isinstance(entry, dict):
+            continue
+        defn_id = entry.get('definitionId')
+        if not defn_id or not _get_item_def(defn_id):
+            continue
+        amt = _get_entry_amount(entry, defn_id)
+        if _is_ammo_definition(defn_id):
+            required_ammo[defn_id] = required_ammo.get(defn_id, 0) + amt
+        elif _is_consumable_definition(defn_id):
+            required_consumables[defn_id] = required_consumables.get(defn_id, 0) + amt
+        else:
+            required_equip[defn_id] = required_equip.get(defn_id, 0) + 1
+
+    # 3) Compute missing quantities.
+    missing: list[tuple[str, int]] = []
+    for defn_id, qty in required_equip.items():
+        owned = _get_owned_stash_count(profile, defn_id)
+        if owned < qty:
+            missing.append((defn_id, qty - owned))
+    for defn_id, qty in required_ammo.items():
+        owned = _get_ammo_count(profile, defn_id)
+        if owned < qty:
+            missing.append((defn_id, qty - owned))
+    for defn_id, qty in required_consumables.items():
+        owned = _get_owned_stash_count(profile, defn_id)
+        if owned < qty:
+            missing.append((defn_id, qty - owned))
+
+    # 4) Optionally buy missing items.
+    if missing:
+        if not auto_buy:
+            raise ValueError('Missing items required for this loadout.')
+        total_cost = sum(_get_buy_trade_total(d, q) for d, q in missing)
+        coins = _normalize_non_negative_int(profile.get('coins', 0))
+        if coins < total_cost:
+            raise ValueError('Not enough coins to buy the selected loadout.')
+        profile['coins'] = coins - total_cost
+        stats = _ensure_profile_stats(profile)
+        for defn_id, qty in missing:
+            _add_item_to_stash(profile, defn_id, qty)
+            stats['totalMarketTrades'] = _normalize_non_negative_int(stats.get('totalMarketTrades', 0)) + qty
+
+    # 5) Apply the snapshot's loadout slots.
+    new_loadout: dict[str, str | None] = {}
+    for slot in LOADOUT_SLOTS:
+        defn_id = snap_loadout.get(slot)
+        new_loadout[slot] = defn_id if (defn_id and _get_item_def(defn_id)) else None
+    profile['loadout'] = new_loadout
+
+    # 6) Move snapshot's backpack/safebox entries from stash into containers.
+    new_backpack: list[dict] = []
+    for entry in (snapshot.get('backpackItems') or []):
+        if not isinstance(entry, dict):
+            continue
+        defn_id = entry.get('definitionId')
+        if not defn_id or not _get_item_def(defn_id):
+            continue
+        amt = _get_entry_amount(entry, defn_id)
+        if _is_ammo_definition(defn_id):
+            _remove_ammo_from_profile(profile, defn_id, amt)
+            new_backpack.append({'definitionId': defn_id, 'quantity': amt})
+        elif _is_consumable_definition(defn_id):
+            for _ in range(amt):
+                _remove_single_stash_copy(profile, defn_id)
+            new_backpack.append({'definitionId': defn_id, 'quantity': amt})
+        else:
+            _remove_single_stash_copy(profile, defn_id)
+            new_backpack.append({'definitionId': defn_id})
+    profile['backpackItems'] = new_backpack
+
+    new_safebox: list[dict] = []
+    for entry in (snapshot.get('safeboxItems') or []):
+        if not isinstance(entry, dict):
+            continue
+        defn_id = entry.get('definitionId')
+        if not defn_id or not _get_item_def(defn_id):
+            continue
+        amt = _get_entry_amount(entry, defn_id)
+        if _is_ammo_definition(defn_id):
+            _remove_ammo_from_profile(profile, defn_id, amt)
+            new_safebox.append({'definitionId': defn_id, 'quantity': amt})
+        elif _is_consumable_definition(defn_id):
+            for _ in range(amt):
+                _remove_single_stash_copy(profile, defn_id)
+            new_safebox.append({'definitionId': defn_id, 'quantity': amt})
+        else:
+            _remove_single_stash_copy(profile, defn_id)
+            new_safebox.append({'definitionId': defn_id})
+    profile['safeboxItems'] = new_safebox
 
 
 def _ensure_profile_stats(profile: dict) -> dict:
@@ -707,8 +880,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             if not user:
                 self._send_json({'ok': False, 'message': 'User not found.'}, HTTPStatus.NOT_FOUND)
                 return
-            safe_user = {k: v for k, v in user.items() if k != 'password'}
-            self._send_json({'ok': True, 'profile': safe_user})
+            self._send_json({'ok': True, 'profile': _safe_profile(user, store)})
             return
         if parsed.path == '/api/health':
             self._send_json({'ok': True})
@@ -767,6 +939,8 @@ class ApiHandler(SimpleHTTPRequestHandler):
             norm_requesting = normalize_username_key(requesting_username) if requesting_username else None
             player_entry = None
             for _key, user in users.items():
+                if user.get('isAI', False):
+                    continue
                 username = user.get('username', _key)
                 elo = int(user.get('elo', 1000))
                 stats = user.get('stats') or {}
@@ -935,8 +1109,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 if user_key not in users or not users[user_key].get('isAI', False):
                     continue
                 entry = users[user_key]
-                if 'elo' in upd:
-                    entry['elo'] = max(0, int(upd['elo']))
+                # AI ELO is no longer tracked — ignore any 'elo' field in updates.
                 if 'totalRuns' in upd:
                     entry['stats']['totalRuns'] = max(0, int(entry['stats'].get('totalRuns', 0) + upd['totalRuns']))
                 if 'totalExtractions' in upd:
@@ -1226,6 +1399,23 @@ class ApiHandler(SimpleHTTPRequestHandler):
                     stats['totalCoinsEarned'] = _normalize_non_negative_int(stats.get('totalCoinsEarned', 0)) + granted
                     extra_payload['coinsGranted'] = granted
 
+                elif action == 'apply-saved-loadout':
+                    raw_slot = body.get('slotIndex', None)
+                    auto_buy = bool(body.get('autoBuyMissing', False))
+                    if raw_slot is None or (isinstance(raw_slot, (int, float)) and raw_slot < 0):
+                        # "Current" slot — loadout is already applied; nothing to do.
+                        pass
+                    else:
+                        try:
+                            slot_index = max(0, min(4, int(raw_slot)))
+                        except (TypeError, ValueError):
+                            raise ValueError('Invalid loadout slot.')
+                        saved = profile.get('savedLoadouts') or []
+                        snapshot = saved[slot_index] if 0 <= slot_index < len(saved) else None
+                        if not snapshot:
+                            raise ValueError('Saved loadout slot is empty.')
+                        _apply_saved_loadout_to_profile(profile, snapshot, auto_buy=auto_buy)
+
                 else:
                     self._send_json({'ok': False, 'message': 'Invalid profile action.'}, HTTPStatus.BAD_REQUEST)
                     return
@@ -1298,9 +1488,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             profile = merged
             users[existing_key] = profile
             write_store(store)
-            safe_user = {k: v for k, v in profile.items() if k != 'password'}
-            safe_user['_clientVersion'] = store.get('_version', 0)
-            self._send_json({'ok': True, 'profile': safe_user})
+            self._send_json({'ok': True, 'profile': _safe_profile(profile, store)})
             return
 
         if parsed.path == '/api/raid-outcome':
@@ -1315,8 +1503,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 return
             # Skip if no active raid (prevents duplicate outcomes)
             if not user.get('activeRaid'):
-                safe = {k: v for k, v in user.items() if k != 'password'}
-                self._send_json({'ok': True, 'profile': safe, 'skipped': True})
+                self._send_json({'ok': True, 'profile': _safe_profile(user, store), 'skipped': True})
                 return
             profile = dict(user)  # work on a copy
             status = result.get('status', '')
@@ -1475,9 +1662,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 user[regen_key] = int(time.time() * 1000) + regen_ms
             users[existing_key] = user
             write_store(store)
-            safe = {k: v for k, v in user.items() if k != 'password'}
-            safe['_clientVersion'] = store.get('_version', 0)
-            self._send_json({'ok': True, 'profile': safe})
+            self._send_json({'ok': True, 'profile': _safe_profile(user, store)})
             return
 
         if parsed.path == '/api/complete-raid':
@@ -1503,9 +1688,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 user[f'{difficulty}ChanceRegenAt'] = 0
             users[existing_key] = user
             write_store(store)
-            safe = {k: v for k, v in user.items() if k != 'password'}
-            safe['_clientVersion'] = store.get('_version', 0)
-            self._send_json({'ok': True, 'profile': safe})
+            self._send_json({'ok': True, 'profile': _safe_profile(user, store)})
             return
 
         if parsed.path == '/api/buy-chance':
@@ -1566,8 +1749,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             user['password'] = new_pw
             users[existing_key] = user
             write_store(store)
-            safe_user = {k: v for k, v in user.items() if k != 'password'}
-            self._send_json({'ok': True, 'profile': safe_user})
+            self._send_json({'ok': True, 'profile': _safe_profile(user, store)})
             return
 
         if parsed.path == '/api/unlock-achievement':
@@ -1590,8 +1772,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 user['unlockedAchievements'] = unlocked
                 users[existing_key] = user
                 write_store(store)
-            safe_user = {k: v for k, v in user.items() if k != 'password'}
-            self._send_json({'ok': True, 'profile': safe_user})
+            self._send_json({'ok': True, 'profile': _safe_profile(user, store)})
             return
 
         if parsed.path == '/api/lock-achievement':
@@ -1612,8 +1793,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 user['unlockedAchievements'] = unlocked
                 users[existing_key] = user
                 write_store(store)
-            safe_user = {k: v for k, v in user.items() if k != 'password'}
-            self._send_json({'ok': True, 'profile': safe_user})
+            self._send_json({'ok': True, 'profile': _safe_profile(user, store)})
             return
 
         if parsed.path == '/api/dev-config':
@@ -1835,4 +2015,11 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print('\nShutting down...')
     finally:
+        # Flush a final backup snapshot since runtime backups are throttled.
+        try:
+            with STORE_LOCK:
+                _atomic_write_json(DATA_FILE_BACKUP, read_store())
+            print('Final backup written.')
+        except Exception as exc:
+            print(f'Final backup failed: {exc}')
         server.server_close()
