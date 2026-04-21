@@ -1809,6 +1809,20 @@ export class ProfileStore {
         return result;
     }
 
+    // Fire a server profile-action in the background after an optimistic local mutation.
+    // On success the server's authoritative profile replaces the local one (silent re-render).
+    // On failure the pre-mutation backup is restored and _onRollback is called.
+    _fireOptimistic(backup, action, payload) {
+        this._runServerProfileAction(action, payload).then(() => {
+            this._onProfileRefreshed?.();
+        }).catch((err) => {
+            if (this.activeUsername) {
+                this.currentProfile = normalizeProfile(backup, this.activeUsername, false);
+            }
+            this._onRollback?.(err?.message || 'Action failed. Change reversed.');
+        });
+    }
+
     async saveCurrentProfile() {
         if (!this.activeUsername) return this.getCurrentProfile();
         const profile = {
@@ -1865,11 +1879,6 @@ export class ProfileStore {
         const isGunCategoryRequest = slot === 'gun';
         if (!LOADOUT_SLOTS.includes(slot) && !isGunCategoryRequest) return this.getCurrentProfile();
 
-        if (this.activeUsername) {
-            await this._runServerProfileAction('update-loadout', { slot, definitionId });
-            return this.getCurrentProfile();
-        }
-
         const resolveGunSlot = () => {
             const emptySlot = GUN_LOADOUT_SLOTS.find((gunSlot) => !this.currentProfile.loadout?.[gunSlot]);
             if (emptySlot) return emptySlot;
@@ -1881,15 +1890,21 @@ export class ProfileStore {
         };
 
         const targetSlot = isGunCategoryRequest ? resolveGunSlot() : slot;
+        const backup = clone(this.currentProfile);
         if (definitionId == null) {
             this.currentProfile.loadout[targetSlot] = null;
-            return this.saveCurrentProfile();
+        } else {
+            const definition = ITEM_DEFS[definitionId];
+            if (!definition || definition.category !== getLoadoutSlotCategory(targetSlot)) return this.getCurrentProfile();
+            const owned = (this.currentProfile.stashItems || []).some((item) => item.definitionId === definitionId);
+            if (!owned) return this.getCurrentProfile();
+            this.currentProfile.loadout[targetSlot] = definitionId;
         }
-        const definition = ITEM_DEFS[definitionId];
-        if (!definition || definition.category !== getLoadoutSlotCategory(targetSlot)) return this.getCurrentProfile();
-        const owned = (this.currentProfile.stashItems || []).some((item) => item.definitionId === definitionId);
-        if (!owned) return this.getCurrentProfile();
-        this.currentProfile.loadout[targetSlot] = definitionId;
+
+        if (this.activeUsername) {
+            this._fireOptimistic(backup, 'update-loadout', { slot, definitionId });
+            return this.getCurrentProfile();
+        }
         return this.saveCurrentProfile();
     }
 
@@ -1976,129 +1991,87 @@ export class ProfileStore {
 
     async moveItemToSafebox(definitionId, quantity = 1) {
         const amount = Math.max(1, Math.floor(Number(quantity) || 1));
-        if (this.activeUsername) {
-            await this._runServerProfileAction('move-item-to-safebox', { definitionId, quantity: amount });
-            return this.getCurrentProfile();
-        }
+        if (isConsumableDefinition(definitionId)) throw new Error('Consumables cannot be stored in the safebox.');
         const currentUsedSpace = getEntriesSpaceUsed(this.currentProfile.safeboxItems || []);
-
-        if (isConsumableDefinition(definitionId)) {
-            throw new Error('Consumables cannot be stored in the safebox.');
-        }
+        const backup = clone(this.currentProfile);
 
         if (isAmmoDefinition(definitionId)) {
-            if (isFreeFallbackAmmo(definitionId)) {
-                throw new Error('Gray ammo is free and unlimited, so it cannot be stored.');
-            }
+            if (isFreeFallbackAmmo(definitionId)) throw new Error('Gray ammo is free and unlimited, so it cannot be stored.');
             const availableAmmo = getAmmoCountForProfile(this.currentProfile, definitionId);
-            if (amount > availableAmmo) {
-                throw new Error(`You only have ${availableAmmo} ${ITEM_DEFS[definitionId].name}.`);
-            }
+            if (amount > availableAmmo) throw new Error(`You only have ${availableAmmo} ${ITEM_DEFS[definitionId].name}.`);
             const requiredSlots = Math.ceil(amount / AMMO_PACK_LIMIT);
             const requiredSpace = requiredSlots * getEntrySpaceUsed({ definitionId });
-            if (currentUsedSpace + requiredSpace > SAFEBOX_CAPACITY) {
-                throw new Error('Safebox does not have enough space for that ammo.');
-            }
+            if (currentUsedSpace + requiredSpace > SAFEBOX_CAPACITY) throw new Error('Safebox does not have enough space for that ammo.');
             removeAmmoFromProfile(this.currentProfile, definitionId, amount);
             this.currentProfile.safeboxItems.push(...packAmmoAmount(definitionId, amount));
-            return this.saveCurrentProfile();
+        } else {
+            if (currentUsedSpace + getEntrySpaceUsed({ definitionId }) > SAFEBOX_CAPACITY) throw new Error('Safebox is full.');
+            const stash = this.currentProfile.stashItems || [];
+            const ownedCount = stash.filter((item) => item.definitionId === definitionId).length;
+            const equipped = Object.values(this.currentProfile.loadout).includes(definitionId);
+            const movableCount = Math.max(0, ownedCount - (equipped ? 1 : 0));
+            if (movableCount <= 0) throw new Error('No movable copy available.');
+            const index = stash.findIndex((item) => item.definitionId === definitionId);
+            if (index === -1) throw new Error('Item not found in inventory.');
+            stash.splice(index, 1);
+            this.currentProfile.safeboxItems.push({ definitionId });
         }
 
-        if (currentUsedSpace + getEntrySpaceUsed({ definitionId }) > SAFEBOX_CAPACITY) {
-            throw new Error('Safebox is full.');
+        if (this.activeUsername) {
+            this._fireOptimistic(backup, 'move-item-to-safebox', { definitionId, quantity: amount });
+            return this.getCurrentProfile();
         }
-
-        const stash = this.currentProfile.stashItems || [];
-        const ownedCount = stash.filter((item) => item.definitionId === definitionId).length;
-        const equipped = Object.values(this.currentProfile.loadout).includes(definitionId);
-        const movableCount = Math.max(0, ownedCount - (equipped ? 1 : 0));
-        if (movableCount <= 0) {
-            throw new Error('No movable copy available.');
-        }
-
-        const index = stash.findIndex((item) => item.definitionId === definitionId);
-        if (index === -1) {
-            throw new Error('Item not found in inventory.');
-        }
-
-        stash.splice(index, 1);
-        this.currentProfile.safeboxItems.push({ definitionId });
         return this.saveCurrentProfile();
     }
 
     async moveItemToBackpack(definitionId, capacity, quantity = 1) {
         const amount = Math.max(1, Math.floor(Number(quantity) || 1));
-        if (this.activeUsername) {
-            await this._runServerProfileAction('move-item-to-backpack', { definitionId, quantity: amount });
-            return this.getCurrentProfile();
-        }
         const currentUsedSpace = getEntriesSpaceUsed(this.currentProfile.backpackItems || []);
+        const backup = clone(this.currentProfile);
 
         if (isConsumableDefinition(definitionId)) {
             const stash = this.currentProfile.stashItems || [];
             const ownedCount = stash.filter((item) => item.definitionId === definitionId).length;
-            if (amount > ownedCount) {
-                throw new Error(`You only have ${ownedCount} ${ITEM_DEFS[definitionId].name}.`);
-            }
+            if (amount > ownedCount) throw new Error(`You only have ${ownedCount} ${ITEM_DEFS[definitionId].name}.`);
             const requiredSlots = Math.ceil(amount / AMMO_PACK_LIMIT);
             const requiredSpace = requiredSlots * getEntrySpaceUsed({ definitionId });
-            if (currentUsedSpace + requiredSpace > capacity) {
-                throw new Error('Backpack does not have enough space for those consumables.');
-            }
+            if (currentUsedSpace + requiredSpace > capacity) throw new Error('Backpack does not have enough space for those consumables.');
             for (let i = 0; i < amount; i++) {
                 const index = stash.findIndex((item) => item.definitionId === definitionId);
                 if (index === -1) throw new Error('Item not found in inventory.');
                 stash.splice(index, 1);
             }
             this.currentProfile.backpackItems.push(...packStackableAmount(definitionId, amount));
-            return this.saveCurrentProfile();
-        }
-
-        if (isAmmoDefinition(definitionId)) {
-            if (isFreeFallbackAmmo(definitionId)) {
-                throw new Error('Gray ammo is free and unlimited, so it cannot be stored.');
-            }
+        } else if (isAmmoDefinition(definitionId)) {
+            if (isFreeFallbackAmmo(definitionId)) throw new Error('Gray ammo is free and unlimited, so it cannot be stored.');
             const availableAmmo = getAmmoCountForProfile(this.currentProfile, definitionId);
-            if (amount > availableAmmo) {
-                throw new Error(`You only have ${availableAmmo} ${ITEM_DEFS[definitionId].name}.`);
-            }
+            if (amount > availableAmmo) throw new Error(`You only have ${availableAmmo} ${ITEM_DEFS[definitionId].name}.`);
             const requiredSlots = Math.ceil(amount / AMMO_PACK_LIMIT);
             const requiredSpace = requiredSlots * getEntrySpaceUsed({ definitionId });
-            if (currentUsedSpace + requiredSpace > capacity) {
-                throw new Error('Backpack does not have enough space for that ammo.');
-            }
+            if (currentUsedSpace + requiredSpace > capacity) throw new Error('Backpack does not have enough space for that ammo.');
             removeAmmoFromProfile(this.currentProfile, definitionId, amount);
             this.currentProfile.backpackItems.push(...packAmmoAmount(definitionId, amount));
-            return this.saveCurrentProfile();
+        } else {
+            if (currentUsedSpace + getEntrySpaceUsed({ definitionId }) > capacity) throw new Error('Backpack is full.');
+            const stash = this.currentProfile.stashItems || [];
+            const ownedCount = stash.filter((item) => item.definitionId === definitionId).length;
+            const equipped = Object.values(this.currentProfile.loadout).includes(definitionId);
+            const movableCount = Math.max(0, ownedCount - (equipped ? 1 : 0));
+            if (movableCount <= 0) throw new Error('No movable copy available.');
+            const index = stash.findIndex((item) => item.definitionId === definitionId);
+            if (index === -1) throw new Error('Item not found in inventory.');
+            stash.splice(index, 1);
+            this.currentProfile.backpackItems.push({ definitionId });
         }
 
-        if (currentUsedSpace + getEntrySpaceUsed({ definitionId }) > capacity) {
-            throw new Error('Backpack is full.');
+        if (this.activeUsername) {
+            this._fireOptimistic(backup, 'move-item-to-backpack', { definitionId, quantity: amount });
+            return this.getCurrentProfile();
         }
-
-        const stash = this.currentProfile.stashItems || [];
-        const ownedCount = stash.filter((item) => item.definitionId === definitionId).length;
-        const equipped = Object.values(this.currentProfile.loadout).includes(definitionId);
-        const movableCount = Math.max(0, ownedCount - (equipped ? 1 : 0));
-        if (movableCount <= 0) {
-            throw new Error('No movable copy available.');
-        }
-
-        const index = stash.findIndex((item) => item.definitionId === definitionId);
-        if (index === -1) {
-            throw new Error('Item not found in inventory.');
-        }
-
-        stash.splice(index, 1);
-        this.currentProfile.backpackItems.push({ definitionId });
         return this.saveCurrentProfile();
     }
 
     async moveBackpackItemToStash(definitionId, entryIndex = null) {
-        if (this.activeUsername) {
-            await this._runServerProfileAction('move-backpack-item-to-stash', { definitionId, entryIndex });
-            return this.getCurrentProfile();
-        }
         const backpack = this.currentProfile.backpackItems || [];
         const resolvedIndex = entryIndex == null
             ? backpack.findIndex((item) => item.definitionId === definitionId)
@@ -2106,7 +2079,7 @@ export class ProfileStore {
         if (!Number.isInteger(resolvedIndex) || resolvedIndex < 0 || resolvedIndex >= backpack.length) {
             throw new Error('Item not found in backpack.');
         }
-
+        const backup = clone(this.currentProfile);
         const [entry] = backpack.splice(resolvedIndex, 1);
         if (isAmmoDefinition(entry.definitionId)) {
             addAmmoToProfile(this.currentProfile, entry.definitionId, getAmmoAmountForEntry(entry));
@@ -2118,14 +2091,14 @@ export class ProfileStore {
         } else {
             this.currentProfile.stashItems.push({ definitionId: entry.definitionId });
         }
+        if (this.activeUsername) {
+            this._fireOptimistic(backup, 'move-backpack-item-to-stash', { definitionId, entryIndex });
+            return this.getCurrentProfile();
+        }
         return this.saveCurrentProfile();
     }
 
     async moveSafeboxItemToStash(definitionId, entryIndex = null) {
-        if (this.activeUsername) {
-            await this._runServerProfileAction('move-safebox-item-to-stash', { definitionId, entryIndex });
-            return this.getCurrentProfile();
-        }
         const safebox = this.currentProfile.safeboxItems || [];
         const resolvedIndex = entryIndex == null
             ? safebox.findIndex((item) => item.definitionId === definitionId)
@@ -2133,7 +2106,7 @@ export class ProfileStore {
         if (!Number.isInteger(resolvedIndex) || resolvedIndex < 0 || resolvedIndex >= safebox.length) {
             throw new Error('Item not found in safebox.');
         }
-
+        const backup = clone(this.currentProfile);
         const [entry] = safebox.splice(resolvedIndex, 1);
         if (isAmmoDefinition(entry.definitionId)) {
             addAmmoToProfile(this.currentProfile, entry.definitionId, getAmmoAmountForEntry(entry));
@@ -2145,14 +2118,14 @@ export class ProfileStore {
         } else {
             this.currentProfile.stashItems.push({ definitionId: entry.definitionId });
         }
+        if (this.activeUsername) {
+            this._fireOptimistic(backup, 'move-safebox-item-to-stash', { definitionId, entryIndex });
+            return this.getCurrentProfile();
+        }
         return this.saveCurrentProfile();
     }
 
     async buyItem(definitionId, quantity = 1) {
-        if (this.activeUsername) {
-            await this._runServerProfileAction('buy-item', { definitionId, quantity });
-            return this.getCurrentProfile();
-        }
         const definition = ITEM_DEFS[definitionId];
         if (!definition) throw new Error('Item not found.');
         if (isMarketLockedAmmo(definitionId)) throw new Error('Gray ammo cannot be traded in the market.');
@@ -2160,6 +2133,7 @@ export class ProfileStore {
         const totalCost = getBuyTradeTotal(definitionId, amount);
         if (totalCost < MIN_TRADE_TOTAL) throw new Error(`Trades must be at least ${MIN_TRADE_TOTAL} coins.`);
         if (this.currentProfile.coins < totalCost) throw new Error('Not enough coins.');
+        const backup = clone(this.currentProfile);
         this.currentProfile.coins -= totalCost;
         if (isAmmoDefinition(definitionId)) {
             addAmmoToProfile(this.currentProfile, definitionId, amount);
@@ -2169,14 +2143,14 @@ export class ProfileStore {
             }
         }
         this.currentProfile.stats.totalMarketTrades += amount;
+        if (this.activeUsername) {
+            this._fireOptimistic(backup, 'buy-item', { definitionId, quantity });
+            return this.getCurrentProfile();
+        }
         return this.saveCurrentProfile();
     }
 
     async sellItem(definitionId, quantity = 1) {
-        if (this.activeUsername) {
-            await this._runServerProfileAction('sell-item', { definitionId, quantity });
-            return this.getCurrentProfile();
-        }
         const definition = ITEM_DEFS[definitionId];
         if (!definition) throw new Error('Item not found.');
         if (isMarketLockedAmmo(definitionId)) throw new Error('Gray ammo cannot be traded in the market.');
@@ -2192,6 +2166,7 @@ export class ProfileStore {
         if (amount > sellableCount) throw new Error(`You can sell at most ${sellableCount}.`);
         const totalValue = getSellTradeTotal(definitionId, amount);
         if (totalValue < MIN_TRADE_TOTAL) throw new Error(`Trades must be at least ${MIN_TRADE_TOTAL} coins.`);
+        const backup = clone(this.currentProfile);
         if (isAmmoDefinition(definitionId)) {
             removeAmmoFromProfile(this.currentProfile, definitionId, amount);
         } else {
@@ -2204,6 +2179,10 @@ export class ProfileStore {
         this.currentProfile.coins += totalValue;
         this.currentProfile.stats.totalCoinsEarned += totalValue;
         this.currentProfile.stats.totalMarketTrades += amount;
+        if (this.activeUsername) {
+            this._fireOptimistic(backup, 'sell-item', { definitionId, quantity });
+            return this.getCurrentProfile();
+        }
         return this.saveCurrentProfile();
     }
 

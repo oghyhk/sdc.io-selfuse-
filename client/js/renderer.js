@@ -966,7 +966,7 @@ export class Renderer {
     }
 
     // ---------- Minimap ----------
-    drawMinimap(tiles, player, enemies, aiPlayers, crates, extractionPoints, difficulty = 'advanced') {
+    drawMinimap(tiles, player, enemies, aiPlayers, crates, extractionPoints, difficulty = 'advanced', enemyDeathMarkers = [], gameTime = 0) {
         const { ctx, cam } = this;
         // Scale minimap by difficulty: hell 1.5x, chaos 2.0x (0.8× of full 2.5)
         const scaleMultiplier = difficulty === 'chaos' ? 2.0 : difficulty === 'hell' ? 1.5 : 1;
@@ -1038,6 +1038,35 @@ export class Renderer {
         for (const e of enemies) {
             if (!e.alive) continue;
             ctx.fillRect(mmX + e.x * scaleX - 1, mmY + e.y * scaleY - 1, 2, 2);
+        }
+
+        // Enemy death markers (red X + countdown ring)
+        const MARKER_DURATION = 45;
+        const markerR = Math.round(4 * scaleMultiplier);
+        for (const m of enemyDeathMarkers) {
+            const remaining = m.expiresAt - gameTime;
+            if (remaining <= 0) continue;
+            const fraction = remaining / MARKER_DURATION;
+            const mx = mmX + m.x * scaleX;
+            const my = mmY + m.y * scaleY;
+            const xSize = markerR * 0.65;
+
+            // Countdown arc (shrinks clockwise as time passes)
+            ctx.strokeStyle = 'rgba(220,50,50,0.85)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(mx, my, markerR, -Math.PI / 2, -Math.PI / 2 + fraction * Math.PI * 2);
+            ctx.stroke();
+
+            // Red X
+            ctx.strokeStyle = 'rgba(255,80,80,1)';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(mx - xSize, my - xSize);
+            ctx.lineTo(mx + xSize, my + xSize);
+            ctx.moveTo(mx + xSize, my - xSize);
+            ctx.lineTo(mx - xSize, my + xSize);
+            ctx.stroke();
         }
 
         // Player

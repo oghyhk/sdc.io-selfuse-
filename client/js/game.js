@@ -410,6 +410,9 @@ export class Game {
         this.totalOperatorDeaths = 0;
         this.extractionGateOpen = this.activeDifficulty !== 'chaos';
 
+        // Minimap death markers
+        this.enemyDeathMarkers = [];
+
         // Create enemies
         this.enemies = [];
         for (const spawn of this.mapData.enemySpawns) {
@@ -734,6 +737,11 @@ export class Game {
         // Bullets
         this._updateBullets(dt);
 
+        // Cull expired minimap death markers
+        if (this.enemyDeathMarkers.length) {
+            this.enemyDeathMarkers = this.enemyDeathMarkers.filter(m => m.expiresAt > this.gameTime);
+        }
+
         // Health pack pickup
         this._checkHealthPickup();
         this._checkAiHealthPickup();
@@ -980,6 +988,9 @@ export class Game {
         if (!bot || bot._deathHandled) return;
         bot._deathHandled = true;
         bot.returnLoadedAmmoToInventory();
+
+        // Record minimap death marker
+        this.enemyDeathMarkers.push({ x: bot.x, y: bot.y, expiresAt: this.gameTime + 45 });
 
         // Track operator death for extraction gating
         this.totalOperatorDeaths = (this.totalOperatorDeaths || 0) + 1;
@@ -1723,7 +1734,7 @@ export class Game {
         }
 
         r._entrances = this.mapData.entrances || [];
-        r.drawMinimap(this.mapData.tiles, this.player, this.enemies, this.aiPlayers, this.mapData.lootCrates, this.mapData.extractionPoints, this.activeDifficulty);
+        r.drawMinimap(this.mapData.tiles, this.player, this.enemies, this.aiPlayers, this.mapData.lootCrates, this.mapData.extractionPoints, this.activeDifficulty, this.enemyDeathMarkers, this.gameTime);
     }
 
     _renderTutorialHUD() {

@@ -54,6 +54,16 @@ import { NetworkManager } from './network.js';
 const store = new ProfileStore();
 const net = new NetworkManager();
 
+function showToast(msg, isError = false) {
+    const el = document.createElement('div');
+    el.textContent = msg;
+    el.style.cssText = `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;pointer-events:none;background:${isError ? '#c0392b' : '#27ae60'};color:#fff;box-shadow:0 3px 10px rgba(0,0,0,.45);white-space:nowrap`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+}
+store._onRollback = (msg) => { renderAll(); showToast(msg || 'Action failed. Change reversed.', true); };
+store._onProfileRefreshed = () => renderAll();
+
 const canvas = document.getElementById('gameCanvas');
 const loading = document.getElementById('loading');
 const topBar = document.getElementById('topBar');
@@ -181,6 +191,11 @@ const buyChanceMessage = document.getElementById('buyChanceMessage');
 const buyChanceClose = document.getElementById('buyChanceClose');
 const buyChanceCancel = document.getElementById('buyChanceCancel');
 const buyChanceConfirm = document.getElementById('buyChanceConfirm');
+const missingGearModal = document.getElementById('missingGearModal');
+const missingGearMessage = document.getElementById('missingGearMessage');
+const missingGearClose = document.getElementById('missingGearClose');
+const missingGearBack = document.getElementById('missingGearBack');
+const missingGearContinue = document.getElementById('missingGearContinue');
 
 let currentView = 'menu';
 let authMode = 'login';
@@ -193,6 +208,7 @@ let activeTradeRequest = null;
 let selectedMenuLoadoutSlot = 0;
 let pendingChaosStartResolver = null;
 let pendingBuyChanceResolver = null;
+let pendingMissingGearResolver = null;
 let authDropdownOpen = false;
 let currentPlaceholderPage = 'raid-history';
 let runtimeConfigRefreshPromise = null;
@@ -1062,6 +1078,39 @@ function confirmChaosStart() {
     return new Promise((resolve) => {
         pendingChaosStartResolver = resolve;
     });
+}
+
+function resolveMissingGear(shouldContinue) {
+    const resolver = pendingMissingGearResolver;
+    pendingMissingGearResolver = null;
+    missingGearModal.classList.add('hidden');
+    if (resolver) resolver(Boolean(shouldContinue));
+}
+
+function buildMissingGearList(snapshot) {
+    const missing = [];
+    const REQUIRED_SLOTS = ['gunPrimary', 'armor', 'helmet', 'shoes', 'backpack'];
+    const SLOT_LABELS = { gunPrimary: 'Primary Gun', armor: 'Armor', helmet: 'Helmet', shoes: 'Shoes', backpack: 'Backpack' };
+    for (const slot of REQUIRED_SLOTS) {
+        if (!snapshot?.loadout?.[slot]) missing.push(`No ${SLOT_LABELS[slot]} equipped`);
+    }
+    const bp = snapshot?.backpackItems || [];
+    const hasConsumable = bp.some((e) => isConsumableDefinition(e.definitionId));
+    const hasAmmo = bp.some((e) => isAmmoDefinition(e.definitionId));
+    if (!hasConsumable) missing.push('No consumable in backpack');
+    if (!hasAmmo) missing.push('No ammo in backpack');
+    return missing;
+}
+
+async function confirmMissingGear(snapshot) {
+    const missing = buildMissingGearList(snapshot);
+    if (!missing.length) return true;
+    if (pendingMissingGearResolver) pendingMissingGearResolver(false);
+    missingGearMessage.innerHTML = 'You are entering a high-stakes raid with an incomplete loadout:<br>' +
+        missing.map((m) => `&bull; ${m}`).join('<br>') +
+        '<br><br>You can go back and fix this, or continue at your own risk.';
+    missingGearModal.classList.remove('hidden');
+    return new Promise((resolve) => { pendingMissingGearResolver = resolve; });
 }
 
 function resolveBuyChance(shouldBuy) {
@@ -2100,6 +2149,12 @@ async function startRaidWithSelectedLoadout() {
         }
     }
 
+    const diff0 = difficultySelect.value;
+    if (diff0 === 'hell' || diff0 === 'chaos') {
+        const gearOk = await confirmMissingGear(preview.snapshot);
+        if (!gearOk) return;
+    }
+
     if (difficultySelect.value === 'chaos') {
         const profile2 = store.getCurrentProfile();
         if ((profile2.chaosChances || 0) <= 0) { window.alert('No Chaos chances remaining. Wait for regen or buy more.'); return; }
@@ -2157,8 +2212,18 @@ async function startRaidWithSelectedLoadout() {
         }
     }
 
+    // Auto-equip white-rarity defaults for any missing slot before starting
+    const liveProfile = store.getCurrentProfile();
+    const WHITE_DEFAULTS = { gunPrimary: 'g18', gunSecondary: null, armor: 'cloth_vest', helmet: 'scout_cap', shoes: 'trail_shoes', backpack: 'sling_pack' };
+    const GEAR_SLOTS = ['gunPrimary', 'armor', 'helmet', 'shoes', 'backpack'];
+    for (const slot of GEAR_SLOTS) {
+        if (!liveProfile.loadout?.[slot] && WHITE_DEFAULTS[slot]) {
+            liveProfile.loadout[slot] = WHITE_DEFAULTS[slot];
+        }
+    }
+
     game.setNetwork(net.isInRaid() ? net : null);
-    game.startGame(store.getCurrentProfile(), {
+    game.startGame(liveProfile, {
         difficulty: difficultySelect.value,
         mapSeed: mapSeed || undefined,
     });
@@ -2748,6 +2813,12 @@ chaosStartBack.addEventListener('click', () => resolveChaosStart(false));
 chaosStartContinue.addEventListener('click', () => resolveChaosStart(true));
 chaosStartModal.addEventListener('click', (event) => {
     if (event.target === chaosStartModal) resolveChaosStart(false);
+});
+missingGearClose.addEventListener('click', () => resolveMissingGear(false));
+missingGearBack.addEventListener('click', () => resolveMissingGear(false));
+missingGearContinue.addEventListener('click', () => resolveMissingGear(true));
+missingGearModal.addEventListener('click', (event) => {
+    if (event.target === missingGearModal) resolveMissingGear(false);
 });
 
 buyChanceClose.addEventListener('click', () => resolveBuyChance(false));

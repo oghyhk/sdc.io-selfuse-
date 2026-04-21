@@ -17,6 +17,7 @@ CLIENT_ROOT = ROOT / 'client'
 CLIENT_ASSETS_DIR = CLIENT_ROOT / 'assets'
 DATA_FILE = ROOT / 'data' / 'users.json'
 DATA_FILE_BACKUP = ROOT / 'data' / 'users.json.runtime.bak'
+PROFILE_DIR = ROOT / 'data' / 'profiles'
 DEV_CONFIG_FILE = ROOT / 'data' / 'dev-config.json'
 HOST = '0.0.0.0'
 PORT = 8765
@@ -25,9 +26,20 @@ STORE_LOCK = RLock()
 
 # Throttle the secondary backup write — primary write is already atomic
 # (tmp file + os.replace), so the backup is for catastrophic recovery only.
-# Writing 15+ MB twice on every profile-action is the dominant latency source.
 BACKUP_INTERVAL_SEC = 30.0
 _LAST_BACKUP_AT = 0.0
+
+# In-memory store cache. read_store() returns this same dict reference;
+# callers mutate in place and write_store() persists only what changed.
+# Profile bodies live in PROFILE_DIR/<key>.json; the index file (DATA_FILE)
+# only carries auth fields per user plus the global _version.
+_STORE_CACHE: dict | None = None
+_PROFILE_BYTES: dict[str, bytes] = {}  # key -> last-written profile body JSON bytes
+
+# Auth fields kept in the slim index file alongside username key.
+# Everything else on a user dict is the gameplay profile and lives in
+# its own sidecar file under PROFILE_DIR/<key>.json.
+AUTH_FIELDS = {'username', 'password', 'isAI', 'joinedAt'}
 
 # Cached dev-config — loaded lazily, refreshed on conflict
 _cached_dev_config: dict | None = None
@@ -81,6 +93,7 @@ def _default_store() -> dict:
 def _ensure_store_file() -> None:
     if not DATA_FILE.exists():
         DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
+    PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _load_store_file(path: Path) -> dict:
@@ -93,58 +106,253 @@ def _load_store_file(path: Path) -> dict:
     return store
 
 
-def _atomic_write_json(path: Path, payload: dict) -> None:
+def _atomic_write_bytes(path: Path, payload: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_name(f'{path.name}.{uuid.uuid4().hex}.tmp')
-    tmp_path.write_text(json.dumps(payload, indent=2), encoding='utf-8')
+    tmp_path.write_bytes(payload)
     tmp_path.replace(path)
 
 
-def read_store() -> dict:
-    with STORE_LOCK:
-        _ensure_store_file()
-        if not DATA_FILE.exists():
-            store = _default_store()
-            _atomic_write_json(DATA_FILE, store)
-            _atomic_write_json(DATA_FILE_BACKUP, store)
-            return store
-        try:
-            return _load_store_file(DATA_FILE)
-        except (json.JSONDecodeError, OSError, ValueError):
-            if DATA_FILE_BACKUP.exists():
-                try:
-                    return _load_store_file(DATA_FILE_BACKUP)
-                except (json.JSONDecodeError, OSError, ValueError):
-                    pass
+def _atomic_write_json(path: Path, payload: dict, *, indent: int | None = 2) -> None:
+    if indent is None:
+        data = json.dumps(payload, separators=(',', ':'), ensure_ascii=False).encode('utf-8')
+    else:
+        data = json.dumps(payload, indent=indent, ensure_ascii=False).encode('utf-8')
+    _atomic_write_bytes(path, data)
+
+
+def _profile_path(key: str) -> Path:
+    # Username keys are validated against USERNAME_PATTERN (alphanumerics and ❤),
+    # which is filesystem-safe. Still, sanitize defensively.
+    safe = re.sub(r'[^A-Za-z0-9_-]', '_', key)
+    return PROFILE_DIR / f'{safe}.json'
+
+
+# --- On-disk compaction --------------------------------------------------
+#
+# A profile's `stashItems` list is one entry per unit of stash. For real
+# players it is dominated by stackable consumables stored as bare
+# {"definitionId": id} dicts (oghyhk's profile carries 235 K such entries —
+# ~7.6 MB on disk). Per-instance state never travels with these entries
+# (anything with state has extra keys), so they are losslessly representable
+# as a {definitionId: count} map.
+#
+# Disk format:
+#   "stashItems": {"_packs": {defId: count, ...}, "_unique": [entries...]}
+#
+# In-memory format (what every other code path sees) stays the legacy list.
+# `_load_profile_file` expands the disk form on read, `_split_profile_body`
+# compacts it on write. No other code in the server or client needs to know.
+
+_STASH_FIELDS_TO_COMPACT = ('stashItems',)
+
+
+def _compact_stash_list(items: list) -> dict | list:
+    if not isinstance(items, list) or not items:
+        return items
+    packs: dict[str, int] = {}
+    unique: list = []
+    for entry in items:
+        if isinstance(entry, dict) and len(entry) == 1 and 'definitionId' in entry:
+            defn_id = entry['definitionId']
+            if isinstance(defn_id, str):
+                packs[defn_id] = packs.get(defn_id, 0) + 1
+                continue
+        unique.append(entry)
+    if not packs:
+        return items
+    return {'_packs': packs, '_unique': unique}
+
+
+def _expand_stash_list(payload) -> list:
+    if isinstance(payload, list):
+        return payload
+    if not isinstance(payload, dict):
+        return []
+    packs = payload.get('_packs') or {}
+    unique = payload.get('_unique') or []
+    expanded: list = list(unique) if isinstance(unique, list) else []
+    if isinstance(packs, dict):
+        for defn_id, count in packs.items():
+            if not isinstance(defn_id, str):
+                continue
+            try:
+                n = max(0, int(count))
+            except (TypeError, ValueError):
+                continue
+            for _ in range(n):
+                expanded.append({'definitionId': defn_id})
+    return expanded
+
+
+def _expand_compacted_profile(body: dict) -> dict:
+    for field in _STASH_FIELDS_TO_COMPACT:
+        if field in body:
+            body[field] = _expand_stash_list(body[field])
+    return body
+
+
+def _compact_profile_for_disk(body: dict) -> dict:
+    out = dict(body)
+    for field in _STASH_FIELDS_TO_COMPACT:
+        if field in out:
+            out[field] = _compact_stash_list(out[field])
+    return out
+
+
+def _split_profile_body(user: dict) -> dict:
+    return {k: v for k, v in user.items() if k not in AUTH_FIELDS}
+
+
+def _build_index_entry(user: dict) -> dict:
+    entry = {k: user.get(k) for k in AUTH_FIELDS if k in user}
+    # Always carry username for casefold mapping back to display form.
+    if 'username' not in entry:
+        entry['username'] = user.get('username')
+    return entry
+
+
+def _load_profile_file(key: str) -> dict | None:
+    path = _profile_path(key)
+    if not path.exists():
+        return None
+    try:
+        raw = path.read_bytes()
+        body = json.loads(raw.decode('utf-8'))
+        if not isinstance(body, dict):
+            return None
+        # Cache the on-disk bytes (compact form) so write_store can detect
+        # no-op writes by re-compacting + re-serializing and byte-comparing.
+        _PROFILE_BYTES[key] = raw
+        return _expand_compacted_profile(body)
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def _hydrate_store_from_disk() -> dict:
+    """Load the slim index + every per-user profile sidecar into memory.
+
+    Falls back to the legacy fat users.json when the index doesn't yet have
+    a sidecar for a user (one-shot migration: legacy bodies stay in cache
+    and get written to sidecars on the next write_store call).
+    """
+    _ensure_store_file()
+    if not DATA_FILE.exists():
+        store = _default_store()
+        _atomic_write_json(DATA_FILE, store)
+        return store
+    try:
+        raw_store = _load_store_file(DATA_FILE)
+    except (json.JSONDecodeError, OSError, ValueError):
+        if DATA_FILE_BACKUP.exists():
+            try:
+                raw_store = _load_store_file(DATA_FILE_BACKUP)
+            except (json.JSONDecodeError, OSError, ValueError):
+                raw_store = None
+        else:
+            raw_store = None
+        if raw_store is None:
             raise RuntimeError(
                 f'Both primary store ({DATA_FILE}) and backup ({DATA_FILE_BACKUP}) are unreadable. '
-                'Cannot safely load or write user data without risking total data loss. '
                 'Restore from git history or a known-good backup before resuming.'
             )
 
+    merged_users: dict[str, dict] = {}
+    for key, raw_user in (raw_store.get('users') or {}).items():
+        if not isinstance(raw_user, dict):
+            continue
+        body = _load_profile_file(key)
+        if body is None:
+            # Legacy: full body still inline in users.json. Use it as-is;
+            # next write_store will spill it to a sidecar file.
+            merged_users[key] = dict(raw_user)
+        else:
+            # Sidecar wins for gameplay fields; index supplies auth.
+            merged = dict(body)
+            for field in AUTH_FIELDS:
+                if field in raw_user:
+                    merged[field] = raw_user[field]
+            merged_users[key] = merged
+    store = {
+        'users': merged_users,
+        '_version': int(raw_store.get('_version', 0) or 0),
+    }
+    return store
 
-def write_store(store: dict, bump_version: bool = True) -> None:
+
+def read_store() -> dict:
+    global _STORE_CACHE
+    with STORE_LOCK:
+        if _STORE_CACHE is None:
+            _STORE_CACHE = _hydrate_store_from_disk()
+        return _STORE_CACHE
+
+
+def _write_index_only(store: dict) -> None:
+    index = {
+        '_version': store.get('_version', 0),
+        'users': {key: _build_index_entry(user) for key, user in (store.get('users') or {}).items()},
+    }
+    # Index is small (~tens of KB even with hundreds of users), keep it
+    # human-readable. Profile bodies use compact json since size dominates.
+    _atomic_write_json(DATA_FILE, index, indent=2)
+    global _LAST_BACKUP_AT
+    now = time.time()
+    if now - _LAST_BACKUP_AT >= BACKUP_INTERVAL_SEC:
+        _atomic_write_json(DATA_FILE_BACKUP, index, indent=2)
+        _LAST_BACKUP_AT = now
+
+
+def _write_profile_if_changed(key: str, user: dict) -> bool:
+    body = _split_profile_body(user)
+    body = _compact_profile_for_disk(body)
+    payload = json.dumps(body, separators=(',', ':'), ensure_ascii=False).encode('utf-8')
+    if _PROFILE_BYTES.get(key) == payload:
+        return False
+    _atomic_write_bytes(_profile_path(key), payload)
+    _PROFILE_BYTES[key] = payload
+    return True
+
+
+def write_store(store: dict, bump_version: bool = True, dirty_keys=None) -> None:
+    """Persist the store. When dirty_keys is supplied, only those user
+    profile sidecars are considered for rewrite (the index is always
+    refreshed). When dirty_keys is None, every user is hash-checked.
+    """
     if not isinstance(store, dict):
         raise ValueError('store must be a dict')
     if 'users' not in store:
         raise ValueError('store must have users key')
-    # Prevent wiping users with empty dict
     if not isinstance(store.get('users'), dict):
         raise ValueError('store.users must be a dict')
     with STORE_LOCK:
-        # Only bump version when a human user's profile was modified.
-        # AI roster updates and internal cleanups skip the bump so they
-        # don't invalidate active clients' optimistic-concurrency tokens.
         if bump_version:
             store['_version'] = store.get('_version', 0) + 1
-        _atomic_write_json(DATA_FILE, store)
-        # Backup is throttled — primary is atomic and safe on its own.
-        # Doing both on every action doubles disk I/O for a 15+ MB store.
-        global _LAST_BACKUP_AT
-        now = time.time()
-        if now - _LAST_BACKUP_AT >= BACKUP_INTERVAL_SEC:
-            _atomic_write_json(DATA_FILE_BACKUP, store)
-            _LAST_BACKUP_AT = now
+        users = store.get('users') or {}
+        # Deletions: remove sidecar files for users no longer in the store.
+        existing_keys = set(users.keys())
+        for stale_key in list(_PROFILE_BYTES.keys()):
+            if stale_key not in existing_keys:
+                try:
+                    _profile_path(stale_key).unlink(missing_ok=True)
+                except OSError:
+                    pass
+                _PROFILE_BYTES.pop(stale_key, None)
+        if dirty_keys is None:
+            keys_to_check = list(users.keys())
+        else:
+            keys_to_check = [k for k in dirty_keys if k in users]
+        for key in keys_to_check:
+            user = users.get(key)
+            if isinstance(user, dict):
+                _write_profile_if_changed(key, user)
+        # Ensure any user we have never written a sidecar for gets one,
+        # even if not in dirty_keys (covers freshly migrated profiles).
+        if dirty_keys is not None:
+            for key, user in users.items():
+                if key not in _PROFILE_BYTES and isinstance(user, dict):
+                    _write_profile_if_changed(key, user)
+        _write_index_only(store)
 
 
 def normalize_username_key(username: str) -> str:
@@ -908,7 +1116,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                     # Clear stale activeRaid marker (internal cleanup; no version bump)
                     user['activeRaid'] = None
                     users[existing_key] = user
-                    write_store(store, bump_version=False)
+                    write_store(store, bump_version=False, dirty_keys=[existing_key])
                     self._send_json({'ok': True, 'active': False})
                     return
             elapsed = int(time.time() * 1000) - raid_started
@@ -1059,6 +1267,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             store = read_store()
             users = store.get('users', {})
             saved = 0
+            dirty: list[str] = []
             for entry in roster_entries:
                 if not isinstance(entry, dict):
                     continue
@@ -1085,9 +1294,10 @@ class ApiHandler(SimpleHTTPRequestHandler):
                     is_ai=True,
                 )
                 users[user_key]['isBoss'] = bool(entry.get('isBoss', False))
+                dirty.append(user_key)
                 saved += 1
             store['users'] = users
-            write_store(store, bump_version=False)
+            write_store(store, bump_version=False, dirty_keys=dirty)
             self._send_json({'ok': True, 'saved': saved})
             return
 
@@ -1099,6 +1309,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             store = read_store()
             users = store.get('users', {})
             saved = 0
+            dirty: list[str] = []
             for upd in updates:
                 if not isinstance(upd, dict):
                     continue
@@ -1121,9 +1332,10 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 if 'coins' in upd:
                     entry['coins'] = max(0, int(entry.get('coins', 0) + upd['coins']))
                 users[user_key] = entry
+                dirty.append(user_key)
                 saved += 1
             store['users'] = users
-            write_store(store, bump_version=False)
+            write_store(store, bump_version=False, dirty_keys=dirty)
             self._send_json({'ok': True, 'saved': saved})
             return
 
@@ -1149,7 +1361,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
 
             profile = build_profile(username, password)
             users[canonical_key] = profile
-            write_store(store)
+            write_store(store, dirty_keys=[canonical_key])
             self._send_json({'ok': True, 'created': True, 'profile': _safe_profile(profile, store)}, HTTPStatus.CREATED)
             return
 
@@ -1171,7 +1383,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 return
             profile = build_profile(username, password)
             users[canonical_key] = profile
-            write_store(store)
+            write_store(store, dirty_keys=[canonical_key])
             self._send_json({'ok': True, 'profile': _safe_profile(profile, store)})
             return
 
@@ -1186,7 +1398,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 return
             if apply_chance_regen(user) and existing_key:
                 users_dict[existing_key] = user
-                write_store(store)
+                write_store(store, dirty_keys=[existing_key])
             self._send_json({'ok': True, 'profile': _safe_profile(user, store)})
             return
 
@@ -1425,7 +1637,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 return
 
             users[existing_key] = profile
-            write_store(store)
+            write_store(store, dirty_keys=[existing_key])
             self._send_json({'ok': True, 'profile': _safe_profile(profile, store), **extra_payload})
             return
 
@@ -1487,7 +1699,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             merged['username'] = user.get('username', username)
             profile = merged
             users[existing_key] = profile
-            write_store(store)
+            write_store(store, dirty_keys=[existing_key])
             self._send_json({'ok': True, 'profile': _safe_profile(profile, store)})
             return
 
@@ -1609,7 +1821,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             profile['password'] = user.get('password', '')
             profile['username'] = user.get('username', username)
             users[existing_key] = profile
-            write_store(store)
+            write_store(store, dirty_keys=[existing_key])
             self._send_json({'ok': True, 'profile': _safe_profile(profile, store)})
             return
 
@@ -1629,7 +1841,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 'preRaidElo': int(user.get('elo', 1000)),
             }
             users[existing_key] = user
-            write_store(store, bump_version=False)
+            write_store(store, bump_version=False, dirty_keys=[existing_key])
             self._send_json({'ok': True})
             return
 
@@ -1661,7 +1873,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 regen_ms = 5 * 3600 * 1000 if difficulty == 'hell' else 23 * 3600 * 1000
                 user[regen_key] = int(time.time() * 1000) + regen_ms
             users[existing_key] = user
-            write_store(store)
+            write_store(store, dirty_keys=[existing_key])
             self._send_json({'ok': True, 'profile': _safe_profile(user, store)})
             return
 
@@ -1687,7 +1899,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             if user.get(chance_key, 0) >= max_val:
                 user[f'{difficulty}ChanceRegenAt'] = 0
             users[existing_key] = user
-            write_store(store)
+            write_store(store, dirty_keys=[existing_key])
             self._send_json({'ok': True, 'profile': _safe_profile(user, store)})
             return
 
@@ -1721,7 +1933,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             if user.get(chance_key, 0) >= max_val:
                 user[f'{difficulty}ChanceRegenAt'] = 0
             users[existing_key] = user
-            write_store(store)
+            write_store(store, dirty_keys=[existing_key])
             safe = {k: v for k, v in user.items() if k != 'password'}
             safe['_clientVersion'] = store.get('_version', 0)
             self._send_json({'ok': True, 'profile': safe})
@@ -1748,7 +1960,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 return
             user['password'] = new_pw
             users[existing_key] = user
-            write_store(store)
+            write_store(store, dirty_keys=[existing_key])
             self._send_json({'ok': True, 'profile': _safe_profile(user, store)})
             return
 
@@ -1771,7 +1983,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 unlocked.append(achievement_id)
                 user['unlockedAchievements'] = unlocked
                 users[existing_key] = user
-                write_store(store)
+                write_store(store, dirty_keys=[existing_key])
             self._send_json({'ok': True, 'profile': _safe_profile(user, store)})
             return
 
@@ -1792,7 +2004,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 unlocked.remove(achievement_id)
                 user['unlockedAchievements'] = unlocked
                 users[existing_key] = user
-                write_store(store)
+                write_store(store, dirty_keys=[existing_key])
             self._send_json({'ok': True, 'profile': _safe_profile(user, store)})
             return
 
@@ -1911,7 +2123,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             changed = _clean_mail(user)
             if changed:
                 users[existing_key] = user
-                write_store(store)
+                write_store(store, dirty_keys=[existing_key])
             safe_mail = [{k: v for k, v in m.items()} for m in user.get('mail', [])]
             self._send_json({'ok': True, 'mail': safe_mail})
             return
@@ -1959,7 +2171,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
                 self._send_json({'ok': False, 'message': 'Mail not found.'}, HTTPStatus.NOT_FOUND)
                 return
             users[existing_key] = user
-            write_store(store)
+            write_store(store, dirty_keys=[existing_key])
             safe_user = {k: v for k, v in user.items() if k != 'password'}
             self._send_json({'ok': True, 'profile': safe_user})
             return
@@ -1995,7 +2207,7 @@ class ApiHandler(SimpleHTTPRequestHandler):
             mail.append(mail_entry)
             user['mail'] = mail
             users[existing_key] = user
-            write_store(store)
+            write_store(store, dirty_keys=[existing_key])
             self._send_json({'ok': True, 'mailId': mail_entry['id']})
             return
 
@@ -2015,11 +2227,21 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print('\nShutting down...')
     finally:
-        # Flush a final backup snapshot since runtime backups are throttled.
+        # Flush a final pass: ensure every profile sidecar is up-to-date and
+        # write a fresh backup of the slim index file.
         try:
             with STORE_LOCK:
-                _atomic_write_json(DATA_FILE_BACKUP, read_store())
-            print('Final backup written.')
+                store = read_store()
+                # Force-check every user and write changed sidecars.
+                for _final_key, _final_user in (store.get('users') or {}).items():
+                    if isinstance(_final_user, dict):
+                        _write_profile_if_changed(_final_key, _final_user)
+                _index_payload = {
+                    '_version': store.get('_version', 0),
+                    'users': {k: _build_index_entry(u) for k, u in (store.get('users') or {}).items()},
+                }
+                _atomic_write_json(DATA_FILE_BACKUP, _index_payload, indent=2)
+            print('Final snapshot written.')
         except Exception as exc:
-            print(f'Final backup failed: {exc}')
+            print(f'Final snapshot failed: {exc}')
         server.server_close()
