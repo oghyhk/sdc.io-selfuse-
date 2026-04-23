@@ -125,7 +125,7 @@ Shield HP is shown as a **light-blue segment** on the health bar, sitting to the
 | ammo rarity **=** shield rarity | Shield absorbs **30 %** of incoming damage; operator takes the remaining 70 % |
 | ammo rarity **>** shield rarity | **Both** shield and operator take the full projectile damage (shield offers no protection) |
 
-- `instantKill` bullets (red ammo, .338 AP) **bypass shields entirely**.
+- `instantKill` bullets (red ammo, .338 AP) one-shot **AI enemies only** (drones, sentinels, etc.). Against operators they behave like normal projectiles, dealing their listed damage and interacting with shields normally.
 - When armor and helmet have **different** shield rarities, the **higher-rarity** shield is consumed first.
 - Shields regenerate passively at `shieldRegen` HP/s while the operator is alive.
 - Enemy (drone/sentinel) bullets have no ammo rarity (treated as gray), so shields absorb their damage fully.

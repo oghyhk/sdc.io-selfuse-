@@ -632,10 +632,10 @@
       "lootType": "ammo",
       "rarity": "legend",
       "name": ".338 AP",
-      "description": "The most overpowered ammo in existence. Vaporises targets and punches through walls. | DMG:x999 | INSTAKILL",
-      "sellValue": 5000000,
-      "ammoAmount": 20,
-      "damageMultiplier": 999,
+      "description": "The most overpowered ammo in existence. Vaporises targets and punches through walls. | DMG:x7",
+      "sellValue": 1000000,
+      "ammoAmount": 1,
+      "damageMultiplier": 7,
       "instantKill": true,
       "wallPenetration": 1,
       "projectileStyle": "ap",
@@ -644,8 +644,8 @@
       "projectileLength": 26,
       "trailLength": 58,
       "image": "/assets/items/ap.png",
-      "buyMarketTaxPercent": 900,
-      "sellMarketTaxPercent": 90
+      "buyMarketTaxPercent": 200,
+      "sellMarketTaxPercent": 70
     },
     "ammo_red": {
       "id": "ammo_red",
@@ -657,7 +657,7 @@
       "sellValue": 200000,
       "ammoAmount": 1,
       "damageMultiplier": 3,
-      "instantKill": false,
+      "instantKill": true,
       "image": "/assets/dev/ammo_red.jpg",
       "buyMarketTaxPercent": 20,
       "sellMarketTaxPercent": 50
@@ -1797,7 +1797,7 @@
         600,
         1000
       ],
-      "combatConfidence": 1.5,
+      "combatConfidence": 1.28,
       "disengageBias": 0.6,
       "isBoss": true,
       "bossHealCooldown": 15

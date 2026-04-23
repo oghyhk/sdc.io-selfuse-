@@ -1846,7 +1846,21 @@ export class ProfileStore {
             await this.init();
             result = await runRequest();
         }
-        this.currentProfile = normalizeProfile(result.profile, this.activeUsername, false);
+        // Surgical merge: only update the fields we sent (cosmetic + savedLoadouts).
+        // Do NOT overwrite server-authoritative fields like backpackItems/stashItems
+        // that may have in-flight optimistic mutations which haven't reached the server yet.
+        if (result?.profile) {
+            const updated = normalizeProfile(result.profile, this.activeUsername, false);
+            this.currentProfile._clientVersion = updated._clientVersion;
+            this.currentProfile.savedLoadouts = updated.savedLoadouts;
+            this.currentProfile.avatarDataUrl = updated.avatarDataUrl;
+            this.currentProfile.pinnedAchievements = updated.pinnedAchievements;
+            this.currentProfile.unlockedAchievements = updated.unlockedAchievements;
+            this.currentProfile.hasCompletedTutorial = updated.hasCompletedTutorial;
+            // Also pick up any chance-regen timer updates from the server
+            if (updated.hellChanceRegenAt != null) this.currentProfile.hellChanceRegenAt = updated.hellChanceRegenAt;
+            if (updated.chaosChanceRegenAt != null) this.currentProfile.chaosChanceRegenAt = updated.chaosChanceRegenAt;
+        }
         return this.getCurrentProfile();
     }
 

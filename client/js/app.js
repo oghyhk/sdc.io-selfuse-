@@ -2155,21 +2155,24 @@ async function startRaidWithSelectedLoadout() {
         if (!gearOk) return;
     }
 
-    if (difficultySelect.value === 'chaos') {
+    const diff = difficultySelect.value;
+    if (diff === 'chaos') {
         const profile2 = store.getCurrentProfile();
         if ((profile2.chaosChances || 0) <= 0) { window.alert('No Chaos chances remaining. Wait for regen or buy more.'); return; }
         const shouldContinue = await confirmChaosStart();
         if (!shouldContinue) return;
-    } else if (difficultySelect.value === 'hell') {
+    } else if (diff === 'hell') {
         const profile2 = store.getCurrentProfile();
         if ((profile2.hellChances || 0) <= 0) { window.alert('No Hell chances remaining. Wait for regen or buy more.'); return; }
-        showRaidLoadingOverlay();
-    } else {
-        showRaidLoadingOverlay();
     }
 
-    // Deduct raid chance for hell/chaos (server-authoritative)
-    const diff = difficultySelect.value;
+    // Show overlay once and yield to the browser so the loader actually paints
+    // BEFORE we begin the heavy synchronous map / AI generation in startGame().
+    showRaidLoadingOverlay();
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+    // Deduct raid chance for hell/chaos (server-authoritative). Must complete
+    // before we commit other state, so this stays sequential.
     if (diff === 'hell' || diff === 'chaos') {
         const deducted = await deductRaidChance(diff);
         updateRaidChancesUI();
@@ -2181,36 +2184,47 @@ async function startRaidWithSelectedLoadout() {
     }
     window._lastRaidDifficulty = diff;
 
-    await store.applyRaidLoadoutSelection(selectedSlot, { autoBuyMissing: preview.totalCost > 0 });
-    showRaidLoadingOverlay();
-    // Mark raid active on server before starting
-    try {
-        await apiFetch('/enter-raid', {
-            method: 'POST',
-            body: JSON.stringify({ username: store.activeUsername, difficulty: difficultySelect.value })
-        });
-    } catch (e) {
-        console.warn('Failed to mark raid active:', e);
+    // Run independent prep tasks in parallel:
+    //  1. Apply the chosen loadout (may hit the server for saved presets).
+    //  2. Mark the raid active on the HTTP server.
+    //  3. Connect the WebSocket and wait for raid_joined (provides mapSeed).
+    let mapSeed = null;
+    const loadoutTask = store
+        .applyRaidLoadoutSelection(selectedSlot, { autoBuyMissing: preview.totalCost > 0 });
+    const enterRaidTask = apiFetch('/enter-raid', {
+        method: 'POST',
+        body: JSON.stringify({ username: store.activeUsername, difficulty: diff })
+    }).catch((e) => { console.warn('Failed to mark raid active:', e); });
+
+    let netTask = Promise.resolve();
+    if (store.isAuthenticated()) {
+        netTask = (async () => {
+            try {
+                // Reuse an existing authenticated socket if we already have one.
+                if (!net.connected || !net.authenticated) {
+                    await net.connect(store.activeUsername);
+                }
+                // Resolve as soon as the server acknowledges the join (mapSeed
+                // is already included). raid_start still fires for sync, but
+                // we don't need to block raid creation on the lobby countdown.
+                const raidReady = new Promise((resolve) => {
+                    let done = false;
+                    const finish = () => { if (!done) { done = true; resolve(); } };
+                    net.onRaidJoined = (info) => { mapSeed = info.mapSeed; finish(); };
+                    net.onRaidStart = (info) => { mapSeed = info.mapSeed; finish(); };
+                    // Safety: if the server never replies, fall through to solo
+                    // play after a short wait instead of stalling the loader.
+                    setTimeout(finish, 1500);
+                });
+                net.joinRaid(diff);
+                await raidReady;
+            } catch (e) {
+                console.warn('WebSocket connect failed, playing solo:', e);
+            }
+        })();
     }
 
-    // Connect to WebSocket for multiplayer
-    let mapSeed = null;
-    if (store.isAuthenticated()) {
-        try {
-            await net.connect(store.activeUsername);
-            // Wait for raid_start (server sends after lobby countdown)
-            const raidReady = new Promise((resolve) => {
-                net.onRaidStart = (info) => { mapSeed = info.mapSeed; resolve(); };
-                // Fallback: use raid_joined seed if raid_start doesn't arrive in time
-                net.onRaidJoined = (info) => { mapSeed = info.mapSeed; };
-                setTimeout(resolve, 5000); // safety timeout
-            });
-            net.joinRaid(difficultySelect.value);
-            await raidReady;
-        } catch (e) {
-            console.warn('WebSocket connect failed, playing solo:', e);
-        }
-    }
+    await Promise.all([loadoutTask, enterRaidTask, netTask]);
 
     // Auto-equip white-rarity defaults for any missing slot before starting
     const liveProfile = store.getCurrentProfile();
@@ -2224,7 +2238,7 @@ async function startRaidWithSelectedLoadout() {
 
     game.setNetwork(net.isInRaid() ? net : null);
     game.startGame(liveProfile, {
-        difficulty: difficultySelect.value,
+        difficulty: diff,
         mapSeed: mapSeed || undefined,
     });
     renderVisibility();
@@ -3266,6 +3280,8 @@ window.addEventListener('DOMContentLoaded', async () => {
                     uiLoop();
                     setTimeout(() => { loading.classList.add('hidden'); setTimeout(() => loading.remove(), 300); }, 200);
                     showRaidLoadingOverlay();
+                    // Yield so the loader paints before the synchronous startGame() work.
+                    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
                     // Re-enter raid to refresh the server timer
                     try {
                         await apiFetch('/enter-raid', {

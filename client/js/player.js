@@ -41,6 +41,21 @@ export class Player {
         this.alive = true;
         this.angle = 0; // facing direction
 
+        // Down / revive state (BR-style; only meaningful when squadSize >= 2)
+        this.isDowned = false;
+        this.downHp = 0;                  // current down-state HP (drains over time + from damage)
+        this.downHpMax = 100;
+        this.downBleedoutSeconds = 30;    // seconds for downHp to drain naturally from full to 0
+        this.isDeadBody = false;          // intermediate state after downHp reaches 0
+        this.deadBodyTimer = 0;           // counts up while in dead_body
+        this.deadBodyMax = 150;           // seconds until corpse becomes a death crate
+        this.hasBeenDeadBody = false;     // once-per-raid: second time you bleed out → final death
+        this.reviveTimer = 0;             // accumulated revive progress (seconds)
+        this.reviveRequiredDown = 4;      // seconds of channel needed while downed
+        this.reviveRequiredDeadBody = 8;  // seconds of channel needed while dead_body
+        this.reviverId = null;            // id of ally currently channeling a revive on us
+        this._deathHandled = false;       // reused by death pipeline
+
         this.loadout = {
             gunPrimary: getItemDefinition(loadout.gunPrimary || loadout.primaryGun || loadout.gun)?.category === 'gun' ? (loadout.gunPrimary || loadout.primaryGun || loadout.gun) : null,
             gunSecondary: getItemDefinition(loadout.gunSecondary || loadout.secondaryGun || loadout.gun2)?.category === 'gun' ? (loadout.gunSecondary || loadout.secondaryGun || loadout.gun2) : null,
@@ -906,6 +921,36 @@ export class Player {
         this._updateFloatingDamageTexts(dt);
         if (!this.alive) return;
 
+        // Dead-body: completely immobile, no actions, no damage. Just tick visuals.
+        if (this.isDeadBody) {
+            this.damageFlash = Math.max(0, this.damageFlash - dt);
+            this.invincible = Math.max(0, this.invincible - dt);
+            this.vx = 0;
+            this.vy = 0;
+            return;
+        }
+
+        // While downed: no shooting / reloading / healing / dashing. Crawl at 15 px/s.
+        if (this.isDowned) {
+            this.damageFlash = Math.max(0, this.damageFlash - dt);
+            this.invincible = Math.max(0, this.invincible - dt);
+            this.angle = angleBetween(this.x, this.y, input.aimWorld.x, input.aimWorld.y);
+            const crawlSpeed = 15;
+            const dir = input.moveDir;
+            if (dir.x !== 0 || dir.y !== 0) {
+                const n = normalize(dir.x, dir.y);
+                const nx = this.x + n.x * crawlSpeed * dt;
+                const ny = this.y + n.y * crawlSpeed * dt;
+                if (!wallGrid?.collidesCircle?.(nx, this.y, this.radius)) this.x = nx;
+                if (!wallGrid?.collidesCircle?.(this.x, ny, this.radius)) this.y = ny;
+                this.x = Math.max(this.radius, Math.min(MAP_WIDTH - this.radius, this.x));
+                this.y = Math.max(this.radius, Math.min(MAP_HEIGHT - this.radius, this.y));
+            }
+            this.vx = 0;
+            this.vy = 0;
+            return;
+        }
+
         if (input.shooting && this.isHealing) {
             this.stopHealing();
         }
@@ -1171,9 +1216,21 @@ export class Player {
     takeDamage(amount, bullet = null) {
         if (this.invincible > 0) return;
         const rawDamage = Math.max(0, Number(amount) || 0);
+        // Dead-body operators take no further damage (they're already at 0 down-hp,
+        // sitting on a 150 s timer). Bullets pass through them.
+        if (this.isDeadBody) return;
         let hpDamage = rawDamage;
-        if (rawDamage > 0 && this.shieldLayers && this.shieldLayers.length > 0 && bullet && !bullet.instantKill) {
+        if (rawDamage > 0 && this.shieldLayers && this.shieldLayers.length > 0 && bullet) {
             hpDamage = this._applyShieldDamage(rawDamage, bullet);
+        }
+        // Damage taken while downed reduces the down-state HP. Per spec, damage does
+        // NOT cancel an in-progress revive — only the state transition to dead_body does.
+        if (this.isDowned) {
+            this.damageFlash = 0.28;
+            this.invincible = 0.2;
+            this._spawnFloatingDamageText(rawDamage);
+            this.downHp = Math.max(0, this.downHp - hpDamage);
+            return;
         }
         this.hp -= hpDamage;
         this.damageFlash = 0.28;
@@ -1184,8 +1241,80 @@ export class Player {
         }
         if (this.hp <= 0) {
             this.hp = 0;
-            this.alive = false;
+            if (this._canEnterDownedState()) {
+                this._enterDownedState();
+            } else {
+                this.alive = false;
+            }
         }
+    }
+
+    _canEnterDownedState() {
+        if (this.isDowned || this.isDeadBody) return false;
+        if (!this.squadSize || this.squadSize < 2) return false;
+        if (typeof this._findSquadmateResolver !== 'function') return false;
+        const squadmates = this._findSquadmateResolver(this) || [];
+        return squadmates.some((mate) => mate && mate.alive && !mate.isDowned && !mate.isDeadBody && mate !== this);
+    }
+
+    _enterDownedState() {
+        this.isDowned = true;
+        this.hp = 0;
+        this.downHp = this.downHpMax;
+        this.reviveTimer = 0;
+        this.reviverId = null;
+        // Cancel all active actions
+        this.isReloading = false;
+        this.reloadTimer = 0;
+        this.isHealing = false;
+        this.healingDefinitionId = null;
+        this.healingName = '';
+        this.healingRate = 0;
+        this.healingProgress = 0;
+        this.dashing = false;
+        this.dashTimer = 0;
+        this.vx = 0;
+        this.vy = 0;
+        if (this.onDowned) this.onDowned(this);
+    }
+
+    enterDeadBodyState() {
+        // Transition from downed → dead_body when downHp reaches 0 (first time only).
+        if (this.isDeadBody || !this.isDowned) return;
+        this.isDowned = false;
+        this.isDeadBody = true;
+        this.hasBeenDeadBody = true;
+        this.deadBodyTimer = 0;
+        // Per spec, the state change to dead_body cancels any in-progress revive.
+        this.reviveTimer = 0;
+        this.reviverId = null;
+        this.vx = 0;
+        this.vy = 0;
+        if (this.onDeadBody) this.onDeadBody(this);
+    }
+
+    applyRevive() {
+        // Called when a squadmate finishes channeling a revive on this operator.
+        // Works from either downed or dead_body.
+        if (!this.isDowned && !this.isDeadBody) return;
+        this.isDowned = false;
+        this.isDeadBody = false;
+        this.downHp = 0;
+        this.deadBodyTimer = 0;
+        this.reviveTimer = 0;
+        this.reviverId = null;
+        this.hp = Math.max(1, Math.floor(this.maxHp * 0.3));
+        this.invincible = 1.0;
+        if (this.onRevived) this.onRevived(this);
+    }
+
+    finishFinalDeath() {
+        // Called when bleed-out can't be saved or the dead_body timer expires
+        // (or when there are no squadmates left to revive us).
+        this.isDowned = false;
+        this.isDeadBody = false;
+        this.alive = false;
+        this.hp = 0;
     }
 
     /**

@@ -1,485 +1,485 @@
 {
-  "_version": 387,
+  "_version": 412,
   "users": {
     "oghyhk": {
-      "password": "112069",
-      "username": "oghyhk"
+      "username": "oghyhk",
+      "password": "112069"
     },
     "oghyhkhk": {
-      "password": "112069",
-      "username": "oghyhkhk"
+      "username": "oghyhkhk",
+      "password": "112069"
     },
     "testbot99": {
-      "password": "test123",
-      "username": "TestBot99"
+      "username": "TestBot99",
+      "password": "test123"
     },
     "fixtest1": {
-      "password": "test",
-      "username": "FixTest1"
+      "username": "FixTest1",
+      "password": "test"
     },
     "testpfp99": {
-      "password": "test123",
-      "username": "testpfp99"
+      "username": "testpfp99",
+      "password": "test123"
     },
     "ai_ghost11": {
-      "password": "ai_ai_ghost11",
+      "username": "Ghost-11",
       "isAI": true,
-      "username": "Ghost-11"
+      "password": "ai_ai_ghost11"
     },
     "ai_brick4": {
-      "password": "ai_ai_brick4",
+      "username": "Brick-4",
       "isAI": true,
-      "username": "Brick-4"
+      "password": "ai_ai_brick4"
     },
     "ai_anvil9": {
-      "password": "ai_ai_anvil9",
+      "username": "Anvil-9",
       "isAI": true,
-      "username": "Anvil-9"
+      "password": "ai_ai_anvil9"
     },
     "ai_badger6": {
-      "password": "ai_ai_badger6",
+      "username": "Badger-6",
       "isAI": true,
-      "username": "Badger-6"
+      "password": "ai_ai_badger6"
     },
     "ai_hound12": {
-      "password": "ai_ai_hound12",
+      "username": "Hound-12",
       "isAI": true,
-      "username": "Hound-12"
+      "password": "ai_ai_hound12"
     },
     "ai_ember3": {
-      "password": "ai_ai_ember3",
+      "username": "Ember-3",
       "isAI": true,
-      "username": "Ember-3"
+      "password": "ai_ai_ember3"
     },
     "ai_magpie5": {
-      "password": "ai_ai_magpie5",
+      "username": "Magpie-5",
       "isAI": true,
-      "username": "Magpie-5"
+      "password": "ai_ai_magpie5"
     },
     "ai_rook14": {
-      "password": "ai_ai_rook14",
+      "username": "Rook-14",
       "isAI": true,
-      "username": "Rook-14"
+      "password": "ai_ai_rook14"
     },
     "ai_ferret2": {
-      "password": "ai_ai_ferret2",
+      "username": "Ferret-2",
       "isAI": true,
-      "username": "Ferret-2"
+      "password": "ai_ai_ferret2"
     },
     "ai_cricket8": {
-      "password": "ai_ai_cricket8",
+      "username": "Cricket-8",
       "isAI": true,
-      "username": "Cricket-8"
+      "password": "ai_ai_cricket8"
     },
     "ai_pebble17": {
-      "password": "ai_ai_pebble17",
+      "username": "Pebble-17",
       "isAI": true,
-      "username": "Pebble-17"
+      "password": "ai_ai_pebble17"
     },
     "ai_sprout10": {
-      "password": "ai_ai_sprout10",
+      "username": "Sprout-10",
       "isAI": true,
-      "username": "Sprout-10"
+      "password": "ai_ai_sprout10"
     },
     "ai_rabbit7": {
-      "password": "ai_ai_rabbit7",
+      "username": "Rabbit-7",
       "isAI": true,
-      "username": "Rabbit-7"
+      "password": "ai_ai_rabbit7"
     },
     "ai_flicker16": {
-      "password": "ai_ai_flicker16",
+      "username": "Flicker-16",
       "isAI": true,
-      "username": "Flicker-16"
+      "password": "ai_ai_flicker16"
     },
     "ai_wisp1": {
-      "password": "ai_ai_wisp1",
+      "username": "Wisp-1",
       "isAI": true,
-      "username": "Wisp-1"
+      "password": "ai_ai_wisp1"
     },
     "ai_dart13": {
-      "password": "ai_ai_dart13",
+      "username": "Dart-13",
       "isAI": true,
-      "username": "Dart-13"
+      "password": "ai_ai_dart13"
     },
     "ai_swift20": {
-      "password": "ai_ai_swift20",
+      "username": "Swift-20",
       "isAI": true,
-      "username": "Swift-20"
+      "password": "ai_ai_swift20"
     },
     "ai_viper9": {
-      "password": "ai_ai_viper9",
+      "username": "Viper-9",
       "isAI": true,
-      "username": "Viper-9"
+      "password": "ai_ai_viper9"
     },
     "ai_raven2": {
-      "password": "ai_ai_raven2",
+      "username": "Raven-2",
       "isAI": true,
-      "username": "Raven-2"
+      "password": "ai_ai_raven2"
     },
     "ai_mako7": {
-      "password": "ai_ai_mako7",
+      "username": "Mako-7",
       "isAI": true,
-      "username": "Mako-7"
+      "password": "ai_ai_mako7"
     },
     "ai_warden1": {
-      "password": "ai_ai_warden1",
+      "username": "Warden-1",
       "isAI": true,
-      "username": "Warden-1"
+      "password": "ai_ai_warden1"
     },
     "ai_titan15": {
-      "password": "ai_ai_titan15",
+      "username": "Titan-15",
       "isAI": true,
-      "username": "Titan-15"
+      "password": "ai_ai_titan15"
     },
     "ai_storm22": {
-      "password": "ai_ai_storm22",
+      "username": "Storm-22",
       "isAI": true,
-      "username": "Storm-22"
+      "password": "ai_ai_storm22"
     },
     "ai_blitz12": {
-      "password": "ai_ai_blitz12",
+      "username": "Blitz-12",
       "isAI": true,
-      "username": "Blitz-12"
+      "password": "ai_ai_blitz12"
     },
     "ai_atlas4": {
-      "password": "ai_ai_atlas4",
+      "username": "Atlas-4",
       "isAI": true,
-      "username": "Atlas-4"
+      "password": "ai_ai_atlas4"
     },
     "ai_cipher8": {
-      "password": "ai_ai_cipher8",
+      "username": "Cipher-8",
       "isAI": true,
-      "username": "Cipher-8"
+      "password": "ai_ai_cipher8"
     },
     "ai_echo6": {
-      "password": "ai_ai_echo6",
+      "username": "Echo-6",
       "isAI": true,
-      "username": "Echo-6"
+      "password": "ai_ai_echo6"
     },
     "ai_nomad18": {
-      "password": "ai_ai_nomad18",
+      "username": "Nomad-18",
       "isAI": true,
-      "username": "Nomad-18"
+      "password": "ai_ai_nomad18"
     },
     "ai_lynx25": {
-      "password": "ai_ai_lynx25",
+      "username": "Lynx-25",
       "isAI": true,
-      "username": "Lynx-25"
+      "password": "ai_ai_lynx25"
     },
     "ai_pilgrim21": {
-      "password": "ai_ai_pilgrim21",
+      "username": "Pilgrim-21",
       "isAI": true,
-      "username": "Pilgrim-21"
+      "password": "ai_ai_pilgrim21"
     },
     "ai_falcon5": {
-      "password": "ai_ai_falcon5",
+      "username": "Falcon-5",
       "isAI": true,
-      "username": "Falcon-5"
+      "password": "ai_ai_falcon5"
     },
     "ai_nova3": {
-      "password": "ai_ai_nova3",
+      "username": "Nova-3",
       "isAI": true,
-      "username": "Nova-3"
+      "password": "ai_ai_nova3"
     },
     "ai_drift17": {
-      "password": "ai_ai_drift17",
+      "username": "Drift-17",
       "isAI": true,
-      "username": "Drift-17"
+      "password": "ai_ai_drift17"
     },
     "ai_zephyr11": {
-      "password": "ai_ai_zephyr11",
+      "username": "Zephyr-11",
       "isAI": true,
-      "username": "Zephyr-11"
+      "password": "ai_ai_zephyr11"
     },
     "ai_shade28": {
-      "password": "ai_ai_shade28",
+      "username": "Shade-28",
       "isAI": true,
-      "username": "Shade-28"
+      "password": "ai_ai_shade28"
     },
     "ai_breeze19": {
-      "password": "ai_ai_breeze19",
+      "username": "Breeze-19",
       "isAI": true,
-      "username": "Breeze-19"
+      "password": "ai_ai_breeze19"
     },
     "ai_reaper10": {
-      "password": "ai_ai_reaper10",
+      "username": "Reaper-10",
       "isAI": true,
-      "username": "Reaper-10"
+      "password": "ai_ai_reaper10"
     },
     "ai_phantom13": {
-      "password": "ai_ai_phantom13",
+      "username": "Phantom-13",
       "isAI": true,
-      "username": "Phantom-13"
+      "password": "ai_ai_phantom13"
     },
     "ai_mantis14": {
-      "password": "ai_ai_mantis14",
+      "username": "Mantis-14",
       "isAI": true,
-      "username": "Mantis-14"
+      "password": "ai_ai_mantis14"
     },
     "ai_cerberus30": {
-      "password": "ai_ai_cerberus30",
+      "username": "Cerberus-30",
       "isAI": true,
-      "username": "Cerberus-30"
+      "password": "ai_ai_cerberus30"
     },
     "ai_apex26": {
-      "password": "ai_ai_apex26",
+      "username": "Apex-26",
       "isAI": true,
-      "username": "Apex-26"
+      "password": "ai_ai_apex26"
     },
     "ai_hydra31": {
-      "password": "ai_ai_hydra31",
+      "username": "Hydra-31",
       "isAI": true,
-      "username": "Hydra-31"
+      "password": "ai_ai_hydra31"
     },
     "ai_vulcan32": {
-      "password": "ai_ai_vulcan32",
+      "username": "Vulcan-32",
       "isAI": true,
-      "username": "Vulcan-32"
+      "password": "ai_ai_vulcan32"
     },
     "ai_onslaught33": {
-      "password": "ai_ai_onslaught33",
+      "username": "Onslaught-33",
       "isAI": true,
-      "username": "Onslaught-33"
+      "password": "ai_ai_onslaught33"
     },
     "ai_havoc34": {
-      "password": "ai_ai_havoc34",
+      "username": "Havoc-34",
       "isAI": true,
-      "username": "Havoc-34"
+      "password": "ai_ai_havoc34"
     },
     "ai_fury35": {
-      "password": "ai_ai_fury35",
+      "username": "Fury-35",
       "isAI": true,
-      "username": "Fury-35"
+      "password": "ai_ai_fury35"
     },
     "ai_titanx": {
-      "password": "ai_ai_titanx",
+      "username": "Titan-X",
       "isAI": true,
-      "username": "Titan-X"
+      "password": "ai_ai_titanx"
     },
     "ai_warpath36": {
-      "password": "ai_ai_warpath36",
+      "username": "Warpath-36",
       "isAI": true,
-      "username": "Warpath-36"
+      "password": "ai_ai_warpath36"
     },
     "ai_specter18": {
-      "password": "ai_ai_specter18",
+      "username": "Specter-18",
       "isAI": true,
-      "username": "Specter-18"
+      "password": "ai_ai_specter18"
     },
     "ai_orion15": {
-      "password": "ai_ai_orion15",
+      "username": "Orion-15",
       "isAI": true,
-      "username": "Orion-15"
+      "password": "ai_ai_orion15"
     },
     "ai_jackal29": {
-      "password": "ai_ai_jackal29",
+      "username": "Jackal-29",
       "isAI": true,
-      "username": "Jackal-29"
+      "password": "ai_ai_jackal29"
     },
     "ai_sable37": {
-      "password": "ai_ai_sable37",
+      "username": "Sable-37",
       "isAI": true,
-      "username": "Sable-37"
+      "password": "ai_ai_sable37"
     },
     "ai_mirage38": {
-      "password": "ai_ai_mirage38",
+      "username": "Mirage-38",
       "isAI": true,
-      "username": "Mirage-38"
+      "password": "ai_ai_mirage38"
     },
     "ai_crypt39": {
-      "password": "ai_ai_crypt39",
+      "username": "Crypt-39",
       "isAI": true,
-      "username": "Crypt-39"
+      "password": "ai_ai_crypt39"
     },
     "ai_argus40": {
-      "password": "ai_ai_argus40",
+      "username": "Argus-40",
       "isAI": true,
-      "username": "Argus-40"
+      "password": "ai_ai_argus40"
     },
     "ai_nexus41": {
-      "password": "ai_ai_nexus41",
+      "username": "Nexus-41",
       "isAI": true,
-      "username": "Nexus-41"
+      "password": "ai_ai_nexus41"
     },
     "ai_valkyrie19": {
-      "password": "ai_ai_valkyrie19",
+      "username": "Valkyrie-19",
       "isAI": true,
-      "username": "Valkyrie-19"
+      "password": "ai_ai_valkyrie19"
     },
     "ai_ion20": {
-      "password": "ai_ai_ion20",
+      "username": "Ion-20",
       "isAI": true,
-      "username": "Ion-20"
+      "password": "ai_ai_ion20"
     },
     "ai_aegis16": {
-      "password": "ai_ai_aegis16",
+      "username": "Aegis-16",
       "isAI": true,
-      "username": "Aegis-16"
+      "password": "ai_ai_aegis16"
     },
     "ai_wraith27": {
-      "password": "ai_ai_wraith27",
+      "username": "Wraith-27",
       "isAI": true,
-      "username": "Wraith-27"
+      "password": "ai_ai_wraith27"
     },
     "ai_comet24": {
-      "password": "ai_ai_comet24",
+      "username": "Comet-24",
       "isAI": true,
-      "username": "Comet-24"
+      "password": "ai_ai_comet24"
     },
     "ai_mercury42": {
-      "password": "ai_ai_mercury42",
+      "username": "Mercury-42",
       "isAI": true,
-      "username": "Mercury-42"
+      "password": "ai_ai_mercury42"
     },
     "ai_bolt43": {
-      "password": "ai_ai_bolt43",
+      "username": "Bolt-43",
       "isAI": true,
-      "username": "Bolt-43"
+      "password": "ai_ai_bolt43"
     },
     "ai_pulse44": {
-      "password": "ai_ai_pulse44",
+      "username": "Pulse-44",
       "isAI": true,
-      "username": "Pulse-44"
+      "password": "ai_ai_pulse44"
     },
     "ai_streak45": {
-      "password": "ai_ai_streak45",
+      "username": "Streak-45",
       "isAI": true,
-      "username": "Streak-45"
+      "password": "ai_ai_streak45"
     },
     "ai_glint46": {
-      "password": "ai_ai_glint46",
+      "username": "Glint-46",
       "isAI": true,
-      "username": "Glint-46"
+      "password": "ai_ai_glint46"
     },
     "ai_oblivion47": {
-      "password": "ai_ai_oblivion47",
+      "username": "Oblivion-47",
       "isAI": true,
-      "username": "Oblivion-47"
+      "password": "ai_ai_oblivion47"
     },
     "ai_ragnarok48": {
-      "password": "ai_ai_ragnarok48",
+      "username": "Ragnarok-48",
       "isAI": true,
-      "username": "Ragnarok-48"
+      "password": "ai_ai_ragnarok48"
     },
     "ai_desolator49": {
-      "password": "ai_ai_desolator49",
+      "username": "Desolator-49",
       "isAI": true,
-      "username": "Desolator-49"
+      "password": "ai_ai_desolator49"
     },
     "ai_inferno50": {
-      "password": "ai_ai_inferno50",
+      "username": "Inferno-50",
       "isAI": true,
-      "username": "Inferno-50"
+      "password": "ai_ai_inferno50"
     },
     "ai_tyrant51": {
-      "password": "ai_ai_tyrant51",
+      "username": "Tyrant-51",
       "isAI": true,
-      "username": "Tyrant-51"
+      "password": "ai_ai_tyrant51"
     },
     "ai_dreadnought52": {
-      "password": "ai_ai_dreadnought52",
+      "username": "Dreadnought-52",
       "isAI": true,
-      "username": "Dreadnought-52"
+      "password": "ai_ai_dreadnought52"
     },
     "ai_warlord53": {
-      "password": "ai_ai_warlord53",
+      "username": "Warlord-53",
       "isAI": true,
-      "username": "Warlord-53"
+      "password": "ai_ai_warlord53"
     },
     "ai_juggernaut54": {
-      "password": "ai_ai_juggernaut54",
+      "username": "Juggernaut-54",
       "isAI": true,
-      "username": "Juggernaut-54"
+      "password": "ai_ai_juggernaut54"
     },
     "ai_overlord55": {
-      "password": "ai_ai_overlord55",
+      "username": "Overlord-55",
       "isAI": true,
-      "username": "Overlord-55"
+      "password": "ai_ai_overlord55"
     },
     "ai_executioner56": {
-      "password": "ai_ai_executioner56",
+      "username": "Executioner-56",
       "isAI": true,
-      "username": "Executioner-56"
+      "password": "ai_ai_executioner56"
     },
     "ai_annihilator57": {
-      "password": "ai_ai_annihilator57",
+      "username": "Annihilator-57",
       "isAI": true,
-      "username": "Annihilator-57"
+      "password": "ai_ai_annihilator57"
     },
     "ai_colossus58": {
-      "password": "ai_ai_colossus58",
+      "username": "Colossus-58",
       "isAI": true,
-      "username": "Colossus-58"
+      "password": "ai_ai_colossus58"
     },
     "ai_spectre59": {
-      "password": "ai_ai_spectre59",
+      "username": "Spectre-59",
       "isAI": true,
-      "username": "Spectre-59"
+      "password": "ai_ai_spectre59"
     },
     "ai_revenant60": {
-      "password": "ai_ai_revenant60",
+      "username": "Revenant-60",
       "isAI": true,
-      "username": "Revenant-60"
+      "password": "ai_ai_revenant60"
     },
     "ai_enigma61": {
-      "password": "ai_ai_enigma61",
+      "username": "Enigma-61",
       "isAI": true,
-      "username": "Enigma-61"
+      "password": "ai_ai_enigma61"
     },
     "ai_phantomx": {
-      "password": "ai_ai_phantomx",
+      "username": "Phantom-X",
       "isAI": true,
-      "username": "Phantom-X"
+      "password": "ai_ai_phantomx"
     },
     "ai_oracle62": {
-      "password": "ai_ai_oracle62",
+      "username": "Oracle-62",
       "isAI": true,
-      "username": "Oracle-62"
+      "password": "ai_ai_oracle62"
     },
     "ai_wraithx": {
-      "password": "ai_ai_wraithx",
+      "username": "Wraith-X",
       "isAI": true,
-      "username": "Wraith-X"
+      "password": "ai_ai_wraithx"
     },
     "ai_eclipse63": {
-      "password": "ai_ai_eclipse63",
+      "username": "Eclipse-63",
       "isAI": true,
-      "username": "Eclipse-63"
+      "password": "ai_ai_eclipse63"
     },
     "ai_tempest64": {
-      "password": "ai_ai_tempest64",
+      "username": "Tempest-64",
       "isAI": true,
-      "username": "Tempest-64"
+      "password": "ai_ai_tempest64"
     },
     "ai_miragex": {
-      "password": "ai_ai_miragex",
+      "username": "Mirage-X",
       "isAI": true,
-      "username": "Mirage-X"
+      "password": "ai_ai_miragex"
     },
     "ai_blitzx": {
-      "password": "ai_ai_blitzx",
+      "username": "Blitz-X",
       "isAI": true,
-      "username": "Blitz-X"
+      "password": "ai_ai_blitzx"
     },
     "ai_strider65": {
-      "password": "ai_ai_strider65",
+      "username": "Strider-65",
       "isAI": true,
-      "username": "Strider-65"
+      "password": "ai_ai_strider65"
     },
     "ai_neon66": {
-      "password": "ai_ai_neon66",
+      "username": "Neon-66",
       "isAI": true,
-      "username": "Neon-66"
+      "password": "ai_ai_neon66"
     },
     "ai_quicksilver67": {
-      "password": "ai_ai_quicksilver67",
+      "username": "Quicksilver-67",
       "isAI": true,
-      "username": "Quicksilver-67"
+      "password": "ai_ai_quicksilver67"
     },
     "ai_boss": {
-      "password": "ai_ai_boss",
+      "username": "BOSS",
       "isAI": true,
-      "username": "BOSS"
+      "password": "ai_ai_boss"
     }
   }
 }

@@ -387,6 +387,7 @@ export class Game {
         this.player.displayName = this.activeProfile?.username || 'Operator';
         this.player.setSquad(`human-solo-${this.player.id}`, 0, 1);
         this.player.onDamageTaken = (entity, amount) => this._spawnFloatingDamageNumber(entity.x, entity.y, amount);
+        this.player._findSquadmateResolver = (self) => this._getSquadRoster(self);
 
         // Operator count per difficulty
         const raidCountByDifficulty = {
@@ -461,6 +462,7 @@ export class Game {
                 });
                 bot.onDamageTaken = (entity, amount) => this._spawnFloatingDamageNumber(entity.x, entity.y, amount);
                 bot.elo = rosterEntry?.stats?.elo || 1000;
+                bot._findSquadmateResolver = (self) => this._getSquadRoster(self);
                 bots.push(bot);
                 operatorIndex += 1;
             });
@@ -692,6 +694,11 @@ export class Game {
             }
         }
 
+        // Down / revive state: tick bleed-out + handle revive interactions before any
+        // death check so a downed operator who bleeds out falls through the normal
+        // death pipeline in this same tick.
+        this._updateDownStates(dt);
+
         // Check player death
         if (!this.player.alive) {
             if (!this._deathHandled) {
@@ -861,7 +868,7 @@ export class Game {
                 }
                 if (bulletRemoved) continue;
 
-                if (b.owner !== 'player' && this.player.alive && circleCollision(b.x, b.y, b.radius, this.player.x, this.player.y, this.player.radius)) {
+                if (b.owner !== 'player' && this.player.alive && !this.player.isDeadBody && circleCollision(b.x, b.y, b.radius, this.player.x, this.player.y, this.player.radius)) {
                     this.player.takeDamage(this._getAttenuatedDamage(b), b);
                     this._spawnParticles(b.x, b.y, COLORS.PLAYER, 5);
                     if (!this.player.alive && b.owner === 'bot' && b.ownerId) {
@@ -879,10 +886,12 @@ export class Game {
 
                 for (const bot of this.aiPlayers) {
                     if (!bot.alive) continue;
+                    if (bot.isDeadBody) continue; // dead_body operators don't block bullets
                     if (b.owner === 'bot' && b.ownerId === bot.id) continue;
                     if (b.ownerSquadId && b.ownerSquadId === bot.squadId) continue;
                     if (!circleCollision(b.x, b.y, b.radius, bot.x, bot.y, bot.radius)) continue;
-                    bot.takeDamage(b.instantKill ? bot.maxHp : this._getAttenuatedDamage(b), b);
+                    // instantKill ammo only one-shots AI enemies, not operators.
+                    bot.takeDamage(this._getAttenuatedDamage(b), b);
                     this._spawnParticles(b.x, b.y, COLORS.AI_PLAYER, 5);
                     this.audio.playHit();
                     if (!bot.alive) {
@@ -926,7 +935,7 @@ export class Game {
                     if (bulletRemoved) continue;
                 }
             } else {
-                if (this.player.alive && b.ownerSquadId !== this.player.squadId && circleCollision(b.x, b.y, b.radius, this.player.x, this.player.y, this.player.radius)) {
+                if (this.player.alive && !this.player.isDeadBody && b.ownerSquadId !== this.player.squadId && circleCollision(b.x, b.y, b.radius, this.player.x, this.player.y, this.player.radius)) {
                     this.player.takeDamage(this._getAttenuatedDamage(b), b);
                     this._spawnParticles(b.x, b.y, COLORS.PLAYER, 5);
                     if (!this.player.alive && b.owner === 'bot' && b.ownerId) {
@@ -944,6 +953,7 @@ export class Game {
 
                 for (const bot of this.aiPlayers) {
                     if (!bot.alive) continue;
+                    if (bot.isDeadBody) continue; // dead_body operators don't block bullets
                     if (!circleCollision(b.x, b.y, b.radius, bot.x, bot.y, bot.radius)) continue;
                     bot.takeDamage(this._getAttenuatedDamage(b), b);
                     this._spawnParticles(b.x, b.y, COLORS.AI_PLAYER, 5);
@@ -975,6 +985,192 @@ export class Game {
                 }
             }
         }
+    }
+
+    _getSquadRoster(self) {
+        if (!self || !self.squadId) return [];
+        const roster = [];
+        if (this.player && this.player.squadId === self.squadId) roster.push(this.player);
+        for (const bot of this.aiPlayers || []) {
+            if (bot && bot.squadId === self.squadId) roster.push(bot);
+        }
+        return roster;
+    }
+
+    _updateDownStates(dt) {
+        const operators = [this.player, ...(this.aiPlayers || [])].filter(Boolean);
+
+        // 1. Tick downHp drain (downed) and deadBody timer. Paused while being revived.
+        for (const op of operators) {
+            const beingRevived = op.reviveTimer > 0 && op.reviverId != null;
+            if (op.isDowned) {
+                // Force final death if no squadmate is alive to save us.
+                const squadmates = this._getSquadRoster(op).filter((m) => m !== op);
+                const hasLiveSaver = squadmates.some((m) => m.alive && !m.isDowned && !m.isDeadBody);
+                if (!hasLiveSaver) {
+                    op.finishFinalDeath();
+                    continue;
+                }
+                if (!beingRevived) {
+                    const drainPerSec = op.downHpMax / Math.max(1, op.downBleedoutSeconds);
+                    op.downHp = Math.max(0, op.downHp - drainPerSec * dt);
+                }
+                if (op.downHp <= 0) {
+                    if (op.hasBeenDeadBody) {
+                        // Already used up dead_body slot this raid → final death.
+                        op.finishFinalDeath();
+                    } else {
+                        this._enterDeadBodyForOperator(op);
+                    }
+                }
+            } else if (op.isDeadBody) {
+                const squadmates = this._getSquadRoster(op).filter((m) => m !== op);
+                const hasLiveSaver = squadmates.some((m) => m.alive && !m.isDowned && !m.isDeadBody);
+                if (!hasLiveSaver) {
+                    op.finishFinalDeath();
+                    continue;
+                }
+                if (!beingRevived) {
+                    op.deadBodyTimer += dt;
+                }
+                if (op.deadBodyTimer >= op.deadBodyMax) {
+                    op.finishFinalDeath();
+                }
+            }
+        }
+
+        // 2. Human player revives a nearby downed/dead_body squadmate by holding F.
+        if (this.player.alive && !this.player.isDowned && !this.player.isDeadBody) {
+            const holdingRevive = Boolean(this.input?.keys?.KeyF);
+            const squadmates = this._getSquadRoster(this.player).filter(
+                (m) => m !== this.player && (m.isDowned || m.isDeadBody)
+            );
+            let target = null;
+            let bestDist = Infinity;
+            for (const mate of squadmates) {
+                const d = Math.hypot(mate.x - this.player.x, mate.y - this.player.y);
+                if (d < 50 && d < bestDist) {
+                    bestDist = d;
+                    target = mate;
+                }
+            }
+            this._reviveHoverTarget = target;
+            if (target) {
+                const required = target.isDeadBody ? target.reviveRequiredDeadBody : target.reviveRequiredDown;
+                if (holdingRevive) {
+                    target.reviverId = this.player.id;
+                    target.reviveTimer = Math.min(required, target.reviveTimer + dt);
+                    if (target.reviveTimer >= required) {
+                        this._completeRevive(target);
+                    }
+                } else if (target.reviverId === this.player.id) {
+                    target.reviveTimer = Math.max(0, target.reviveTimer - dt * 2);
+                    if (target.reviveTimer <= 0) target.reviverId = null;
+                }
+            }
+        } else {
+            this._reviveHoverTarget = null;
+        }
+
+        // 3. AI bots auto-revive downed/dead_body squadmates when adjacent.
+        for (const bot of this.aiPlayers || []) {
+            if (!bot.alive || bot.isDowned || bot.isDeadBody) continue;
+            const target = bot.aiReviveTarget;
+            if (!target || (!target.isDowned && !target.isDeadBody)) continue;
+            const d = Math.hypot(target.x - bot.x, target.y - bot.y);
+            const required = target.isDeadBody ? target.reviveRequiredDeadBody : target.reviveRequiredDown;
+            if (d < 50) {
+                target.reviverId = bot.id;
+                target.reviveTimer = Math.min(required, target.reviveTimer + dt);
+                if (target.reviveTimer >= required) {
+                    this._completeRevive(target);
+                }
+            } else if (target.reviverId === bot.id) {
+                target.reviveTimer = Math.max(0, target.reviveTimer - dt * 2);
+                if (target.reviveTimer <= 0) target.reviverId = null;
+            }
+        }
+
+        // 4. Defensive: clear stale reviverId if reviver died / left the squad.
+        for (const op of operators) {
+            if ((!op.isDowned && !op.isDeadBody) || !op.reviverId) continue;
+            const reviver = operators.find((o) => o.id === op.reviverId);
+            if (!reviver || !reviver.alive || reviver.isDowned || reviver.isDeadBody) {
+                op.reviveTimer = Math.max(0, op.reviveTimer - dt * 2);
+                if (op.reviveTimer <= 0) op.reviverId = null;
+            }
+        }
+    }
+
+    _enterDeadBodyForOperator(op) {
+        // Build the partial-loss loot crate per the death-loss rule.
+        const fakeProfile = { loadout: op.loadout || {} };
+        const lossDefinitionIds = calculateDeathLosses(fakeProfile, this.activeDifficulty);
+        const lostLoadoutItems = lossDefinitionIds
+            .map((definitionId) => createLootItem(definitionId))
+            .filter(Boolean);
+        const droppedItems = [
+            ...lostLoadoutItems,
+            // Backpack inventory is always lost on death — surface it on the corpse.
+            ...op.inventoryItems.map((item) => ({ ...item })),
+        ];
+        // Remove these items from the operator so revive doesn't double-grant them.
+        op.inventoryItems = [];
+        for (const definitionId of lossDefinitionIds) {
+            for (const slot of Object.keys(op.loadout || {})) {
+                if (op.loadout[slot] === definitionId) {
+                    op.loadout[slot] = null;
+                    break;
+                }
+            }
+        }
+
+        op.enterDeadBodyState();
+
+        // Don't spawn an empty corpse-crate (e.g. easy difficulty + empty backpack).
+        // The operator still enters the dead_body state; if they bleed out fully,
+        // _handleAiPlayerDeath will produce the final operator-cache crate from
+        // whatever's left on them.
+        if (droppedItems.length === 0) {
+            op._corpseCrateId = null;
+            return;
+        }
+
+        const crate = {
+            id: generateId(),
+            x: op.x,
+            y: op.y,
+            w: CRATE_WIDTH,
+            h: CRATE_HEIGHT,
+            opened: false,
+            inspected: true,
+            tier: 'corpse',
+            tierLabel: 'Downed Operator',
+            tierColor: '#ff5252',
+            items: droppedItems,
+            ownerOperatorId: op.id,
+            isCorpseCrate: true,
+        };
+        this.mapData.lootCrates.push(crate);
+        op._corpseCrateId = crate.id;
+    }
+
+    _completeRevive(op) {
+        // Remove the corpse-crate (whatever items remain go back to the operator's
+        // inventory, capped by carry capacity).
+        if (op._corpseCrateId) {
+            const crateIndex = this.mapData.lootCrates.findIndex((c) => c.id === op._corpseCrateId);
+            if (crateIndex >= 0) {
+                const crate = this.mapData.lootCrates[crateIndex];
+                for (const item of crate.items || []) {
+                    if (op.getRemainingCarrySpace && op.getRemainingCarrySpace() <= 0) break;
+                    op.inventoryItems.push(item);
+                }
+                this.mapData.lootCrates.splice(crateIndex, 1);
+            }
+            op._corpseCrateId = null;
+        }
+        op.applyRevive();
     }
 
     _handleAiPlayerDeaths() {
@@ -1041,20 +1237,35 @@ export class Game {
         bot.safeboxItems = [];
 
         if (droppedItems.length) {
-            this.mapData.lootCrates.push({
-                id: generateId(),
-                x: bot.x,
-                y: bot.y,
-                w: CRATE_WIDTH,
-                h: CRATE_HEIGHT,
-                opened: false,
-                inspected: true,
-                tier: 'operator',
-                tierLabel: 'Operator Cache',
-                tierColor: COLORS.AI_PLAYER,
-                items: droppedItems,
-            });
+            // If a corpse-crate from the dead_body state is still on the map,
+            // merge the final-death drops into it so we don't end up with two
+            // crates stacked at the same spot.
+            const existingCorpseCrate = bot._corpseCrateId
+                ? this.mapData.lootCrates.find((c) => c.id === bot._corpseCrateId)
+                : null;
+            if (existingCorpseCrate) {
+                existingCorpseCrate.items.push(...droppedItems);
+                existingCorpseCrate.tier = 'operator';
+                existingCorpseCrate.tierLabel = 'Operator Cache';
+                existingCorpseCrate.tierColor = COLORS.AI_PLAYER;
+                existingCorpseCrate.isCorpseCrate = false;
+            } else {
+                this.mapData.lootCrates.push({
+                    id: generateId(),
+                    x: bot.x,
+                    y: bot.y,
+                    w: CRATE_WIDTH,
+                    h: CRATE_HEIGHT,
+                    opened: false,
+                    inspected: true,
+                    tier: 'operator',
+                    tierLabel: 'Operator Cache',
+                    tierColor: COLORS.AI_PLAYER,
+                    items: droppedItems,
+                });
+            }
         }
+        bot._corpseCrateId = null;
 
         this._spawnParticles(bot.x, bot.y, COLORS.AI_PLAYER, 12);
     }
@@ -1711,6 +1922,29 @@ export class Game {
         this._renderFloatingDamageNumbers();
         r.drawCrosshair(this.input.mouse.x, this.input.mouse.y);
         r.drawHUD(this.player, this.gameTime, this.extracting, this.extractTimer, this.nearbyCrateId ? 'F · Open Crate' : '', this.crateMessage, this.killFeed, this.killBanner);
+
+        // Revive prompt when hovering a downed/dead-body squadmate
+        if (this._reviveHoverTarget && this.player.alive && !this.player.isDowned && !this.player.isDeadBody) {
+            const ctx = this.ctx;
+            const target = this._reviveHoverTarget;
+            const required = target.isDeadBody ? target.reviveRequiredDeadBody : target.reviveRequiredDown;
+            const revFrac = Math.max(0, Math.min(1, (target.reviveTimer || 0) / (required || 4)));
+            const label = target.isDeadBody ? 'HOLD F TO REVIVE (DEAD BODY)' : 'HOLD F TO REVIVE';
+            const barColor = target.isDeadBody ? '#ffeb3b' : '#4caf50';
+            ctx.save();
+            ctx.fillStyle = '#000';
+            ctx.globalAlpha = 0.65;
+            ctx.fillRect(this.canvas.width / 2 - 150, this.canvas.height - 120, 300, 44);
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = barColor;
+            ctx.fillRect(this.canvas.width / 2 - 150, this.canvas.height - 120, 300 * revFrac, 44);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 14px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(label, this.canvas.width / 2, this.canvas.height - 92);
+            ctx.textAlign = 'left';
+            ctx.restore();
+        }
 
         // Extraction gate indicator for chaos mode
         if (!this.extractionGateOpen) {

@@ -415,7 +415,7 @@ Guard functions:
 ### Shooting & Bullet Behavior
 - Each shot shifts one round from `loadedAmmoQueue`.
 - The bullet inherits the round's `damageMultiplier`, `instantKill` flag, and rarity **color**.
-- `game.js` applies instant-kill logic: if `b.instantKill` is true, the bullet deals `e.maxHp` damage, killing any enemy in one hit.
+- `game.js` applies instant-kill logic: if `b.instantKill` is true, the bullet deals `e.maxHp` damage, killing any **AI enemy** (drones, sentinels, turrets) in one hit. Against operators (player or bots), instant-kill ammo deals only its normal damage and interacts with shields like any other round.
 - Bullets are rendered on canvas in the color of their ammo rarity via `b.color` in `renderer.js`.
 - `.338 AP` additionally uses a custom premium projectile style with longer visuals and one-tile wall penetration.
 

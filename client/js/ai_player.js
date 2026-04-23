@@ -167,10 +167,11 @@ const AI_LEVEL_CONFIG = {
         aggroRange: [600, 1000],
         wanderRadius: [100, 300],
         preferredRange: [0.4, 0.65],
-        movementNoise: 0.08,
+        movementNoise: 0.45,
+        awkwardOffsetMagnitude: 0.55,
         hesitationChance: 0,
         dashChance: 0.25,
-        combatConfidence: 1.5,
+        combatConfidence: 1.28,
         disengageBias: 0.6,
         ammoReserve: [300, 300],
         consumableAmount: [300, 300],
@@ -448,6 +449,26 @@ export class AIPlayer extends Player {
             return;
         }
 
+        // Downed / dead-body bots don't make combat decisions.
+        if (this.isDowned || this.isDeadBody) {
+            this.damageFlash = Math.max(0, this.damageFlash - dt);
+            this.invincible = Math.max(0, this.invincible - dt);
+            this.aiTarget = null;
+            this.aiSeekingCover = false;
+            this.vx = 0;
+            this.vy = 0;
+            return;
+        }
+
+        // If a squadmate is downed or dead_body and it's safe-ish, divert to revive them.
+        this.aiReviveTarget = this._pickReviveTarget(context);
+        if (this.aiReviveTarget) {
+            // Path toward the downed squadmate; skip normal combat picking this tick.
+            const destination = { x: this.aiReviveTarget.x, y: this.aiReviveTarget.y };
+            this._setDestinationWithPath(destination, context);
+            this.aiTarget = null;
+        }
+
         this.aiDecisionTimer -= dt;
         this.aiLootTimer -= dt;
         this.aiSwitchTimer -= dt;
@@ -461,14 +482,15 @@ export class AIPlayer extends Player {
         }
 
         if (this.aiPathOffsetTimer <= 0) {
-            const magnitude = (this.aiLevel === 'lv3' || this.aiLevel === 'lv4')
+            const useAwkward = this.aiLevel === 'lv3' || this.aiLevel === 'lv4' || this.aiLevelConfig.isBoss;
+            const magnitude = useAwkward
                 ? (this.aiLevelConfig.awkwardOffsetMagnitude || 0.28)
                 : this.aiLevelConfig.movementNoise;
             this.aiPathOffset = {
                 x: randFloat(-magnitude, magnitude),
                 y: randFloat(-magnitude, magnitude),
             };
-            this.aiPathOffsetTimer = randFloat(0.25, (this.aiLevel === 'lv3' || this.aiLevel === 'lv4') ? 0.7 : 0.9);
+            this.aiPathOffsetTimer = randFloat(0.18, this.aiLevelConfig.isBoss ? 0.45 : ((this.aiLevel === 'lv3' || this.aiLevel === 'lv4') ? 0.7 : 0.9));
         }
 
         const movedDistance = dist(this.x, this.y, this.aiLastPosition.x, this.aiLastPosition.y);
@@ -570,6 +592,32 @@ export class AIPlayer extends Player {
         return (context.aiPlayers || []).filter((bot) => bot.id !== this.id && bot.squadId === this.squadId);
     }
 
+    _pickReviveTarget(context) {
+        // Find a downed or dead_body squadmate within a reasonable distance with no nearby immediate threat.
+        if (!this.squadSize || this.squadSize < 2) return null;
+        const mates = this._getSquadmates(context);
+        if (!mates.length) return null;
+        const all = [...mates, context.player].filter(
+            (entity) => entity && entity.squadId === this.squadId && entity !== this && (entity.isDowned || entity.isDeadBody)
+        );
+        if (!all.length) return null;
+        let closest = null;
+        let closestDist = Infinity;
+        for (const mate of all) {
+            const d = dist(this.x, this.y, mate.x, mate.y);
+            if (d > 900) continue;
+            if (d < closestDist) {
+                closestDist = d;
+                closest = mate;
+            }
+        }
+        if (!closest) return null;
+        const threats = [context.player, ...(context.aiPlayers || []).filter((b) => b.id !== this.id), ...(context.enemies || [])];
+        const tooHot = threats.some((e) => e && e.alive && !e.isDowned && !e.isDeadBody && !this.isFriendlyWith(e) && dist(closest.x, closest.y, e.x, e.y) < 180);
+        if (tooHot) return null;
+        return closest;
+    }
+
     _getSquadLeader(context) {
         return [this, ...this._getSquadmates(context)].reduce((leader, member) => {
             if (!leader) return member;
@@ -605,6 +653,7 @@ export class AIPlayer extends Player {
                 const candidate = list[ci];
                 if (si === 1 && candidate.id === this.id) continue;
             if (!candidate?.alive) continue;
+            if (candidate.isDeadBody) continue;
             if (candidate.isBot && this.isFriendlyWith(candidate)) continue;
             const isOperator = candidate === context.player || candidate.isBot;
             const distanceToTarget = dist(this.x, this.y, candidate.x, candidate.y);
@@ -751,10 +800,11 @@ export class AIPlayer extends Player {
             input.aimWorld.y = predictedY + randFloat(-aimNoise, aimNoise);
             const desiredRange = Math.max(110, Math.min(320, (this.bulletRange || 280) * this.aiPreferredRangeMultiplier));
             const healthRatio = this.hp / Math.max(1, this.maxHp);
-            const shouldDisengage = isOperatorTarget && (
+            const bossBackoff = this.aiLevelConfig.isBoss && (this.isReloading || this.isHealing);
+            const shouldDisengage = bossBackoff || (isOperatorTarget && (
                 (this.aiType === 'runner' && (targetDistance < desiredRange * 1.4 || healthRatio < 0.88))
                 || (this.aiType === 'searcher' && healthRatio < 0.42)
-            );
+            ));
 
             let moveX = 0;
             let moveY = 0;

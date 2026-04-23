@@ -271,6 +271,12 @@ export class Renderer {
         const sx = player.x - cam.x;
         const sy = player.y - cam.y;
 
+        // Downed/dead-body: render simplified visual.
+        if (player.isDowned || player.isDeadBody) {
+            this._drawDownedOperator(player, sx, sy, /* isSelf */ true);
+            return;
+        }
+
         if (player.isHealing) {
             this.drawHealingEffect(sx, sy, player.radius);
         }
@@ -469,6 +475,11 @@ export class Renderer {
                 ctx.globalAlpha = Math.max(0, 1 - bot.deathTimer * 1.6);
             }
 
+            if (bot.isDowned || bot.isDeadBody) {
+                this._drawDownedOperator(bot, sx, sy, /* isSelf */ false);
+                continue;
+            }
+
             this._drawOperatorBackpack(bot, sx, sy);
 
             ctx.fillStyle = bot.damageFlash > 0 ? '#bbdefb' : COLORS.AI_PLAYER;
@@ -549,6 +560,95 @@ export class Renderer {
             ctx.fillText('+', px, py);
         }
 
+        ctx.restore();
+    }
+
+    _drawDownedOperator(operator, sx, sy, isSelf = false) {
+        const { ctx } = this;
+        ctx.save();
+
+        if (operator.isDeadBody) {
+            // Dead body: dark cross/X-shape body, very dim, with a white skull-ish dot.
+            ctx.globalAlpha = 0.7;
+            ctx.fillStyle = '#1a1010';
+            ctx.strokeStyle = '#5a1a1a';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(sx, sy, operator.radius * 1.05, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            // Skull X
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(sx - 4, sy - 4); ctx.lineTo(sx + 4, sy + 4);
+            ctx.moveTo(sx + 4, sy - 4); ctx.lineTo(sx - 4, sy + 4);
+            ctx.stroke();
+
+            // Dead-body timer ring (dim grey draining)
+            const dbFrac = Math.max(0, Math.min(1, 1 - (operator.deadBodyTimer || 0) / (operator.deadBodyMax || 150)));
+            ctx.globalAlpha = 0.85;
+            ctx.strokeStyle = '#9e9e9e';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(sx, sy, operator.radius + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * dbFrac);
+            ctx.stroke();
+
+            // Revive arc (longer revive — different color cue)
+            if (operator.reviveTimer > 0) {
+                const revFrac = Math.max(0, Math.min(1, operator.reviveTimer / (operator.reviveRequiredDeadBody || 8)));
+                ctx.strokeStyle = '#ffeb3b';
+                ctx.lineWidth = 3.5;
+                ctx.beginPath();
+                ctx.arc(sx, sy, operator.radius + 10, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * revFrac);
+                ctx.stroke();
+            }
+
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = '#bdbdbd';
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('DEAD BODY', sx, sy - operator.radius - 14);
+            ctx.textAlign = 'left';
+            ctx.restore();
+            return;
+        }
+
+        // Downed
+        ctx.fillStyle = '#3d2727';
+        ctx.strokeStyle = '#ff3b3b';
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.85;
+        ctx.beginPath();
+        ctx.arc(sx, sy, operator.radius * 0.9, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Down-HP ring (drains as the operator bleeds out / takes damage)
+        const dhpFrac = Math.max(0, Math.min(1, (operator.downHp || 0) / (operator.downHpMax || 100)));
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = '#ff1744';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(sx, sy, operator.radius + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * dhpFrac);
+        ctx.stroke();
+
+        // Revive arc (downed = green, faster revive)
+        if (operator.reviveTimer > 0) {
+            const revFrac = Math.max(0, Math.min(1, operator.reviveTimer / (operator.reviveRequiredDown || 4)));
+            ctx.strokeStyle = '#4caf50';
+            ctx.lineWidth = 3.5;
+            ctx.beginPath();
+            ctx.arc(sx, sy, operator.radius + 10, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * revFrac);
+            ctx.stroke();
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#ff5252';
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('DOWN', sx, sy - operator.radius - 14);
+        ctx.textAlign = 'left';
         ctx.restore();
     }
 
@@ -676,6 +776,10 @@ export class Renderer {
             ctx.arc(sx, sy, b.radius, 0, Math.PI * 2);
             ctx.fill();
             ctx.shadowBlur = 0;
+            // Slim black frame
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
 
             // Trail
             const trail = 0.4 + (b.life / b.maxLife) * 0.6;
@@ -1067,6 +1171,23 @@ export class Renderer {
             ctx.moveTo(mx + xSize, my - xSize);
             ctx.lineTo(mx - xSize, my + xSize);
             ctx.stroke();
+        }
+
+        // Boss marker (red "?")
+        if (aiPlayers && aiPlayers.length) {
+            const bossFontSize = Math.round(13 * scaleMultiplier);
+            ctx.font = `bold ${bossFontSize}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            for (const bot of aiPlayers) {
+                if (!bot || !bot.alive || bot.aiLevel !== 'boss') continue;
+                const bx = mmX + bot.x * scaleX;
+                const by = mmY + bot.y * scaleY;
+                ctx.fillStyle = 'rgba(0,0,0,0.55)';
+                ctx.fillText('?', bx + 1, by + 1);
+                ctx.fillStyle = '#ff1e1e';
+                ctx.fillText('?', bx, by);
+            }
         }
 
         // Player
